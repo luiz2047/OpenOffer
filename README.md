@@ -1,5 +1,4 @@
 <div align="center">
-  <img src="assets/icon.png" width="140" alt="OpenOffer logo">
 
 # OpenOffer
 
