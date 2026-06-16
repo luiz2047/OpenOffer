@@ -1,0 +1,773 @@
+import React, { useState, useEffect, useCallback } from "react" // forcing refresh
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import { ToastProvider, ToastViewport } from "./components/ui/toast"
+import NativelyInterface from "./components/NativelyInterface"
+import SettingsPopup from "./components/SettingsPopup" // Keeping for legacy/specific window support if needed
+import Launcher from "./components/Launcher"
+import ModelSelectorWindow from "./components/ModelSelectorWindow"
+import SettingsOverlay from "./components/SettingsOverlay"
+import StartupSequence from "./components/StartupSequence"
+import { AnimatePresence, motion } from "framer-motion"
+import UpdateBanner from "./components/UpdateBanner"
+import { SupportToaster } from "./components/SupportToaster"
+import { PermissionsToaster }   from "./components/onboarding/PermissionsToaster"
+import { AlertCircle, RefreshCw } from "lucide-react"
+import { clampOverlayOpacity, OVERLAY_OPACITY_DEFAULT, getDefaultOverlayOpacity } from "./lib/overlayAppearance"
+import { getMeetingInterfaceTheme, type MeetingInterfaceTheme } from './lib/meetingInterfaceTheme'
+import { isMac } from "./utils/platformUtils"
+import { trackAppOpen, markToasterAsShown } from "./lib/toasterGating"
+import {
+  JDAwarenessToaster,
+  ProfileFeatureToaster,
+  RemoteCampaignToaster,
+  useAdCampaigns
+} from './premium'
+import { analytics } from "./lib/analytics/analytics.service"
+import { ErrorBoundary } from "./components/ErrorBoundary"
+import ModesSettings from "./components/settings/ModesSettings"
+import { ProfileIntelligenceSettings } from "./components/ProfileIntelligenceSettings"
+
+const queryClient = new QueryClient()
+
+const App: React.FC = () => {
+  const isSettingsWindow = new URLSearchParams(window.location.search).get('window') === 'settings';
+  const isLauncherWindow = new URLSearchParams(window.location.search).get('window') === 'launcher';
+  const isOverlayWindow = new URLSearchParams(window.location.search).get('window') === 'overlay';
+  const isModelSelectorWindow = new URLSearchParams(window.location.search).get('window') === 'model-selector';
+  const isCropperWindow = new URLSearchParams(window.location.search).get('window') === 'cropper';
+
+  // Default to launcher if not specified (dev mode safety)
+  const isDefault = !isSettingsWindow && !isOverlayWindow && !isModelSelectorWindow && !isCropperWindow;
+
+  if (isCropperWindow) {
+    const Cropper = React.lazy(() => import('./components/Cropper'));
+    return (
+      <React.Suspense fallback={<div className="w-screen h-screen bg-transparent" />}>
+        <Cropper />
+      </React.Suspense>
+    );
+  }
+
+  // Initialize Analytics
+  useEffect(() => {
+    // Only init if we are in a main window context to avoid duplicate events from helper windows
+    // Actually, we probably want to track app open from the main entry point.
+    // Let's protect initialization to ensure single run per window.
+    // The service handles single-init, but let's be thoughtful about WHICH window tracks "App Open".
+    // Launcher is the main entry. Overlay is the "Assistant".
+
+    analytics.initAnalytics();
+
+    if (isLauncherWindow || isDefault) {
+      analytics.trackAppOpen();
+    }
+
+    if (isOverlayWindow) {
+      analytics.trackAssistantStart();
+    }
+
+    // Cleanup / Session End
+    const handleUnload = () => {
+      if (isOverlayWindow) {
+        analytics.trackAssistantStop();
+      }
+      if (isLauncherWindow || isDefault) {
+        analytics.trackAppClose();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+    };
+  }, [isLauncherWindow, isOverlayWindow, isDefault]);
+
+  // State
+  const [showStartup, setShowStartup] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<string>('general');
+  const [isModesOpen, setIsModesOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const openSettingsExclusive = useCallback((tab: string = 'general') => {
+    setIsModesOpen(false);
+    setIsProfileOpen(false);
+    setSettingsInitialTab(tab);
+    setIsSettingsOpen(true);
+  }, []);
+  const openProfileExclusive = useCallback(() => {
+    setIsModesOpen(false);
+    setIsSettingsOpen(false);
+    setIsProfileOpen(true);
+  }, []);
+  const openModesExclusive = useCallback(() => {
+    setIsProfileOpen(false);
+    setIsSettingsOpen(false);
+    setIsModesOpen(true);
+  }, []);
+  // Overlay opacity — only meaningful when isOverlayWindow, but stored centrally
+  // so it can be initialized once from localStorage and updated via IPC.
+  const [overlayOpacity, setOverlayOpacity] = useState<number>(() => {
+    const stored = localStorage.getItem('natively_overlay_opacity');
+    const parsed = stored ? parseFloat(stored) : NaN;
+    // Treat missing value or the old default (0.65) as "not user-set"
+    const isUserSet = Number.isFinite(parsed) && parsed !== OVERLAY_OPACITY_DEFAULT;
+    return isUserSet ? clampOverlayOpacity(parsed) : getDefaultOverlayOpacity();
+  });
+
+  const [meetingInterfaceTheme, setMeetingInterfaceThemeState] = useState<MeetingInterfaceTheme>(getMeetingInterfaceTheme);
+
+  // Profile state for ad targeting
+  const [hasProfile, setHasProfile] = useState(false);
+  const [isLauncherMainView, setIsLauncherMainView] = useState(true);
+
+  // Initialize Ads Campaign Manager
+  const [appStartTime] = useState<number>(Date.now());
+  const [lastMeetingEndTime, setLastMeetingEndTime] = useState<number | null>(null);
+  const [isProcessingMeeting, setIsProcessingMeeting] = useState<boolean>(false);
+  
+  // Ollama Auto-Pull State
+  const [ollamaPullStatus, setOllamaPullStatus] = useState<'idle' | 'downloading' | 'complete' | 'failed'>('idle');
+  const [ollamaPullPercent, setOllamaPullPercent] = useState<number>(0);
+  const [ollamaPullMessage, setOllamaPullMessage] = useState<string>('');
+
+  // Re-index State
+  const [incompatibleWarning, setIncompatibleWarning] = useState<{count: number; oldProvider: string; newProvider: string} | null>(null);
+  // Automatic background re-index progress (fired after an embedding-model upgrade).
+  const [reindexProgress, setReindexProgress] = useState<{done: number; total: number} | null>(null);
+  
+  // API check
+  // ── Onboarding / promo toasters ───────────────────────────
+  const [showPermissionsToaster, setShowPermissionsToaster] = useState(false);
+
+  const isAppReady = !isSettingsWindow && !isOverlayWindow && !isModelSelectorWindow && !showStartup && !isSettingsOpen && isLauncherMainView && !isProfileOpen;
+  const { activeAd, dismissAd } = useAdCampaigns(
+    { isPremium: false },
+    hasProfile,
+    isAppReady,
+    appStartTime,
+    lastMeetingEndTime,
+    isProcessingMeeting,
+    false
+  );
+
+
+
+  useEffect(() => {
+    // Track app opens for global gating
+    trackAppOpen();
+
+    // Clean up old local storage
+    localStorage.removeItem('useLegacyAudioBackend');
+
+    const fallbackLocal = () => {
+      // The classic launch animation is intentionally shown on every launcher
+      // startup, matching the older app behavior from 93ee4a21.
+    };
+
+    if (window.electronAPI?.onboardingGetFlags) {
+      window.electronAPI.onboardingGetFlags()
+        .then((flags) => {
+          if (flags) {
+            // 1. seenStartup intentionally no longer suppresses the classic
+            // black-logo launch animation; the old app played it every launch.
+
+            // 2. seenModesOnboarding
+            if (flags.seenModesOnboarding) {
+              try { localStorage.setItem('natively_seen_modes_onboarding_v5', 'true'); } catch {}
+            } else {
+              try {
+                const localSeen = localStorage.getItem('natively_seen_modes_onboarding_v5') === 'true';
+                if (localSeen) {
+                  window.electronAPI?.onboardingSetFlag?.('seenModesOnboarding', true).catch(() => {});
+                }
+              } catch {}
+            }
+
+            // 3. seenProfileOnboarding
+            if (flags.seenProfileOnboarding) {
+              try { localStorage.setItem('natively_seen_profile_onboarding_v1', 'true'); } catch {}
+            } else {
+              try {
+                const localSeen = localStorage.getItem('natively_seen_profile_onboarding_v1') === 'true';
+                if (localSeen) {
+                  window.electronAPI?.onboardingSetFlag?.('seenProfileOnboarding', true).catch(() => {});
+                }
+              } catch {}
+            }
+
+            // 4. permsShown
+            if (flags.permsShown) {
+              try { localStorage.setItem('natively_perms_shown_v1', '1'); } catch {}
+            } else {
+              try {
+                const localSeen = localStorage.getItem('natively_perms_shown_v1') === '1';
+                if (localSeen) {
+                  window.electronAPI?.onboardingSetFlag?.('permsShown', true).catch(() => {});
+                }
+              } catch {}
+            }
+          } else {
+            fallbackLocal();
+          }
+        })
+        .catch(() => {
+          fallbackLocal();
+        });
+    } else {
+      fallbackLocal();
+    }
+
+    // Basic status check for campaign targeting
+    window.electronAPI?.profileGetStatus?.().then(s => setHasProfile(s?.hasProfile || false)).catch(() => {});
+
+    // ── Onboarding toasters ──────────────────────────────────
+    if (isLauncherWindow || isDefault) {
+      const permsShown = localStorage.getItem('natively_perms_shown_v1');
+      if (!permsShown) {
+        // First ever launch — show permissions toaster
+        setShowPermissionsToaster(true);
+      } else {
+        // Returning launch: re-check live TCC status. A macOS permission grant
+        // can be DROPPED out from under a returning user — most commonly after
+        // an app update changes the code signature (macOS may re-evaluate /
+        // invalidate the Screen Recording or Microphone grant for the new
+        // binary), or if the user revoked it in System Settings. In that state
+        // askForMediaAccess() returns denied WITHOUT a prompt (macOS only
+        // prompts from 'not-determined'), so the app would silently fail to
+        // capture with nothing on screen. Surface the recoverable permissions
+        // card (it deep-links to the exact System Settings pane) instead of the
+        // trial promo when mic/screen is denied or restricted. The main process
+        // also broadcasts a denied banner at startup, but that targets the
+        // in-overlay meeting surface — at launch the user is on the launcher,
+        // so this launcher-side check is what they actually see.
+        const maybeSurfacePermissions = window.electronAPI?.checkPermissions;
+        if (maybeSurfacePermissions) {
+          maybeSurfacePermissions()
+            .then((p) => {
+              const blocked = (s?: string) => s === 'denied' || s === 'restricted';
+              if (p?.platform === 'darwin' && (blocked(p.microphone) || blocked(p.screen))) {
+                setShowPermissionsToaster(true);
+              }
+            })
+            .catch(() => {});
+        } else {
+          // Non-macOS or API unavailable.
+        }
+      }
+    }
+
+    // Listen for open-settings-tab events from other windows (e.g. overlay Modes button)
+    const removeOpenSettingsTab = window.electronAPI?.onOpenSettingsTab?.((tab: string) => {
+      openSettingsExclusive(tab);
+    });
+
+    // Listen for meeting processing completion to trigger post-meeting ads
+    const removeMeetingsListener = window.electronAPI?.onMeetingsUpdated?.(() => {
+      console.log("[App.tsx] Meetings updated (processing finished), starting ad delay timer");
+      setIsProcessingMeeting(false);
+      setLastMeetingEndTime(Date.now());
+    });
+
+    // Listen for Ollama Auto-Pull Progress
+    let removeProgress: (() => void) | undefined;
+    let removeComplete: (() => void) | undefined;
+    if (window.electronAPI?.onOllamaPullProgress && window.electronAPI?.onOllamaPullComplete) {
+      removeProgress = window.electronAPI.onOllamaPullProgress((data) => {
+        setOllamaPullStatus('downloading');
+        setOllamaPullPercent(data.percent || 0);
+        setOllamaPullMessage(data.status || 'Downloading...');
+      });
+
+      removeComplete = window.electronAPI.onOllamaPullComplete(() => {
+        setOllamaPullStatus('complete');
+        setOllamaPullMessage('Local AI memory ready');
+        setOllamaPullPercent(100);
+        setTimeout(() => setOllamaPullStatus('idle'), 3000);
+      });
+    }
+
+    let removeWarning: (() => void) | undefined;
+    if (window.electronAPI?.onIncompatibleProviderWarning) {
+      removeWarning = window.electronAPI.onIncompatibleProviderWarning((data) => {
+        setIncompatibleWarning(data);
+      });
+    }
+
+    let removeReindexProgress: (() => void) | undefined;
+    if (window.electronAPI?.onReindexProgress) {
+      removeReindexProgress = window.electronAPI.onReindexProgress((phase, data) => {
+        if (phase === 'started') {
+          setReindexProgress({ done: 0, total: data.count ?? 0 });
+        } else if (phase === 'progress') {
+          setReindexProgress({ done: data.done ?? 0, total: data.total ?? 0 });
+        } else if (phase === 'complete') {
+          // On a full completion show 100%; on a partial bail (paused by continuous
+          // live meetings — resumes next launch) reflect the actual done count rather
+          // than forcing 100%. Either way, briefly show then dismiss.
+          const total = data.total ?? 0;
+          const done = data.partial ? (data.done ?? 0) : total;
+          setReindexProgress({ done, total });
+          setTimeout(() => setReindexProgress(null), 4000);
+        }
+      });
+    }
+
+    return () => {
+      if (removeMeetingsListener) removeMeetingsListener();
+      if (removeProgress) removeProgress();
+      if (removeComplete) removeComplete();
+      if (removeWarning) removeWarning();
+      if (removeReindexProgress) removeReindexProgress();
+      if (removeOpenSettingsTab) removeOpenSettingsTab();
+    }
+  }, []);
+
+  // Listen for overlay opacity changes — scoped to overlay window only
+  useEffect(() => {
+    if (!isOverlayWindow) return;
+    const removeOpacityListener = window.electronAPI?.onOverlayOpacityChanged?.((opacity) => {
+      setOverlayOpacity(opacity);
+    });
+    return () => {
+      if (removeOpacityListener) removeOpacityListener();
+    };
+  }, [isOverlayWindow]);
+
+  // When the theme switches and no user preference is stored, reset to theme-aware default
+  useEffect(() => {
+    if (!isOverlayWindow || !window.electronAPI?.onThemeChanged) return;
+    return window.electronAPI.onThemeChanged(() => {
+      const stored = localStorage.getItem('natively_overlay_opacity');
+      if (!stored) {
+        setOverlayOpacity(getDefaultOverlayOpacity());
+      }
+    });
+  }, [isOverlayWindow]);
+
+  useEffect(() => {
+    // Two propagation channels:
+    //  1. `storage` event — fires within the same window when our own
+    //     setMeetingInterfaceTheme() dispatches it (covers settings-pane → App
+    //     state in the launcher).
+    //  2. IPC `interface-theme:changed` broadcast — main relays the new theme
+    //     to EVERY BrowserWindow, including the overlay. Without this the
+    //     overlay holds a stale theme value across hide/show cycles, which
+    //     yielded the half-painted UI on next meeting start.
+    const handleStorage = () => setMeetingInterfaceThemeState(getMeetingInterfaceTheme());
+    window.addEventListener('storage', handleStorage);
+    const unsubscribeIpc = window.electronAPI?.onMeetingInterfaceThemeChanged?.((theme) => {
+      const valid: MeetingInterfaceTheme[] = ['default', 'liquid-glass', 'modern'];
+      if (valid.includes(theme as MeetingInterfaceTheme)) {
+        setMeetingInterfaceThemeState(theme as MeetingInterfaceTheme);
+      }
+    });
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      unsubscribeIpc?.();
+    };
+  }, []);
+
+
+  // Handlers
+  const handleReindex = async () => {
+    if (window.electronAPI?.reindexIncompatibleMeetings) {
+      setIncompatibleWarning(null);
+      await window.electronAPI.reindexIncompatibleMeetings();
+    }
+  };
+
+  const handleStartMeeting = async () => {
+    try {
+      localStorage.setItem('natively_last_meeting_start', Date.now().toString());
+      const inputDeviceId = localStorage.getItem('preferredInputDeviceId');
+      let outputDeviceId = localStorage.getItem('preferredOutputDeviceId');
+      // SCK is a macOS-only backend (ScreenCaptureKit + CoreAudio Process Tap
+      // live in the Rust speaker module under #[cfg(target_os = "macos")]).
+      // F-003 hid the toggle UI on Windows, but the localStorage key can be
+      // present on a Windows machine via cross-OS sync or restored backup —
+      // routing "sck" as an outputDeviceId then hands the Windows speaker
+      // module an unknown WASAPI device id and silently breaks system audio.
+      // Defense-in-depth: also require isMac at the consumer.
+      const useExperimentalSck = isMac && localStorage.getItem('useExperimentalSckBackend') === 'true';
+
+      // Override output device ID to force SCK if experimental mode is enabled
+      // Default to CoreAudio unless experimental is enabled
+      if (useExperimentalSck) {
+        console.log("[App] Using ScreenCaptureKit backend (Experimental).");
+        outputDeviceId = "sck";
+      } else if (isMac) {
+        console.log("[App] Using CoreAudio backend (Default).");
+      }
+
+      const meetingRetention = await window.electronAPI.getMeetingRetention?.().catch(() => 'forever');
+      const result = await window.electronAPI.startMeeting({
+        audio: { inputDeviceId, outputDeviceId },
+        doNotPersist: meetingRetention === 'never'
+      });
+      if (result.success) {
+        analytics.trackMeetingStarted();
+        // Window swap happens inside main's startMeeting() now (before the
+        // meeting-state broadcast) to avoid a blue→green CTA flash on the
+        // launcher. No follow-up setWindowMode IPC needed here.
+      } else {
+        console.error("Failed to start meeting:", result.error);
+        // A mic-permission denial aborts the meeting before the overlay (which
+        // hosts the in-meeting audio banner) is ever shown — so the user is
+        // left on the launcher with nothing actionable. Re-open the permissions
+        // card, which checks live mic/screen status, re-requests the mic, and
+        // deep-links to System Settings. This is the recoverable surface for
+        // the "I press Start Natively and nothing happens" report.
+        if (result.code === 'mic-permission-denied') {
+          setShowPermissionsToaster(true);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to start meeting:", err);
+      // Defense-in-depth: today the start-meeting IPC handler catches and
+      // resolves {success:false, code}, so a mic denial lands in the else
+      // branch above. If the call ever rejects instead, Electron preserves the
+      // serialized error .code across ipcRenderer.invoke — keep the recovery
+      // working so the denial never regresses to a silent failure.
+      if ((err as { code?: string })?.code === 'mic-permission-denied') {
+        setShowPermissionsToaster(true);
+      }
+    }
+  };
+
+  const handleEndMeeting = () => {
+    console.log("[App.tsx] handleEndMeeting triggered");
+    analytics.trackMeetingEnded();
+    setIsProcessingMeeting(true);
+
+    // Local bookkeeping that does not depend on the main process.
+    const startStr = localStorage.getItem('natively_last_meeting_start');
+    if (startStr) {
+      const duration = Date.now() - parseInt(startStr, 10);
+      const threshold = import.meta.env.DEV ? 10000 : 180000;
+      if (duration >= threshold) {
+        localStorage.setItem('natively_show_profile_toaster', 'true');
+      }
+      localStorage.removeItem('natively_last_meeting_start');
+    }
+
+    // Fire-and-forget: main's endMeeting() handler now performs the
+    // launcher swap synchronously at the top, BEFORE any blocking audio
+    // teardown. Awaiting here would stall the overlay's React render
+    // loop for the IPC round-trip while libuv-blocking setImmediate
+    // native stops fire on the main process — which is the lag the user
+    // was seeing. The launcher window receives a 'meetings-updated'
+    // event after the BG teardown so its list refreshes on its own.
+    window.electronAPI.endMeeting().catch(err => {
+      console.error("Failed to end meeting:", err);
+      // Belt-and-suspenders: if the IPC itself rejected, the swap may
+      // not have happened — request it manually so the user isn't
+      // stranded on a dead overlay.
+      window.electronAPI.setWindowMode('launcher');
+    });
+  };
+
+  const interfaceThemeAttribute = meetingInterfaceTheme === 'default' ? undefined : meetingInterfaceTheme;
+
+  // Render Logic
+  if (isSettingsWindow) {
+    return (
+      <ErrorBoundary context="SettingsPopup">
+        <div className="h-full min-h-0 w-full" data-interface-theme={interfaceThemeAttribute}>
+          <QueryClientProvider client={queryClient}>
+            <ToastProvider>
+              <SettingsPopup />
+              <ToastViewport />
+            </ToastProvider>
+          </QueryClientProvider>
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
+  if (isModelSelectorWindow) {
+    return (
+      <ErrorBoundary context="ModelSelector">
+        <div
+          className="h-full min-h-0 w-full overflow-hidden"
+          data-interface-theme={interfaceThemeAttribute}
+        >
+          <QueryClientProvider client={queryClient}>
+            <ToastProvider>
+              <ModelSelectorWindow />
+              <ToastViewport />
+            </ToastProvider>
+          </QueryClientProvider>
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
+  // --- OVERLAY WINDOW (Meeting Interface) ---
+  if (isOverlayWindow) {
+    return (
+      <ErrorBoundary context="Overlay">
+        <div className="w-full h-full relative overflow-hidden bg-transparent">
+          <QueryClientProvider client={queryClient}>
+            <ToastProvider>
+              <div
+                style={{
+                  ['--overlay-opacity' as '--overlay-opacity']: String(overlayOpacity),
+                  transition: 'background-color 75ms ease, border-color 75ms ease, box-shadow 75ms ease'
+                } as React.CSSProperties}
+              >
+                <NativelyInterface
+                  onEndMeeting={handleEndMeeting}
+                  overlayOpacity={overlayOpacity}
+                  interfaceTheme={meetingInterfaceTheme}
+                />
+              </div>
+              <ToastViewport />
+            </ToastProvider>
+          </QueryClientProvider>
+        </div>
+      </ErrorBoundary>
+    );
+  }
+
+  // --- LAUNCHER WINDOW (Default) ---
+  // Renders if window=launcher OR no param
+  return (
+    <ErrorBoundary context="Launcher">
+    <div className="h-full min-h-0 w-full relative bg-transparent">
+      <AnimatePresence>
+        {showStartup ? (
+          <motion.div
+            key="startup"
+            className="h-full w-full"
+            initial={{ opacity: 0, scale: 1.01 }}
+            animate={{ opacity: 1, scale: 1, transition: { duration: 0.5, ease: [0.23, 1, 0.32, 1] } }}
+            exit={{ opacity: 0, scale: 1.04, pointerEvents: "none", transition: { duration: 0.55, ease: [0.4, 0, 0.2, 1] } }}
+          >
+            <StartupSequence onComplete={() => setShowStartup(false)} />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="main"
+            className="h-full w-full"
+            initial={{ opacity: 0, scale: 0.99, y: 8 }} // "Linear" style entry: slightly down and scaled down
+            animate={{ opacity: 1, scale: 1, y: 0 }}    // Slide up and snap to place
+            transition={{
+              duration: 0.6,
+              ease: [0.19, 1, 0.22, 1], // Expo-out: snappy start, smooth landing
+            }}
+          >
+            <QueryClientProvider client={queryClient}>
+              <ToastProvider>
+                <div id="launcher-container" className="h-full w-full relative">
+                  <Launcher
+                    onStartMeeting={handleStartMeeting}
+                    onOpenSettings={(tab = 'general') => openSettingsExclusive(tab)}
+                    onOpenProfile={() => openProfileExclusive()}
+                    onOpenModes={() => openModesExclusive()}
+                    onPageChange={setIsLauncherMainView}
+                    ollamaPullStatus={ollamaPullStatus}
+                    ollamaPullPercent={ollamaPullPercent}
+                    ollamaPullMessage={ollamaPullMessage}
+                  />
+                </div>
+                <SettingsOverlay
+                  isOpen={isSettingsOpen}
+                  onClose={() => {
+                    setIsSettingsOpen(false);
+                  }}
+                  initialTab={settingsInitialTab}
+                />
+                <AnimatePresence>
+                  {isModesOpen && (
+                    <motion.div
+                      key="modes-panel"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                      onClick={(e) => { if (e.target === e.currentTarget) setIsModesOpen(false); }}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.92, y: 18, filter: 'blur(12px)' }}
+                        animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+                        exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(8px)' }}
+                        transition={{
+                          opacity: { duration: 0.32, ease: [0.23, 1, 0.32, 1] },
+                          filter: { duration: 0.34, ease: [0.23, 1, 0.32, 1] },
+                          scale: { type: 'spring', stiffness: 320, damping: 34, mass: 0.9 },
+                          y: { type: 'spring', stiffness: 320, damping: 34, mass: 0.9 },
+                        }}
+                        style={{
+                          willChange: 'transform, opacity, filter',
+                          transformOrigin: 'center',
+                          boxShadow: '0 30px 80px -20px rgba(0,0,0,0.65), 0 16px 40px -12px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)',
+                        }}
+                        className="w-[820px] h-[600px] max-w-[95vw] max-h-[90vh] rounded-2xl overflow-hidden border border-white/10 bg-[#141414]"
+                      >
+                        <ModesSettings onClose={() => setIsModesOpen(false)} isPremium={false} isLoaded={true} isTrialActive={false} />
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                <AnimatePresence>
+                  {isProfileOpen && (
+                    <motion.div
+                      key="profile-panel"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                      onClick={(e) => { if (e.target === e.currentTarget) setIsProfileOpen(false); }}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.92, y: 18, filter: 'blur(12px)' }}
+                        animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
+                        exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(8px)' }}
+                        transition={{
+                          opacity: { duration: 0.32, ease: [0.23, 1, 0.32, 1] },
+                          filter: { duration: 0.34, ease: [0.23, 1, 0.32, 1] },
+                          scale: { type: 'spring', stiffness: 320, damping: 34, mass: 0.9 },
+                          y: { type: 'spring', stiffness: 320, damping: 34, mass: 0.9 },
+                        }}
+                        style={{
+                          willChange: 'transform, opacity, filter',
+                          transformOrigin: 'center',
+                          boxShadow: '0 30px 80px -20px rgba(0,0,0,0.65), 0 16px 40px -12px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)',
+                        }}
+                        className="w-[820px] h-[600px] max-w-[95vw] max-h-[90vh] rounded-2xl overflow-hidden border border-white/10 bg-[#141414]"
+                      >
+                        <ProfileIntelligenceSettings
+                          onClose={() => setIsProfileOpen(false)}
+                        />
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                <ToastViewport />
+              </ToastProvider>
+            </QueryClientProvider>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
+      <AnimatePresence>
+        {incompatibleWarning && isDefault && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="fixed bottom-6 right-6 z-50 pointer-events-auto"
+          >
+            <div className="bg-[#1A1A1A] border border-[#ff3333]/30 shadow-2xl rounded-2xl p-5 max-w-[340px] flex flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-[#ff3333] shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-[#E0E0E0] font-medium text-sm">Provider Changed</h3>
+                  <p className="text-[#A0A0A0] text-xs mt-1 leading-relaxed">
+                    ⚠ {incompatibleWarning.count} meetings used your previous AI provider ({incompatibleWarning.oldProvider}) and won't appear in search results under {incompatibleWarning.newProvider}.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-1 justify-end">
+                <button 
+                  onClick={() => setIncompatibleWarning(null)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#A0A0A0] hover:text-white hover:bg-white/5 transition-colors"
+                >
+                  Dismiss
+                </button>
+                <button 
+                  onClick={handleReindex}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#ff3333]/10 text-[#ff3333] hover:bg-[#ff3333]/20 transition-colors"
+                >
+                  Re-index automatically
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {reindexProgress && isDefault && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="fixed bottom-6 right-6 z-50 pointer-events-auto"
+          >
+            <div className="bg-[#1A1A1A] border border-white/10 shadow-2xl rounded-2xl p-5 max-w-[340px] flex flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <RefreshCw className={`w-5 h-5 text-[#A0A0A0] shrink-0 mt-0.5 ${reindexProgress.done < reindexProgress.total ? 'animate-spin' : ''}`} />
+                <div className="flex-1">
+                  <h3 className="text-[#E0E0E0] font-medium text-sm">
+                    {reindexProgress.done >= reindexProgress.total && reindexProgress.total > 0
+                      ? 'Search index updated'
+                      : 'Updating search index'}
+                  </h3>
+                  <p className="text-[#A0A0A0] text-xs mt-1 leading-relaxed">
+                    {reindexProgress.done >= reindexProgress.total && reindexProgress.total > 0
+                      ? 'Your past conversations are searchable again.'
+                      : `Re-indexing your past conversations for the upgraded AI model… ${reindexProgress.done}/${reindexProgress.total}`}
+                  </p>
+                  {reindexProgress.total > 0 && (
+                    <div className="mt-2 h-1 w-full rounded-full bg-white/10 overflow-hidden">
+                      <div
+                        className="h-full bg-[#E0E0E0] transition-all duration-500"
+                        style={{ width: `${Math.min(100, Math.round((reindexProgress.done / reindexProgress.total) * 100))}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <UpdateBanner />
+      <SupportToaster />
+
+
+
+      {/* Permissions toaster — first ever launch */}
+      <PermissionsToaster
+        isOpen={showPermissionsToaster}
+        onDismiss={() => {
+          localStorage.setItem('natively_perms_shown_v1', '1');
+          window.electronAPI?.onboardingSetFlag?.('permsShown', true).catch(() => {});
+          setShowPermissionsToaster(false);
+        }}
+      />
+
+      {isLauncherMainView && (
+        <>
+          <ProfileFeatureToaster
+            isOpen={activeAd === 'profile'}
+            onDismiss={dismissAd}
+            onSetupProfile={() => openProfileExclusive()}
+          />
+          <JDAwarenessToaster
+            isOpen={activeAd === 'jd'}
+            onDismiss={dismissAd}
+            onSetupJD={() => openProfileExclusive()}
+          />
+
+          {/* Remote Campaigns Render Logic (Commented out)
+          <RemoteCampaignToaster
+            isOpen={typeof activeAd === 'object' && activeAd !== null}
+            campaign={typeof activeAd === 'object' && activeAd !== null ? activeAd : undefined as any}
+            onDismiss={dismissAd}
+          />
+          */}
+        </>
+      )}
+
+    </div>
+    </ErrorBoundary>
+  )
+}
+
+export default App
