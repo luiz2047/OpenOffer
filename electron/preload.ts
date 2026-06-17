@@ -9,10 +9,16 @@ import type {
   InterviewQuestionPayload,
   InterviewRetro,
   InterviewRetroPayload,
+  InterviewSourceParseInput,
+  InterviewSourceParseResult,
   InterviewUpdatePatch,
   PrepBrief,
   PrepBriefPayload,
   ReadinessResult,
+  RetroPromptActionPayload,
+  RetroPromptDecision,
+  VacancyDossier,
+  VacancyDossierPayload,
 } from '../src/types/interviews';
 
 // Types for the exposed Electron API
@@ -807,11 +813,15 @@ interface ElectronAPI {
   interviewsList: (input?: InterviewListInput) => Promise<InterviewIpcResult<InterviewListItem[]>>;
   interviewsGet: (input: { id: string; include?: Array<'dossier' | 'prep' | 'retros' | 'questions' | 'contacts' | 'meetings'> }) => Promise<InterviewIpcResult<InterviewDetail>>;
   interviewsCreate: (operationId: string, payload: InterviewCreatePayload) => Promise<InterviewIpcResult<InterviewDetail>>;
+  interviewsParseSourceText: (input: InterviewSourceParseInput | string) => Promise<InterviewIpcResult<InterviewSourceParseResult>>;
   interviewsUpdate: (id: string, patch: InterviewUpdatePatch) => Promise<InterviewIpcResult<InterviewDetail>>;
   interviewsArchive: (id: string) => Promise<InterviewIpcResult<{ archived: boolean }>>;
   interviewsDelete: (id: string, includeLinkedMeetings?: boolean) => Promise<InterviewIpcResult<{ deleted: boolean }>>;
   interviewsAttachMeeting: (interviewId: string, meetingId: string) => Promise<InterviewIpcResult<{ attached: boolean }>>;
   interviewsGetReadiness: (interviewId: string) => Promise<InterviewIpcResult<ReadinessResult>>;
+  interviewsGetRetroPrompt: (interviewId: string) => Promise<InterviewIpcResult<RetroPromptDecision>>;
+  interviewsUpdateRetroPrompt: (interviewId: string, payload: RetroPromptActionPayload) => Promise<InterviewIpcResult<RetroPromptDecision>>;
+  vacancyDossierSave: (interviewId: string, operationId: string, payload: VacancyDossierPayload) => Promise<InterviewIpcResult<VacancyDossier>>;
   prepBriefSave: (interviewId: string, operationId: string, payload: PrepBriefPayload) => Promise<InterviewIpcResult<PrepBrief>>;
   interviewRetroSave: (interviewId: string, operationId: string, payload: InterviewRetroPayload) => Promise<InterviewIpcResult<InterviewRetro>>;
   interviewQuestionsList: (interviewId?: string) => Promise<InterviewIpcResult<InterviewQuestion[]>>;
@@ -2137,6 +2147,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('interviews:get', input),
   interviewsCreate: (operationId: string, payload: InterviewCreatePayload) =>
     ipcRenderer.invoke('interviews:create', operationId, payload),
+  interviewsParseSourceText: (input: InterviewSourceParseInput | string) =>
+    ipcRenderer.invoke('interviews:parse-source-text', input),
   interviewsUpdate: (id: string, patch: InterviewUpdatePatch) =>
     ipcRenderer.invoke('interviews:update', id, patch),
   interviewsArchive: (id: string) => ipcRenderer.invoke('interviews:archive', id),
@@ -2146,6 +2158,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('interviews:attach-meeting', interviewId, meetingId),
   interviewsGetReadiness: (interviewId: string) =>
     ipcRenderer.invoke('interviews:get-readiness', interviewId),
+  interviewsGetRetroPrompt: (interviewId: string) =>
+    ipcRenderer.invoke('interviews:get-retro-prompt', interviewId),
+  interviewsUpdateRetroPrompt: (interviewId: string, payload: RetroPromptActionPayload) =>
+    ipcRenderer.invoke('interviews:update-retro-prompt', interviewId, payload),
+  vacancyDossierSave: (interviewId: string, operationId: string, payload: VacancyDossierPayload) =>
+    ipcRenderer.invoke('vacancy-dossiers:save', interviewId, operationId, payload),
   prepBriefSave: (interviewId: string, operationId: string, payload: PrepBriefPayload) =>
     ipcRenderer.invoke('prep-briefs:save', interviewId, operationId, payload),
   interviewRetroSave: (interviewId: string, operationId: string, payload: InterviewRetroPayload) =>

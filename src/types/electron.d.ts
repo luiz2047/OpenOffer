@@ -8,10 +8,16 @@ import type {
   InterviewQuestionPayload,
   InterviewRetro,
   InterviewRetroPayload,
+  InterviewSourceParseInput,
+  InterviewSourceParseResult,
   InterviewUpdatePatch,
   PrepBrief,
   PrepBriefPayload,
   ReadinessResult,
+  RetroPromptActionPayload,
+  RetroPromptDecision,
+  VacancyDossier,
+  VacancyDossierPayload,
 } from './interviews'
 
 // Phase 3 — DynamicActionPayload mirrors electron/services/dynamic-actions/DynamicAction.ts.
@@ -270,11 +276,15 @@ export interface ElectronAPI {
   interviewsList: (input?: InterviewListInput) => Promise<InterviewIpcResult<InterviewListItem[]>>
   interviewsGet: (input: { id: string; include?: Array<'dossier' | 'prep' | 'retros' | 'questions' | 'contacts' | 'meetings'> }) => Promise<InterviewIpcResult<InterviewDetail>>
   interviewsCreate: (operationId: string, payload: InterviewCreatePayload) => Promise<InterviewIpcResult<InterviewDetail>>
+  interviewsParseSourceText: (input: InterviewSourceParseInput | string) => Promise<InterviewIpcResult<InterviewSourceParseResult>>
   interviewsUpdate: (id: string, patch: InterviewUpdatePatch) => Promise<InterviewIpcResult<InterviewDetail>>
   interviewsArchive: (id: string) => Promise<InterviewIpcResult<{ archived: boolean }>>
   interviewsDelete: (id: string, includeLinkedMeetings?: boolean) => Promise<InterviewIpcResult<{ deleted: boolean }>>
   interviewsAttachMeeting: (interviewId: string, meetingId: string) => Promise<InterviewIpcResult<{ attached: boolean }>>
   interviewsGetReadiness: (interviewId: string) => Promise<InterviewIpcResult<ReadinessResult>>
+  interviewsGetRetroPrompt: (interviewId: string) => Promise<InterviewIpcResult<RetroPromptDecision>>
+  interviewsUpdateRetroPrompt: (interviewId: string, payload: RetroPromptActionPayload) => Promise<InterviewIpcResult<RetroPromptDecision>>
+  vacancyDossierSave: (interviewId: string, operationId: string, payload: VacancyDossierPayload) => Promise<InterviewIpcResult<VacancyDossier>>
   prepBriefSave: (interviewId: string, operationId: string, payload: PrepBriefPayload) => Promise<InterviewIpcResult<PrepBrief>>
   interviewRetroSave: (interviewId: string, operationId: string, payload: InterviewRetroPayload) => Promise<InterviewIpcResult<InterviewRetro>>
   interviewQuestionsList: (interviewId?: string) => Promise<InterviewIpcResult<InterviewQuestion[]>>

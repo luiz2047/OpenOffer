@@ -13,11 +13,15 @@ const channels = [
   ['interviewsList', 'interviews:list'],
   ['interviewsGet', 'interviews:get'],
   ['interviewsCreate', 'interviews:create'],
+  ['interviewsParseSourceText', 'interviews:parse-source-text'],
   ['interviewsUpdate', 'interviews:update'],
   ['interviewsArchive', 'interviews:archive'],
   ['interviewsDelete', 'interviews:delete'],
   ['interviewsAttachMeeting', 'interviews:attach-meeting'],
   ['interviewsGetReadiness', 'interviews:get-readiness'],
+  ['interviewsGetRetroPrompt', 'interviews:get-retro-prompt'],
+  ['interviewsUpdateRetroPrompt', 'interviews:update-retro-prompt'],
+  ['vacancyDossierSave', 'vacancy-dossiers:save'],
   ['prepBriefSave', 'prep-briefs:save'],
   ['interviewRetroSave', 'interview-retros:save'],
   ['interviewQuestionsList', 'interview-questions:list'],
@@ -56,6 +60,9 @@ test('renderer electron.d.ts declares typed interview methods and shared result 
   assert.match(types, /interviewsList:\s*\(input\?: InterviewListInput\) => Promise<InterviewIpcResult<InterviewListItem\[\]>>/);
   assert.match(types, /interviewsGet:\s*\(input: \{ id: string; include\?: Array<['"]dossier['"]/);
   assert.match(types, /interviewsCreate:\s*\(operationId: string, payload: InterviewCreatePayload\) => Promise<InterviewIpcResult<InterviewDetail>>/);
+  assert.match(types, /interviewsParseSourceText:\s*\(input: InterviewSourceParseInput \| string\) => Promise<InterviewIpcResult<InterviewSourceParseResult>>/);
+  assert.match(types, /vacancyDossierSave:\s*\(interviewId: string, operationId: string, payload: VacancyDossierPayload\) => Promise<InterviewIpcResult<VacancyDossier>>/);
+  assert.match(types, /interviewsUpdateRetroPrompt:\s*\(interviewId: string, payload: RetroPromptActionPayload\) => Promise<InterviewIpcResult<RetroPromptDecision>>/);
   assert.match(types, /prepBriefSave:\s*\(interviewId: string, operationId: string, payload: PrepBriefPayload\) => Promise<InterviewIpcResult<PrepBrief>>/);
   assert.match(types, /interviewQuestionsSave:\s*\(interviewId: string, operationId: string, questions: InterviewQuestionPayload\[\]\) => Promise<InterviewIpcResult<InterviewQuestion\[\]>>/);
 });

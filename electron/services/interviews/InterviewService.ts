@@ -11,12 +11,19 @@ import type {
   InterviewQuestionPayload,
   InterviewRetro,
   InterviewRetroPayload,
+  InterviewSourceParseResult,
   InterviewUpdatePatch,
   PrepBrief,
   PrepBriefPayload,
   ReadinessResult,
+  RetroPromptAction,
+  RetroPromptActionPayload,
+  RetroPromptDecision,
+  VacancyDossier,
+  VacancyDossierPayload,
 } from '../../../src/types/interviews';
 import { InterviewRepository } from './InterviewRepository';
+import { parseInterviewSourceText } from './parser';
 
 const VALID_STATUSES = new Set(['active', 'applied', 'screening', 'interviewing', 'offer', 'rejected', 'withdrawn', 'archived']);
 const VALID_PRIORITIES = new Set(['low', 'normal', 'high']);
@@ -244,6 +251,17 @@ function normalizePrep(payload: any): PrepBriefPayload {
   };
 }
 
+function normalizeDossier(payload: any): VacancyDossierPayload {
+  return {
+    description: text(payload?.description, 'description', 20000),
+    requirements: stringArray(payload?.requirements, 'requirements'),
+    compensationText: text(payload?.compensationText, 'compensationText', 1000),
+    fitHypothesis: text(payload?.fitHypothesis, 'fitHypothesis', 4000),
+    risks: stringArray(payload?.risks, 'risks'),
+    questionsToAsk: stringArray(payload?.questionsToAsk, 'questionsToAsk'),
+  };
+}
+
 function normalizeRetro(payload: any): InterviewRetroPayload {
   const passProbability = payload?.passProbability;
   if (passProbability !== undefined && passProbability !== null && (!Number.isInteger(passProbability) || passProbability < 0 || passProbability > 100)) {
@@ -271,6 +289,37 @@ function normalizeQuestions(questions: any): InterviewQuestionPayload[] {
     weakSpot: Boolean(question?.weakSpot),
     followUpNote: text(question?.followUpNote, `questions[${index}].followUpNote`, 20000),
   }));
+}
+
+function normalizeSourceParseInput(input: unknown): string {
+  const raw = typeof input === 'string' ? input : (input as any)?.text;
+  if (typeof raw !== 'string') {
+    throw new InterviewDomainError('invalid_payload', 'text must be provided.', false, 'fix_input');
+  }
+  if (raw.length > 50000) {
+    throw new InterviewDomainError('parser_input_too_large', 'Source text is too large. Paste a shorter vacancy or HR message.', false, 'fix_input');
+  }
+  if (!raw.trim()) {
+    throw new InterviewDomainError('parser_no_fields', 'Paste a vacancy, HR message, or calendar note first.', false, 'fix_input');
+  }
+  return raw;
+}
+
+function normalizeRetroPromptAction(payload: any): { action: RetroPromptAction; snoozeUntil?: number | null } {
+  const action = payload?.action;
+  if (!['prompted', 'snooze', 'dismiss', 'complete'].includes(action)) {
+    throw new InterviewDomainError('invalid_payload', 'retro prompt action is invalid.', false, 'fix_input');
+  }
+  let snoozeUntil: number | null | undefined;
+  if (action === 'snooze') {
+    if (payload?.snoozeUntil !== undefined && payload?.snoozeUntil !== null) {
+      snoozeUntil = optionalEpoch(payload.snoozeUntil, 'snoozeUntil');
+    } else if (payload?.snoozeMs !== undefined && payload?.snoozeMs !== null) {
+      const snoozeMs = optionalEpoch(payload.snoozeMs, 'snoozeMs');
+      snoozeUntil = Date.now() + Math.min(Math.max(snoozeMs ?? 0, 5 * 60 * 1000), 14 * 24 * 60 * 60 * 1000);
+    }
+  }
+  return { action, snoozeUntil };
 }
 
 export class InterviewService {
@@ -302,6 +351,20 @@ export class InterviewService {
     return this.repo.get(event.id, ['dossier', 'prep', 'retros', 'questions', 'meetings']) as InterviewDetail;
   }
 
+  parseSourceText(input: unknown): InterviewSourceParseResult {
+    try {
+      return parseInterviewSourceText(normalizeSourceParseInput(input));
+    } catch (error: any) {
+      if (error?.code === 'parser_input_too_large') {
+        throw new InterviewDomainError('parser_input_too_large', 'Source text is too large. Paste a shorter vacancy or HR message.', false, 'fix_input');
+      }
+      if (error?.code === 'parser_no_fields') {
+        throw new InterviewDomainError('parser_no_fields', error.message || 'Could not extract interview fields.', false, 'fix_input');
+      }
+      throw error;
+    }
+  }
+
   update(id: string, patch: unknown): InterviewDetail {
     const updated = this.repo.update(assertId(id), normalizeUpdatePatch(patch));
     if (!updated) throw new InterviewDomainError('not_found', 'Interview not found.', false, 'none');
@@ -322,6 +385,12 @@ export class InterviewService {
     return { attached };
   }
 
+  saveDossier(interviewId: string, operationId: string, payload: unknown): VacancyDossier {
+    const id = assertId(interviewId, 'interviewId');
+    this.requireActiveInterview(id);
+    return this.repo.saveDossier(id, normalizeDossier(payload), assertId(operationId, 'operationId'));
+  }
+
   savePrep(interviewId: string, operationId: string, payload: unknown): PrepBrief {
     const id = assertId(interviewId, 'interviewId');
     this.requireActiveInterview(id);
@@ -332,6 +401,42 @@ export class InterviewService {
     const id = assertId(interviewId, 'interviewId');
     this.requireActiveInterview(id);
     return this.repo.saveRetro(id, normalizeRetro(payload), assertId(operationId, 'operationId'));
+  }
+
+  getRetroPrompt(interviewId: string): RetroPromptDecision {
+    const id = assertId(interviewId, 'interviewId');
+    const detail = this.repo.get(id, ['retros']);
+    if (!detail) throw new InterviewDomainError('not_found', 'Interview not found.', false, 'none');
+
+    let state = this.repo.getRetroPromptState(id);
+    if (detail.archivedAt || detail.status === 'archived') {
+      return { interviewEventId: id, due: false, reason: 'archived', state };
+    }
+    if ((detail.retros ?? []).length > 0) {
+      state = this.repo.recordRetroPromptAction(id, 'complete');
+      return { interviewEventId: id, due: false, reason: 'has_retro', state };
+    }
+    const now = Date.now();
+    if (!detail.endsAt || detail.endsAt > now) {
+      return { interviewEventId: id, due: false, reason: 'not_ended', state };
+    }
+    if (state?.completedAt) return { interviewEventId: id, due: false, reason: 'already_completed', state };
+    if (state?.dismissedAt) return { interviewEventId: id, due: false, reason: 'dismissed', state };
+    if (state?.snoozedUntil && state.snoozedUntil > now) {
+      return { interviewEventId: id, due: false, reason: 'snoozed', state };
+    }
+    if (!state?.promptedAt) {
+      state = this.repo.recordRetroPromptAction(id, 'prompted', { now });
+    }
+    return { interviewEventId: id, due: true, reason: 'due', state };
+  }
+
+  updateRetroPrompt(interviewId: string, payload: RetroPromptActionPayload): RetroPromptDecision {
+    const id = assertId(interviewId, 'interviewId');
+    this.requireActiveInterview(id);
+    const action = normalizeRetroPromptAction(payload);
+    this.repo.recordRetroPromptAction(id, action.action, { snoozeUntil: action.snoozeUntil });
+    return this.getRetroPrompt(id);
   }
 
   listQuestions(interviewId?: string): InterviewQuestion[] {

@@ -5989,6 +5989,10 @@ export function initializeIpcHandlers(appState: AppState): void {
     safeInterviewHandle(() => getInterviewService().create(operationId, payload))
   ));
 
+  safeHandle('interviews:parse-source-text', async (_, input: unknown) => (
+    safeInterviewHandle(() => getInterviewService().parseSourceText(input))
+  ));
+
   safeHandle('interviews:update', async (_, id: string, patch: unknown) => (
     safeInterviewHandle(() => getInterviewService().update(id, patch))
   ));
@@ -6007,6 +6011,18 @@ export function initializeIpcHandlers(appState: AppState): void {
 
   safeHandle('interviews:get-readiness', async (_, interviewId: string) => (
     safeInterviewHandle(() => getInterviewService().getReadiness(interviewId))
+  ));
+
+  safeHandle('interviews:get-retro-prompt', async (_, interviewId: string) => (
+    safeInterviewHandle(() => getInterviewService().getRetroPrompt(interviewId))
+  ));
+
+  safeHandle('interviews:update-retro-prompt', async (_, interviewId: string, payload: unknown) => (
+    safeInterviewHandle(() => getInterviewService().updateRetroPrompt(interviewId, payload as any))
+  ));
+
+  safeHandle('vacancy-dossiers:save', async (_, interviewId: string, operationId: string, payload: unknown) => (
+    safeInterviewHandle(() => getInterviewService().saveDossier(interviewId, operationId, payload))
   ));
 
   safeHandle('prep-briefs:save', async (_, interviewId: string, operationId: string, payload: unknown) => (

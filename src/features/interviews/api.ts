@@ -8,10 +8,15 @@ import type {
   InterviewQuestionPayload,
   InterviewRetro,
   InterviewRetroPayload,
+  InterviewSourceParseResult,
   InterviewUpdatePatch,
   PrepBrief,
   PrepBriefPayload,
   ReadinessResult,
+  RetroPromptActionPayload,
+  RetroPromptDecision,
+  VacancyDossier,
+  VacancyDossierPayload,
 } from '../../types/interviews';
 
 function requireBridge() {
@@ -48,6 +53,10 @@ export const interviewApi = {
     return unwrap(await requireBridge().interviewsCreate(newOperationId('interviews:create'), payload));
   },
 
+  async parseSourceText(text: string): Promise<InterviewSourceParseResult> {
+    return unwrap(await requireBridge().interviewsParseSourceText({ text }));
+  },
+
   async update(id: string, patch: InterviewUpdatePatch): Promise<InterviewDetail> {
     return unwrap(await requireBridge().interviewsUpdate(id, patch));
   },
@@ -62,6 +71,18 @@ export const interviewApi = {
 
   async getReadiness(interviewId: string): Promise<ReadinessResult> {
     return unwrap(await requireBridge().interviewsGetReadiness(interviewId));
+  },
+
+  async getRetroPrompt(interviewId: string): Promise<RetroPromptDecision> {
+    return unwrap(await requireBridge().interviewsGetRetroPrompt(interviewId));
+  },
+
+  async updateRetroPrompt(interviewId: string, payload: RetroPromptActionPayload): Promise<RetroPromptDecision> {
+    return unwrap(await requireBridge().interviewsUpdateRetroPrompt(interviewId, payload));
+  },
+
+  async saveDossier(interviewId: string, payload: VacancyDossierPayload): Promise<VacancyDossier> {
+    return unwrap(await requireBridge().vacancyDossierSave(interviewId, newOperationId('vacancy-dossiers:save'), payload));
   },
 
   async savePrep(interviewId: string, payload: PrepBriefPayload): Promise<PrepBrief> {

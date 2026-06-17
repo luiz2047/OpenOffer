@@ -9,10 +9,13 @@ import type {
   InterviewQuestionPayload,
   InterviewRetro,
   InterviewRetroPayload,
+  RetroPromptAction,
+  RetroPromptState,
   InterviewUpdatePatch,
   PrepBrief,
   PrepBriefPayload,
   VacancyDossier,
+  VacancyDossierPayload,
 } from '../../../src/types/interviews';
 
 export interface DbRunResult {
@@ -184,6 +187,17 @@ function questionFromRow(row: any): InterviewQuestion {
     weakSpot: Boolean(row.weak_spot),
     followUpNote: row.follow_up_note ?? null,
     createdAt: row.created_at,
+  };
+}
+
+function retroPromptStateFromRow(row: any): RetroPromptState {
+  return {
+    interviewEventId: row.interview_event_id,
+    promptedAt: row.prompted_at ?? null,
+    dismissedAt: row.dismissed_at ?? null,
+    snoozedUntil: row.snoozed_until ?? null,
+    completedAt: row.completed_at ?? null,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -385,6 +399,41 @@ export class InterviewRepository {
     });
   }
 
+  saveDossier(interviewId: string, payload: VacancyDossierPayload, operationId?: string): VacancyDossier {
+    return this.withOperation(operationId, 'vacancy-dossiers:save', () => {
+      const id = `dossier_${interviewId}`;
+      const timestamp = nowIso();
+      this.db.prepare(`
+        INSERT INTO vacancy_dossiers (
+          id, interview_event_id, description, requirements_json, compensation_text,
+          fit_hypothesis, risks_json, questions_to_ask_json, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(interview_event_id) DO UPDATE SET
+          description = excluded.description,
+          requirements_json = excluded.requirements_json,
+          compensation_text = excluded.compensation_text,
+          fit_hypothesis = excluded.fit_hypothesis,
+          risks_json = excluded.risks_json,
+          questions_to_ask_json = excluded.questions_to_ask_json,
+          updated_at = excluded.updated_at
+      `).run(
+        id,
+        interviewId,
+        payload.description ?? null,
+        toJson(payload.requirements),
+        payload.compensationText ?? null,
+        payload.fitHypothesis ?? null,
+        toJson(payload.risks),
+        toJson(payload.questionsToAsk),
+        timestamp,
+        timestamp,
+      );
+      const row = this.db.prepare('SELECT * FROM vacancy_dossiers WHERE interview_event_id = ?').get<any>(interviewId);
+      return dossierFromRow(row);
+    });
+  }
+
   savePrep(interviewId: string, payload: PrepBriefPayload, operationId?: string): PrepBrief {
     return this.withOperation(operationId, 'prep-briefs:save', () => {
       const id = `prep_${interviewId}`;
@@ -441,8 +490,69 @@ export class InterviewRepository {
         nowIso(),
       );
       const row = this.db.prepare('SELECT * FROM interview_retros WHERE id = ?').get<any>(id);
-      return retroFromRow(row);
+      const retro = retroFromRow(row);
+      this.recordRetroPromptAction(interviewId, 'complete');
+      return retro;
     });
+  }
+
+  getRetroPromptState(interviewId: string): RetroPromptState | null {
+    const row = this.db.prepare('SELECT * FROM retro_prompt_state WHERE interview_event_id = ?').get<any>(interviewId);
+    return row ? retroPromptStateFromRow(row) : null;
+  }
+
+  recordRetroPromptAction(
+    interviewId: string,
+    action: RetroPromptAction,
+    options: { now?: number; snoozeUntil?: number | null } = {},
+  ): RetroPromptState {
+    const timestamp = options.now ?? nowMs();
+    const existing = this.getRetroPromptState(interviewId);
+    const next = {
+      promptedAt: existing?.promptedAt ?? null,
+      dismissedAt: existing?.dismissedAt ?? null,
+      snoozedUntil: existing?.snoozedUntil ?? null,
+      completedAt: existing?.completedAt ?? null,
+    };
+
+    if (action === 'prompted') next.promptedAt = next.promptedAt ?? timestamp;
+    if (action === 'snooze') {
+      next.promptedAt = next.promptedAt ?? timestamp;
+      next.snoozedUntil = options.snoozeUntil ?? timestamp + 24 * 60 * 60 * 1000;
+      next.dismissedAt = null;
+    }
+    if (action === 'dismiss') {
+      next.promptedAt = next.promptedAt ?? timestamp;
+      next.dismissedAt = next.dismissedAt ?? timestamp;
+      next.snoozedUntil = null;
+    }
+    if (action === 'complete') {
+      next.promptedAt = next.promptedAt ?? timestamp;
+      next.completedAt = next.completedAt ?? timestamp;
+      next.snoozedUntil = null;
+    }
+
+    this.db.prepare(`
+      INSERT INTO retro_prompt_state (
+        interview_event_id, prompted_at, dismissed_at, snoozed_until, completed_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(interview_event_id) DO UPDATE SET
+        prompted_at = excluded.prompted_at,
+        dismissed_at = excluded.dismissed_at,
+        snoozed_until = excluded.snoozed_until,
+        completed_at = excluded.completed_at,
+        updated_at = excluded.updated_at
+    `).run(
+      interviewId,
+      next.promptedAt,
+      next.dismissedAt,
+      next.snoozedUntil,
+      next.completedAt,
+      nowIso(),
+    );
+
+    return this.getRetroPromptState(interviewId) as RetroPromptState;
   }
 
   listQuestions(input: { interviewId?: string; limit?: number; offset?: number } = {}): InterviewQuestion[] {

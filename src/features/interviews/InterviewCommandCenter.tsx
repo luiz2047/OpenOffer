@@ -28,9 +28,12 @@ import type {
   InterviewPriority,
   InterviewQuestionPayload,
   InterviewRetroPayload,
+  InterviewSourceParseResult,
   InterviewStatus,
   PrepBriefPayload,
   ReadinessResult,
+  RetroPromptDecision,
+  VacancyDossierPayload,
 } from '../../types/interviews';
 import { interviewApi } from './api';
 
@@ -52,13 +55,20 @@ interface CalendarEventSummary {
   attendees?: Array<{ email: string; name?: string; photoUrl?: string; response?: string }>;
 }
 
+export interface InterviewMeetingStartMetadata {
+  title?: string;
+  calendarEventId?: string;
+  interviewEventId?: string;
+  source?: 'manual' | 'calendar';
+}
+
 interface InterviewCommandCenterProps {
   meetings: MeetingSummary[];
   upcomingEvents: CalendarEventSummary[];
   isRefreshing: boolean;
   isMeetingActive: boolean;
   onRefresh: () => Promise<void> | void;
-  onStartMeeting: () => void;
+  onStartMeeting: (metadata?: InterviewMeetingStartMetadata) => void;
   onOpenMeeting: (meeting: MeetingSummary) => void;
   onOpenSettings: (tab?: string) => void;
   onCalendarConnected: (connected: boolean) => void;
@@ -69,6 +79,41 @@ const PRIORITY_OPTIONS: InterviewPriority[] = ['normal', 'high', 'low'];
 const DETAIL_TABS = ['Vacancy', 'Prep', 'Retro', 'Questions'] as const;
 
 type DetailTab = typeof DETAIL_TABS[number];
+type DraftStatus = 'synced' | 'dirty' | 'saved' | 'failed';
+
+const DRAFT_PREFIX = 'openoffer:interviews:draft';
+
+function draftKey(interviewId: string, kind: 'dossier' | 'prep' | 'retro'): string {
+  return `${DRAFT_PREFIX}:${interviewId}:${kind}`;
+}
+
+function readLocalDraft<T>(interviewId: string, kind: 'dossier' | 'prep' | 'retro'): T | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    const raw = window.localStorage.getItem(draftKey(interviewId, kind));
+    return raw ? JSON.parse(raw) as T : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalDraft<T>(interviewId: string, kind: 'dossier' | 'prep' | 'retro', draft: T): DraftStatus {
+  try {
+    if (typeof window === 'undefined') return 'failed';
+    window.localStorage.setItem(draftKey(interviewId, kind), JSON.stringify(draft));
+    return 'saved';
+  } catch {
+    return 'failed';
+  }
+}
+
+function clearLocalDraft(interviewId: string, kind: 'dossier' | 'prep' | 'retro'): void {
+  try {
+    if (typeof window !== 'undefined') window.localStorage.removeItem(draftKey(interviewId, kind));
+  } catch {
+    // Local draft cleanup is best-effort.
+  }
+}
 
 function formatDateTime(ms?: number | null): string {
   if (!ms) return 'Unscheduled';
@@ -163,6 +208,61 @@ function initialCreateForm(): InterviewCreatePayload {
   };
 }
 
+function initialDossierDraft() {
+  return {
+    description: '',
+    requirements: '',
+    compensationText: '',
+    fitHypothesis: '',
+    risks: '',
+    questionsToAsk: '',
+  };
+}
+
+function dossierDraftFromDetail(detail: InterviewDetail) {
+  return {
+    description: detail.dossier?.description ?? detail.rawSourceText ?? '',
+    requirements: joinLines(detail.dossier?.requirements),
+    compensationText: detail.dossier?.compensationText ?? '',
+    fitHypothesis: detail.dossier?.fitHypothesis ?? '',
+    risks: joinLines(detail.dossier?.risks),
+    questionsToAsk: joinLines(detail.dossier?.questionsToAsk),
+  };
+}
+
+function prepDraftFromDetail(detail: InterviewDetail) {
+  return {
+    oneLineGoal: detail.prep?.oneLineGoal ?? '',
+    pitch30s: detail.prep?.pitch30s ?? '',
+    pitch2m: detail.prep?.pitch2m ?? '',
+    expectedTopics: joinLines(detail.prep?.expectedTopics),
+    cheatsheet: detail.prep?.cheatsheet ?? '',
+    riskHandling: joinLines(detail.prep?.riskHandling),
+    lastChecklist: joinLines(detail.prep?.lastChecklist),
+  };
+}
+
+function initialRetroDraft() {
+  return { passProbability: '', mainSignal: '', strongMoments: '', weakMoments: '', newFacts: '', followUpActions: '' };
+}
+
+function hasDossierPayload(payload?: VacancyDossierPayload | null): boolean {
+  if (!payload) return false;
+  return Boolean(
+    payload.description
+    || payload.compensationText
+    || payload.fitHypothesis
+    || (payload.requirements?.length ?? 0) > 0
+    || (payload.risks?.length ?? 0) > 0
+    || (payload.questionsToAsk?.length ?? 0) > 0
+  );
+}
+
+function hasPrepPayload(payload?: Pick<PrepBriefPayload, 'expectedTopics' | 'cheatsheet' | 'riskHandling'> | null): boolean {
+  if (!payload) return false;
+  return Boolean(payload.cheatsheet || (payload.expectedTopics?.length ?? 0) > 0 || (payload.riskHandling?.length ?? 0) > 0);
+}
+
 const inputClass = 'w-full rounded-md border border-white/[0.08] bg-black/20 px-3 py-2 text-[13px] text-text-primary outline-none transition focus:border-sky-400/40 focus:bg-black/30';
 const labelClass = 'text-[11px] font-medium uppercase tracking-[0.08em] text-text-tertiary';
 const iconButtonClass = 'inline-flex h-8 w-8 items-center justify-center rounded-md text-text-secondary transition hover:bg-white/[0.06] hover:text-text-primary';
@@ -182,12 +282,16 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<InterviewDetail | null>(null);
   const [readiness, setReadiness] = useState<ReadinessResult | null>(null);
+  const [retroPrompt, setRetroPrompt] = useState<RetroPromptDecision | null>(null);
   const [calendarStatus, setCalendarStatus] = useState<{ connected: boolean; email?: string } | null>(null);
   const [activeProvider, setActiveProvider] = useState<CalendarProvider>('google');
   const [detailTab, setDetailTab] = useState<DetailTab>('Vacancy');
   const [query, setQuery] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<InterviewCreatePayload>(initialCreateForm);
+  const [sourceParsePreview, setSourceParsePreview] = useState<InterviewSourceParseResult | null>(null);
+  const [parseWarnings, setParseWarnings] = useState<string[]>([]);
+  const [dossierDraft, setDossierDraft] = useState(initialDossierDraft);
   const [prepDraft, setPrepDraft] = useState({
     oneLineGoal: '',
     pitch30s: '',
@@ -197,7 +301,12 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     riskHandling: '',
     lastChecklist: '',
   });
-  const [retroDraft, setRetroDraft] = useState({ passProbability: '', mainSignal: '', strongMoments: '', weakMoments: '', newFacts: '', followUpActions: '' });
+  const [retroDraft, setRetroDraft] = useState(initialRetroDraft);
+  const [draftStatus, setDraftStatus] = useState<Record<'dossier' | 'prep' | 'retro', DraftStatus>>({
+    dossier: 'synced',
+    prep: 'synced',
+    retro: 'synced',
+  });
   const [questionDrafts, setQuestionDrafts] = useState<InterviewQuestionPayload[]>([]);
   const [questionText, setQuestionText] = useState('');
   const [questionCategory, setQuestionCategory] = useState('');
@@ -246,23 +355,26 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     let cancelled = false;
     void (async () => {
       try {
-        const [nextDetail, nextReadiness] = await Promise.all([
+        const [nextDetail, nextReadiness, nextRetroPrompt] = await Promise.all([
           interviewApi.get(selectedId),
           interviewApi.getReadiness(selectedId),
+          interviewApi.getRetroPrompt(selectedId),
         ]);
         if (cancelled) return;
         setDetail(nextDetail);
         setReadiness(nextReadiness);
-        setPrepDraft({
-          oneLineGoal: nextDetail.prep?.oneLineGoal ?? '',
-          pitch30s: nextDetail.prep?.pitch30s ?? '',
-          pitch2m: nextDetail.prep?.pitch2m ?? '',
-          expectedTopics: joinLines(nextDetail.prep?.expectedTopics),
-          cheatsheet: nextDetail.prep?.cheatsheet ?? '',
-          riskHandling: joinLines(nextDetail.prep?.riskHandling),
-          lastChecklist: joinLines(nextDetail.prep?.lastChecklist),
+        setRetroPrompt(nextRetroPrompt);
+        const dossierLocalDraft = readLocalDraft<ReturnType<typeof initialDossierDraft>>(nextDetail.id, 'dossier');
+        const prepLocalDraft = readLocalDraft<ReturnType<typeof prepDraftFromDetail>>(nextDetail.id, 'prep');
+        const retroLocalDraft = readLocalDraft<ReturnType<typeof initialRetroDraft>>(nextDetail.id, 'retro');
+        setDossierDraft(dossierLocalDraft ?? dossierDraftFromDetail(nextDetail));
+        setPrepDraft(prepLocalDraft ?? prepDraftFromDetail(nextDetail));
+        setRetroDraft(retroLocalDraft ?? initialRetroDraft());
+        setDraftStatus({
+          dossier: dossierLocalDraft ? 'dirty' : 'synced',
+          prep: prepLocalDraft ? 'dirty' : 'synced',
+          retro: retroLocalDraft ? 'dirty' : 'synced',
         });
-        setRetroDraft({ passProbability: '', mainSignal: '', strongMoments: '', weakMoments: '', newFacts: '', followUpActions: '' });
         setQuestionDrafts(nextDetail.questions ?? []);
       } catch (err: any) {
         if (!cancelled) setError(err?.message || 'Could not open interview.');
@@ -314,15 +426,69 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     }
   };
 
+  const updateDraft = <T extends Record<string, string>>(
+    kind: 'dossier' | 'prep' | 'retro',
+    setter: React.Dispatch<React.SetStateAction<T>>,
+    key: string,
+    value: string,
+  ) => {
+    setter(prev => {
+      const next = { ...prev, [key]: value };
+      if (detail?.id) {
+        setDraftStatus(current => ({ ...current, [kind]: 'dirty' }));
+        const status = writeLocalDraft(detail.id, kind, next);
+        setDraftStatus(current => ({ ...current, [kind]: status }));
+      }
+      return next;
+    });
+  };
+
+  const clearDraftStatus = (kind: 'dossier' | 'prep' | 'retro', interviewId: string) => {
+    clearLocalDraft(interviewId, kind);
+    setDraftStatus(current => ({ ...current, [kind]: 'synced' }));
+  };
+
   const refreshAll = async () => {
     await Promise.all([Promise.resolve(onRefresh()), loadInterviews(), loadCalendarStatus()]);
+  };
+
+  const parseSourceText = async () => {
+    const rawText = createForm.rawSourceText ?? '';
+    await run(async () => {
+      const parsed = await interviewApi.parseSourceText(rawText);
+      setSourceParsePreview(parsed);
+      setParseWarnings(parsed.warnings);
+      setCreateForm(prev => ({
+        ...prev,
+        title: prev.title.trim() || parsed.fields.title || prev.title,
+        company: prev.company?.trim() ? prev.company : parsed.fields.company ?? prev.company,
+        roleTitle: prev.roleTitle?.trim() ? prev.roleTitle : parsed.fields.roleTitle ?? prev.roleTitle,
+        stage: prev.stage?.trim() && prev.stage !== 'Recruiter screen' ? prev.stage : parsed.fields.stage ?? prev.stage,
+        source: parsed.fields.source ?? prev.source,
+        vacancyUrl: prev.vacancyUrl?.trim() ? prev.vacancyUrl : parsed.fields.vacancyUrl ?? prev.vacancyUrl,
+        meetingUrl: prev.meetingUrl?.trim() ? prev.meetingUrl : parsed.fields.meetingUrl ?? prev.meetingUrl,
+        rawSourceText: parsed.fields.rawSourceText ?? prev.rawSourceText,
+      }));
+    });
   };
 
   const createInterview = async () => {
     await run(async () => {
       const created = await interviewApi.create(createForm);
+      if (sourceParsePreview && hasDossierPayload(sourceParsePreview.dossier)) {
+        await interviewApi.saveDossier(created.id, sourceParsePreview.dossier);
+      }
+      if (sourceParsePreview && hasPrepPayload(sourceParsePreview.prep)) {
+        await interviewApi.savePrep(created.id, {
+          expectedTopics: sourceParsePreview.prep.expectedTopics ?? [],
+          cheatsheet: sourceParsePreview.prep.cheatsheet ?? null,
+          riskHandling: sourceParsePreview.prep.riskHandling ?? [],
+        });
+      }
       setShowCreate(false);
       setCreateForm(initialCreateForm());
+      setSourceParsePreview(null);
+      setParseWarnings([]);
       await loadInterviews();
       setSelectedId(created.id);
     });
@@ -362,6 +528,25 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     });
   };
 
+  const saveDossier = async () => {
+    if (!detail) return;
+    const payload: VacancyDossierPayload = {
+      description: dossierDraft.description,
+      requirements: splitLines(dossierDraft.requirements),
+      compensationText: dossierDraft.compensationText,
+      fitHypothesis: dossierDraft.fitHypothesis,
+      risks: splitLines(dossierDraft.risks),
+      questionsToAsk: splitLines(dossierDraft.questionsToAsk),
+    };
+    await run(async () => {
+      await interviewApi.saveDossier(detail.id, payload);
+      clearDraftStatus('dossier', detail.id);
+      const next = await interviewApi.get(detail.id);
+      setDetail(next);
+      setReadiness(await interviewApi.getReadiness(detail.id));
+    });
+  };
+
   const savePrep = async () => {
     if (!detail) return;
     const payload: PrepBriefPayload = {
@@ -375,6 +560,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     };
     await run(async () => {
       await interviewApi.savePrep(detail.id, payload);
+      clearDraftStatus('prep', detail.id);
       const next = await interviewApi.get(detail.id);
       setDetail(next);
       setReadiness(await interviewApi.getReadiness(detail.id));
@@ -394,8 +580,21 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     };
     await run(async () => {
       await interviewApi.saveRetro(detail.id, payload);
+      clearDraftStatus('retro', detail.id);
       setDetail(await interviewApi.get(detail.id));
-      setRetroDraft({ passProbability: '', mainSignal: '', strongMoments: '', weakMoments: '', newFacts: '', followUpActions: '' });
+      setRetroPrompt(await interviewApi.getRetroPrompt(detail.id));
+      setRetroDraft(initialRetroDraft());
+    });
+  };
+
+  const updateRetroPrompt = async (action: 'snooze' | 'dismiss' | 'complete') => {
+    if (!detail) return;
+    await run(async () => {
+      const next = await interviewApi.updateRetroPrompt(detail.id, action === 'snooze'
+        ? { action, snoozeMs: 24 * 60 * 60 * 1000 }
+        : { action });
+      setRetroPrompt(next);
+      if (action === 'complete') setDetailTab('Retro');
     });
   };
 
@@ -428,6 +627,19 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       await interviewApi.attachMeeting(detail.id, attachMeetingId);
       setDetail(await interviewApi.get(detail.id));
       setAttachMeetingId('');
+    });
+  };
+
+  const startSelectedInterview = () => {
+    if (!detail) {
+      onStartMeeting();
+      return;
+    }
+    onStartMeeting({
+      title: detail.title,
+      interviewEventId: detail.id,
+      calendarEventId: detail.calendarEventId ?? undefined,
+      source: 'manual',
     });
   };
 
@@ -595,7 +807,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         <div className="border-t border-white/[0.07] p-3">
           <div className="mb-2 flex items-center justify-between">
             <span className={labelClass}>Recordings</span>
-            <button onClick={onStartMeeting} className="text-[11px] font-semibold text-sky-300 hover:text-sky-200">
+            <button onClick={startSelectedInterview} className="text-[11px] font-semibold text-sky-300 hover:text-sky-200">
               {isMeetingActive ? 'Open live' : 'Start'}
             </button>
           </div>
@@ -623,6 +835,12 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
           </div>
           {detail && (
             <div className="flex items-center gap-2">
+              <button
+                onClick={startSelectedInterview}
+                className="rounded-md bg-white px-3 py-1.5 text-[12px] font-semibold text-black transition hover:bg-zinc-200"
+              >
+                {isMeetingActive ? 'Open live' : 'Start'}
+              </button>
               <select
                 value={detail.status}
                 onChange={event => updateStatus(detail.id, event.target.value as InterviewStatus)}
@@ -692,6 +910,22 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       {detail.rawSourceText || 'No source text yet.'}
                     </div>
                   </div>
+                  <EditorPanel
+                    title="Vacancy dossier"
+                    action="Save dossier"
+                    busy={busy}
+                    status={draftStatus.dossier}
+                    onSave={saveDossier}
+                    fields={[
+                      { key: 'description', label: 'Description', value: dossierDraft.description, rows: 6 },
+                      { key: 'requirements', label: 'Requirements', value: dossierDraft.requirements, rows: 5 },
+                      { key: 'compensationText', label: 'Compensation', value: dossierDraft.compensationText, rows: 2 },
+                      { key: 'fitHypothesis', label: 'Fit hypothesis', value: dossierDraft.fitHypothesis, rows: 4 },
+                      { key: 'risks', label: 'Risks', value: dossierDraft.risks, rows: 4 },
+                      { key: 'questionsToAsk', label: 'Questions to ask', value: dossierDraft.questionsToAsk, rows: 4 },
+                    ]}
+                    onChange={(key, value) => updateDraft('dossier', setDossierDraft, key, value)}
+                  />
                   <div className="rounded-md border border-white/[0.07] bg-white/[0.025] p-4">
                     <div className={labelClass}>Attach recording</div>
                     <div className="mt-3 flex gap-2">
@@ -712,6 +946,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                   title="Preparation"
                   action="Save prep"
                   busy={busy}
+                  status={draftStatus.prep}
                   onSave={savePrep}
                   fields={[
                     { key: 'oneLineGoal', label: 'One-line goal', value: prepDraft.oneLineGoal, rows: 2 },
@@ -722,26 +957,40 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                     { key: 'riskHandling', label: 'Risk handling', value: prepDraft.riskHandling, rows: 4 },
                     { key: 'lastChecklist', label: 'Last checklist', value: prepDraft.lastChecklist, rows: 4 },
                   ]}
-                  onChange={(key, value) => setPrepDraft(prev => ({ ...prev, [key]: value }))}
+                  onChange={(key, value) => updateDraft('prep', setPrepDraft, key, value)}
                 />
               )}
 
               {detailTab === 'Retro' && (
-                <EditorPanel
-                  title="Retro"
-                  action="Save retro"
-                  busy={busy}
-                  onSave={saveRetro}
-                  fields={[
-                    { key: 'passProbability', label: 'Pass probability', value: retroDraft.passProbability, rows: 1 },
-                    { key: 'mainSignal', label: 'Main signal', value: retroDraft.mainSignal, rows: 4 },
-                    { key: 'strongMoments', label: 'Strong moments', value: retroDraft.strongMoments, rows: 4 },
-                    { key: 'weakMoments', label: 'Weak moments', value: retroDraft.weakMoments, rows: 4 },
-                    { key: 'newFacts', label: 'New facts', value: retroDraft.newFacts, rows: 4 },
-                    { key: 'followUpActions', label: 'Follow-up actions', value: retroDraft.followUpActions, rows: 4 },
-                  ]}
-                  onChange={(key, value) => setRetroDraft(prev => ({ ...prev, [key]: value }))}
-                />
+                <div className="space-y-4">
+                  {retroPrompt?.due && (
+                    <div className="rounded-md border border-amber-400/20 bg-amber-500/10 p-4">
+                      <div className="text-[13px] font-semibold text-amber-100">Retro is due</div>
+                      <div className="mt-1 text-[12px] text-amber-100/75">Capture what changed before the interview context decays.</div>
+                      <div className="mt-3 flex gap-2">
+                        <button onClick={() => setDetailTab('Retro')} className="rounded-md bg-amber-300 px-3 py-1.5 text-[12px] font-semibold text-black">Write</button>
+                        <button onClick={() => updateRetroPrompt('snooze')} className="rounded-md border border-amber-300/25 px-3 py-1.5 text-[12px] font-semibold text-amber-100">Snooze</button>
+                        <button onClick={() => updateRetroPrompt('dismiss')} className="rounded-md border border-white/[0.08] px-3 py-1.5 text-[12px] font-semibold text-text-secondary">Dismiss</button>
+                      </div>
+                    </div>
+                  )}
+                  <EditorPanel
+                    title="Retro"
+                    action="Save retro"
+                    busy={busy}
+                    status={draftStatus.retro}
+                    onSave={saveRetro}
+                    fields={[
+                      { key: 'passProbability', label: 'Pass probability', value: retroDraft.passProbability, rows: 1 },
+                      { key: 'mainSignal', label: 'Main signal', value: retroDraft.mainSignal, rows: 4 },
+                      { key: 'strongMoments', label: 'Strong moments', value: retroDraft.strongMoments, rows: 4 },
+                      { key: 'weakMoments', label: 'Weak moments', value: retroDraft.weakMoments, rows: 4 },
+                      { key: 'newFacts', label: 'New facts', value: retroDraft.newFacts, rows: 4 },
+                      { key: 'followUpActions', label: 'Follow-up actions', value: retroDraft.followUpActions, rows: 4 },
+                    ]}
+                    onChange={(key, value) => updateDraft('retro', setRetroDraft, key, value)}
+                  />
+                </div>
               )}
 
               {detailTab === 'Questions' && (
@@ -813,7 +1062,11 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 <div className="text-[16px] font-semibold">New interview</div>
                 <div className="text-[12px] text-text-tertiary">Manual intake</div>
               </div>
-              <button className={iconButtonClass} onClick={() => setShowCreate(false)} aria-label="Close">
+              <button className={iconButtonClass} onClick={() => {
+                setShowCreate(false);
+                setSourceParsePreview(null);
+                setParseWarnings([]);
+              }} aria-label="Close">
                 <X size={15} />
               </button>
             </div>
@@ -838,12 +1091,38 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               <Field label="Meeting URL"><input className={inputClass} value={createForm.meetingUrl ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, meetingUrl: event.target.value }))} /></Field>
               <div className="col-span-2">
                 <Field label="Source text">
-                  <textarea className={`${inputClass} min-h-[130px] resize-none`} value={createForm.rawSourceText ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, rawSourceText: event.target.value }))} />
+                  <textarea
+                    className={`${inputClass} min-h-[130px] resize-none`}
+                    value={createForm.rawSourceText ?? ''}
+                    onChange={event => {
+                      setSourceParsePreview(null);
+                      setParseWarnings([]);
+                      setCreateForm(prev => ({ ...prev, rawSourceText: event.target.value }));
+                    }}
+                  />
                 </Field>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <div className="min-w-0 truncate text-[11px] text-text-tertiary">
+                    {sourceParsePreview ? `${sourceParsePreview.fieldCount} fields detected` : 'Paste HH, Getmatch, Telegram, or calendar context.'}
+                    {parseWarnings.length > 0 ? ` · ${parseWarnings.join(', ')}` : ''}
+                  </div>
+                  <button
+                    onClick={parseSourceText}
+                    disabled={busy || !(createForm.rawSourceText ?? '').trim()}
+                    className="inline-flex items-center gap-2 rounded-md border border-white/[0.08] px-3 py-1.5 text-[12px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white disabled:opacity-40"
+                  >
+                    <Sparkles size={14} />
+                    Parse
+                  </button>
+                </div>
               </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setShowCreate(false)} className="rounded-md border border-white/[0.08] px-4 py-2 text-[12px] font-semibold text-text-secondary">Cancel</button>
+              <button onClick={() => {
+                setShowCreate(false);
+                setSourceParsePreview(null);
+                setParseWarnings([]);
+              }} className="rounded-md border border-white/[0.08] px-4 py-2 text-[12px] font-semibold text-text-secondary">Cancel</button>
               <button onClick={createInterview} disabled={busy || !createForm.title.trim()} className="rounded-md bg-sky-500 px-4 py-2 text-[12px] font-semibold text-white disabled:opacity-40">
                 Create
               </button>
@@ -886,13 +1165,19 @@ const EditorPanel: React.FC<{
   title: string;
   action: string;
   busy: boolean;
+  status?: DraftStatus;
   fields: Array<{ key: string; label: string; value: string; rows: number }>;
   onChange: (key: string, value: string) => void;
   onSave: () => void;
-}> = ({ title, action, busy, fields, onChange, onSave }) => (
+}> = ({ title, action, busy, status = 'synced', fields, onChange, onSave }) => (
   <div className="space-y-4">
     <div className="flex items-center justify-between">
-      <div className="text-[15px] font-semibold">{title}</div>
+      <div>
+        <div className="text-[15px] font-semibold">{title}</div>
+        <div className="mt-0.5 text-[11px] text-text-tertiary">
+          {status === 'dirty' ? 'Draft changed' : status === 'saved' ? 'Draft saved locally' : status === 'failed' ? 'Draft not saved locally' : 'Synced'}
+        </div>
+      </div>
       <button onClick={onSave} disabled={busy} className="rounded-md bg-sky-500 px-4 py-2 text-[12px] font-semibold text-white disabled:opacity-40">
         {action}
       </button>

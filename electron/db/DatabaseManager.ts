@@ -39,6 +39,7 @@ export interface Meeting {
         items?: string[];
     }>;
     calendarEventId?: string;
+    interviewEventId?: string;
     source?: 'manual' | 'calendar';
     isProcessed?: boolean;
 }
@@ -1150,9 +1151,31 @@ export class DatabaseManager {
             return;
         }
 
+        const existingMeeting = this.db
+            .prepare('SELECT calendar_event_id, interview_event_id FROM meetings WHERE id = ?')
+            .get(meeting.id) as { calendar_event_id?: string | null; interview_event_id?: string | null } | undefined;
+        const effectiveCalendarEventId = meeting.calendarEventId ?? existingMeeting?.calendar_event_id ?? null;
+        let effectiveInterviewEventId = meeting.interviewEventId ?? existingMeeting?.interview_event_id ?? null;
+
+        if (!effectiveInterviewEventId && effectiveCalendarEventId) {
+            try {
+                const matches = this.db.prepare(`
+                    SELECT id
+                    FROM interview_events
+                    WHERE calendar_event_id = ? AND archived_at IS NULL
+                    LIMIT 2
+                `).all(effectiveCalendarEventId) as Array<{ id: string }>;
+                if (matches.length === 1) {
+                    effectiveInterviewEventId = matches[0].id;
+                }
+            } catch {
+                // Interview schema may not exist in older/recovery contexts; leave unlinked.
+            }
+        }
+
         const insertMeeting = this.db.prepare(`
-            INSERT OR REPLACE INTO meetings (id, title, start_time, duration_ms, summary_json, created_at, calendar_event_id, source, is_processed)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO meetings (id, title, start_time, duration_ms, summary_json, created_at, calendar_event_id, source, is_processed, interview_event_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         const insertTranscript = this.db.prepare(`
@@ -1179,9 +1202,10 @@ export class DatabaseManager {
                 durationMs,
                 summaryJson,
                 meeting.date, // Using the ISO string as created_at for sorting simply
-                meeting.calendarEventId || null,
+                effectiveCalendarEventId,
                 meeting.source || 'manual',
-                meeting.isProcessed ? 1 : 0
+                meeting.isProcessed ? 1 : 0,
+                effectiveInterviewEventId
             );
 
             // 2. Insert Transcript

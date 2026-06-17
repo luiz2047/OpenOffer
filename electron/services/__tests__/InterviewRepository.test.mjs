@@ -21,6 +21,9 @@ const {
   InterviewService,
   safeInterviewHandle,
 } = require(path.join(root, 'dist-electron/electron/services/interviews/InterviewService.js'));
+const {
+  parseInterviewSourceText,
+} = require(path.join(root, 'dist-electron/electron/services/interviews/parser.js'));
 
 function createStack() {
   const db = new Database(':memory:');
@@ -177,6 +180,28 @@ describe('InterviewRepository', () => {
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM prep_briefs').get().count, 0);
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM interview_questions').get().count, 0);
   });
+
+  test('stores vacancy dossiers and clamps list size for bounded home rendering', () => {
+    const { repo } = createStack();
+    const first = repo.create({ title: 'Backend process' });
+    const dossier = repo.saveDossier(first.id, {
+      description: 'Payments backend vacancy',
+      requirements: ['Node.js', 'PostgreSQL'],
+      compensationText: '300-450k руб',
+      fitHypothesis: 'Strong domain fit',
+      risks: ['Legacy codebase'],
+      questionsToAsk: ['How is on-call organized?'],
+    }, 'op-dossier-1');
+
+    assert.equal(dossier.description, 'Payments backend vacancy');
+    assert.deepEqual(dossier.requirements, ['Node.js', 'PostgreSQL']);
+    assert.equal(repo.saveDossier(first.id, { description: 'Replay must not win' }, 'op-dossier-1').description, 'Payments backend vacancy');
+
+    for (let index = 0; index < 240; index += 1) {
+      repo.create({ title: `Process ${index}` });
+    }
+    assert.equal(repo.list({ limit: 1000 }).length, 200);
+  });
 });
 
 describe('InterviewService', () => {
@@ -235,5 +260,78 @@ describe('InterviewService', () => {
     assert.equal(wrapped.ok, false);
     assert.equal(wrapped.code, 'not_found');
     assert.equal(wrapped.retryable, false);
+  });
+
+  test('parses HR/vacancy paste safely and maps parser errors to IPC codes', async () => {
+    const { service } = createStack();
+    const parsed = service.parseSourceText({
+      text: `
+        <script>alert('xss')</script>
+        Вакансия: Middle Backend Developer
+        Компания: FinTech Lab
+        https://hh.ru/vacancy/123
+        https://meet.google.com/abc-defg-hij
+        Требования:
+        - Node.js
+        - PostgreSQL
+        Вопросы:
+        - Как устроены релизы?
+        Зарплата: 300-500k руб
+      `,
+    });
+
+    assert.equal(parsed.fields.company, 'FinTech Lab');
+    assert.equal(parsed.fields.roleTitle, 'Middle Backend Developer');
+    assert.equal(parsed.fields.source, 'HH');
+    assert.equal(parsed.fields.vacancyUrl, 'https://hh.ru/vacancy/123');
+    assert.equal(parsed.fields.meetingUrl, 'https://meet.google.com/abc-defg-hij');
+    assert.equal(parsed.dossier.compensationText, '300-500k руб');
+    assert.deepEqual(parsed.prep.expectedTopics.slice(0, 2), ['Node.js', 'PostgreSQL']);
+    assert.equal(parsed.normalizedText.includes('<script>'), false);
+
+    const empty = await safeInterviewHandle(() => service.parseSourceText({ text: '   ' }));
+    assert.equal(empty.ok, false);
+    assert.equal(empty.code, 'parser_no_fields');
+
+    const tooLarge = await safeInterviewHandle(() => service.parseSourceText({ text: 'x'.repeat(50001) }));
+    assert.equal(tooLarge.ok, false);
+    assert.equal(tooLarge.code, 'parser_input_too_large');
+
+    const getmatch = parseInterviewSourceText('Getmatch role\\nCompany: Data Now\\nPosition: ML Engineer\\nhttps://getmatch.ru/vacancies/42');
+    assert.equal(getmatch.detectedSource, 'Getmatch');
+    const telegram = parseInterviewSourceText('Telegram HR\\nКомпания: BotWorks\\nПозиция: Frontend Developer\\nhttps://t.me/hr_channel');
+    assert.equal(telegram.detectedSource, 'Telegram');
+  });
+
+  test('tracks retro prompt due, snooze, dismiss, and completion idempotently', () => {
+    const { service } = createStack();
+    const detail = service.create('op-ended-create', {
+      title: 'Past technical',
+      startsAt: Date.now() - 2 * 60 * 60 * 1000,
+      endsAt: Date.now() - 60 * 60 * 1000,
+    });
+
+    const due = service.getRetroPrompt(detail.id);
+    assert.equal(due.due, true);
+    assert.equal(due.reason, 'due');
+    assert.ok(due.state.promptedAt);
+
+    const snoozed = service.updateRetroPrompt(detail.id, { action: 'snooze', snoozeMs: 60 * 60 * 1000 });
+    assert.equal(snoozed.due, false);
+    assert.equal(snoozed.reason, 'snoozed');
+
+    const dismissed = service.updateRetroPrompt(detail.id, { action: 'dismiss' });
+    assert.equal(dismissed.due, false);
+    assert.equal(dismissed.reason, 'dismissed');
+
+    service.saveRetro(detail.id, 'op-retro-complete', {
+      passProbability: 80,
+      mainSignal: 'Strong signal',
+      strongMoments: ['Architecture'],
+    });
+    const complete = service.getRetroPrompt(detail.id);
+    assert.equal(complete.due, false);
+    assert.equal(complete.reason, 'has_retro');
+    assert.ok(complete.state.completedAt);
   });
 });

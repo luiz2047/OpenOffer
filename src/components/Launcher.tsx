@@ -9,7 +9,7 @@ import { useShortcuts } from '../hooks/useShortcuts';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { isMac } from '../utils/platformUtils';
 import WindowControls from './WindowControls';
-import InterviewCommandCenter from '../features/interviews/InterviewCommandCenter';
+import InterviewCommandCenter, { type InterviewMeetingStartMetadata } from '../features/interviews/InterviewCommandCenter';
 
 interface Meeting {
     id: string;
@@ -38,7 +38,7 @@ interface Meeting {
 }
 
 interface LauncherProps {
-    onStartMeeting: () => void;
+    onStartMeeting: (metadata?: InterviewMeetingStartMetadata) => void;
     onOpenSettings: (tab?: string) => void;
     onOpenProfile?: () => void;
     onOpenModes?: () => void;

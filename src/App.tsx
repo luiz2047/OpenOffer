@@ -26,6 +26,13 @@ import { ErrorBoundary } from "./components/ErrorBoundary"
 import ModesSettings from "./components/settings/ModesSettings"
 import { ProfileIntelligenceSettings } from "./components/ProfileIntelligenceSettings"
 
+interface StartMeetingMetadata {
+  title?: string;
+  calendarEventId?: string;
+  interviewEventId?: string;
+  source?: 'manual' | 'calendar';
+}
+
 const queryClient = new QueryClient()
 
 const App: React.FC = () => {
@@ -375,7 +382,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleStartMeeting = async () => {
+  const handleStartMeeting = async (metadata: StartMeetingMetadata = {}) => {
     try {
       localStorage.setItem('natively_last_meeting_start', Date.now().toString());
       const inputDeviceId = localStorage.getItem('preferredInputDeviceId');
@@ -400,6 +407,7 @@ const App: React.FC = () => {
 
       const meetingRetention = await window.electronAPI.getMeetingRetention?.().catch(() => 'forever');
       const result = await window.electronAPI.startMeeting({
+        ...metadata,
         audio: { inputDeviceId, outputDeviceId },
         doNotPersist: meetingRetention === 'never'
       });

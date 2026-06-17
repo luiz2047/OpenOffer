@@ -116,6 +116,9 @@ export class MeetingPersistence {
             detailedSummary: { actionItems: [], keyPoints: [] },
             transcript: snapshot.transcript,
             usage: snapshot.usage,
+            calendarEventId: metadataSnapshot?.calendarEventId,
+            interviewEventId: metadataSnapshot?.interviewEventId,
+            source: metadataSnapshot?.source ?? 'manual',
             isProcessed: false
         };
 
@@ -142,7 +145,7 @@ export class MeetingPersistence {
         data: { transcript: TranscriptSegment[], usage: any[], startTime: number, durationMs: number, context: string },
         meetingId: string,
         // BUG-04 fix: accept metadata snapshot so calendar info is not lost after session.reset()
-        metadata?: { title?: string; calendarEventId?: string; source?: 'manual' | 'calendar' } | null,
+        metadata?: { title?: string; calendarEventId?: string; interviewEventId?: string; source?: 'manual' | 'calendar' } | null,
         // BUG-MODE-BLEEDING fix: accept mode snapshot so async summary uses the mode that was
         // active when meeting stopped, not whatever mode is active when async processing runs.
         modeSnapshot?: { id: string; name: string; templateType: string } | null
@@ -166,11 +169,13 @@ export class MeetingPersistence {
 
         // Use passed-in metadata snapshot (NOT this.session.getMeetingMetadata() which is already cleared)
         let calendarEventId: string | undefined;
+        let interviewEventId: string | undefined;
         let source: 'manual' | 'calendar' = 'manual';
 
         if (metadata) {
             if (metadata.title) title = metadata.title;
             if (metadata.calendarEventId) calendarEventId = metadata.calendarEventId;
+            if (metadata.interviewEventId) interviewEventId = metadata.interviewEventId;
             if (metadata.source) source = metadata.source;
         }
 
@@ -401,6 +406,7 @@ Return ONLY valid JSON (no markdown code blocks):
                 transcript: data.transcript,
                 usage: data.usage,
                 calendarEventId: calendarEventId,
+                interviewEventId: interviewEventId,
                 source: source,
                 isProcessed: true
             };

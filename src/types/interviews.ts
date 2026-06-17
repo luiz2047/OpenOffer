@@ -133,6 +133,15 @@ export interface VacancyDossier {
   updatedAt: string;
 }
 
+export interface VacancyDossierPayload {
+  description?: string | null;
+  requirements?: string[];
+  compensationText?: string | null;
+  fitHypothesis?: string | null;
+  risks?: string[];
+  questionsToAsk?: string[];
+}
+
 export interface PrepBrief {
   id: string;
   interviewEventId: string;
@@ -203,6 +212,53 @@ export interface ReadinessResult {
   warnings: string[];
   completed: string[];
   nextAction: string | null;
+}
+
+export type RetroPromptAction = 'prompted' | 'snooze' | 'dismiss' | 'complete';
+
+export type RetroPromptReason =
+  | 'due'
+  | 'not_ended'
+  | 'already_completed'
+  | 'has_retro'
+  | 'dismissed'
+  | 'snoozed'
+  | 'archived';
+
+export interface RetroPromptState {
+  interviewEventId: string;
+  promptedAt?: number | null;
+  dismissedAt?: number | null;
+  snoozedUntil?: number | null;
+  completedAt?: number | null;
+  updatedAt: string;
+}
+
+export interface RetroPromptDecision {
+  interviewEventId: string;
+  due: boolean;
+  reason: RetroPromptReason;
+  state: RetroPromptState | null;
+}
+
+export interface RetroPromptActionPayload {
+  action: RetroPromptAction;
+  snoozeUntil?: number | null;
+  snoozeMs?: number | null;
+}
+
+export interface InterviewSourceParseInput {
+  text: string;
+}
+
+export interface InterviewSourceParseResult {
+  fields: Partial<InterviewCreatePayload>;
+  dossier: VacancyDossierPayload;
+  prep: Pick<PrepBriefPayload, 'expectedTopics' | 'cheatsheet' | 'riskHandling'>;
+  warnings: string[];
+  fieldCount: number;
+  detectedSource?: string | null;
+  normalizedText: string;
 }
 
 export interface InterviewListInput {
