@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Bell, Rocket } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import mainui from "../UI_comp/mainui.png";
 
 // --- Types ---
@@ -9,9 +9,8 @@ interface FeatureSlide {
     id: string;
     headline: string;
     subtitle: string;
-    type?: 'feature' | 'support' | 'premium';
+    type?: 'feature' | 'premium';
     actionLabel?: string;
-    url?: string;
     eyebrow?: string;
     bullets?: string[];
     footer?: string;
@@ -21,26 +20,20 @@ interface FeatureSlide {
 
 const FEATURES: FeatureSlide[] = [
     {
-        id: 'tailored_answers',
-        headline: 'Upcoming features',
-        subtitle: 'Answers, tailored to you',
-        bullets: ['Repo aware explanations', 'System design interview specialization'],
-        footer: 'Designed to work silently during live interviews.',
+        id: 'interview_command_center',
+        headline: 'Interview command center',
+        subtitle: 'Calendar, roles, prep, and status in one workspace',
+        bullets: ['Google and macOS calendar paths', 'Per-interview dossiers and next steps'],
+        footer: 'Designed for active job search, not live-meeting theater.',
         type: 'premium',
     },
-
     {
-        id: 'support_natively',
-        headline: 'Support development',
-        subtitle: 'Built openly and sustained by users',
-        bullets: [
-            'Development driven by real users',
-            'Faster iteration on features that matter',
-
-        ],
-        type: 'support',
-        actionLabel: 'Contribute to development',
-        url: 'https://buymeacoffee.com/evinjohnn'
+        id: 'job_search_memory',
+        headline: 'Second brain for search',
+        subtitle: 'Keep every vacancy, recruiter thread, and cheat sheet connected',
+        bullets: ['Status, salary range, company context', 'Prep notes that survive parallel processes'],
+        footer: 'Built to preserve context before every interview.',
+        type: 'premium',
     }
 ];
 
@@ -53,7 +46,7 @@ export const FeatureSpotlight: React.FC = () => {
     // Interest state: map of feature ID -> boolean
     const [interestState, setInterestState] = useState<Record<string, boolean>>(() => {
         try {
-            const saved = localStorage.getItem('natively_feature_interest');
+            const saved = localStorage.getItem('openoffer_feature_interest');
             return saved ? JSON.parse(saved) : {};
         } catch (e) {
             return {};
@@ -62,7 +55,6 @@ export const FeatureSpotlight: React.FC = () => {
 
     const currentFeature = FEATURES[currentIndex];
     const isInterested = interestState[currentFeature.id] || false;
-    const isSupport = currentFeature.type === 'support';
     const isPremium = currentFeature.type === 'premium';
 
     // --- Auto-Advance Logic ---
@@ -70,9 +62,8 @@ export const FeatureSpotlight: React.FC = () => {
     useEffect(() => {
         if (isPaused) return;
 
-        // Support slide has longer duration (10s), others 6-8s
-        const baseDuration = isSupport ? 10000 : 6000;
-        const randomFactor = isSupport ? 0 : Math.random() * 2000;
+        const baseDuration = 6000;
+        const randomFactor = Math.random() * 2000;
         const intervalDuration = baseDuration + randomFactor;
 
         const timer = setTimeout(() => {
@@ -80,7 +71,7 @@ export const FeatureSpotlight: React.FC = () => {
         }, intervalDuration);
 
         return () => clearTimeout(timer);
-    }, [currentIndex, isPaused, isSupport]);
+    }, [currentIndex, isPaused]);
 
 
     // --- Interaction Handlers ---
@@ -88,18 +79,9 @@ export const FeatureSpotlight: React.FC = () => {
     const handleActionClick = (e: React.MouseEvent) => {
         e.stopPropagation(); // Prevent parent clicks
 
-        if (isSupport && currentFeature.url) {
-            if (window.electronAPI && window.electronAPI.openExternal) {
-                window.electronAPI.openExternal(currentFeature.url);
-            } else {
-                window.open(currentFeature.url, '_blank');
-            }
-            return;
-        }
-
         const newState = { ...interestState, [currentFeature.id]: !isInterested };
         setInterestState(newState);
-        localStorage.setItem('natively_feature_interest', JSON.stringify(newState));
+        localStorage.setItem('openoffer_feature_interest', JSON.stringify(newState));
 
         // Interaction triggers "Anonymous one-time ping"
         if (!isInterested) {
@@ -178,14 +160,14 @@ export const FeatureSpotlight: React.FC = () => {
 
                                 {/* Title */}
                                 <h2
-                                    className={`drop-shadow-sm tracking-tight mb-0 transition-all duration-300 group-hover:brightness-105 ${isSupport ? 'translate-y-1.5' : ''}`}
+                                    className="drop-shadow-sm tracking-tight mb-0 transition-all duration-300 group-hover:brightness-105"
                                     style={{
                                         fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text"',
-                                        fontSize: (isPremium || isSupport) ? '30px' : '26px',
+                                        fontSize: isPremium ? '30px' : '26px',
                                         fontWeight: 500,
                                         lineHeight: 1.1,
-                                        color: (isPremium || isSupport) ? '#E6C46A' : '#ffffff',
-                                        textShadow: (isPremium || isSupport) ? '0px 1px 1px rgba(0, 0, 0, 0.1)' : 'none',
+                                        color: isPremium ? '#E6C46A' : '#ffffff',
+                                        textShadow: isPremium ? '0px 1px 1px rgba(0, 0, 0, 0.1)' : 'none',
                                     }}
                                 >
                                     {currentFeature.headline}
@@ -193,15 +175,15 @@ export const FeatureSpotlight: React.FC = () => {
 
                                 {/* Subtitle */}
                                 <p
-                                    className={`antialiased mb-2 ${isSupport ? 'translate-y-1.5' : ''}`} // Standardized mb-2 for equal spacing
+                                    className="antialiased mb-2"
                                     style={{
                                         fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text"',
-                                        fontSize: (isPremium || isSupport) ? '16px' : '15px',
+                                        fontSize: isPremium ? '16px' : '15px',
                                         fontWeight: 400,
                                         lineHeight: 1.4,
                                         color: '#F5F7FA',
                                         opacity: 0.9,
-                                        maxWidth: isSupport ? '380px' : '360px'
+                                        maxWidth: '420px'
                                     }}
                                 >
                                     {currentFeature.subtitle}
@@ -212,8 +194,8 @@ export const FeatureSpotlight: React.FC = () => {
                                         {currentFeature.bullets.map((bullet, idx) => (
                                             <div key={idx} className={`flex items-center justify-center group/item transition-transform duration-200 px-2`}>
                                                 <span
-                                                    className={`${isSupport ? 'text-[12px] leading-relaxed font-medium opacity-100' : 'text-[12.5px] leading-snug font-medium'}`}
-                                                    style={{ letterSpacing: isSupport ? '0.01em' : '-0.01em', color: '#E6C46A' }}
+                                                    className="text-[12.5px] leading-snug font-medium"
+                                                    style={{ letterSpacing: '0', color: '#E6C46A' }}
                                                 >
                                                     {bullet}
                                                 </span>
@@ -228,7 +210,7 @@ export const FeatureSpotlight: React.FC = () => {
                                         <p
                                             className="opacity-65 font-medium tracking-wide"
                                             style={{
-                                                fontSize: (isPremium || isSupport) ? '13px' : '15px',
+                                                fontSize: isPremium ? '13px' : '15px',
                                                 color: '#F5F7FA'
                                             }}
                                         >
@@ -251,18 +233,9 @@ export const FeatureSpotlight: React.FC = () => {
                                             hover:brightness-105
                                             active:scale-[0.98]
                                             overflow-hidden
-                                            ${isSupport
-                                                ? 'mt-2 translate-y-5 px-6 py-2 text-[13px] font-medium text-[#1C1C1E]'
-                                                : `px-10 py-2.5 text-[13px] font-medium text-[#F5F7FA]`
-                                            }
+                                            px-10 py-2.5 text-[13px] font-medium text-[#F5F7FA]
                                         `}
-                                        style={isSupport ? {
-                                            background: 'linear-gradient(180deg, #F1D88B 0%, #E6C87A 100%)',
-                                            boxShadow: `
-                                                0 6px 20px rgba(230, 200, 122, 0.35),
-                                                inset 0 1px 0 rgba(255,255,255,0.35)
-                                            `
-                                        } : {
+                                        style={{
                                             minWidth: '220px',
                                             backgroundColor: isInterested ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.08)',
                                             backdropFilter: 'blur(14px)',
@@ -270,29 +243,25 @@ export const FeatureSpotlight: React.FC = () => {
                                         }}
                                     >
                                         {/* Gradient Border (Standard Connect Button Only) */}
-                                        {!isSupport && (
-                                            <div
-                                                className="absolute inset-0 rounded-full pointer-events-none transition-opacity duration-300 group-hover:opacity-80"
-                                                style={{
-                                                    padding: '1px',
-                                                    background: 'linear-gradient(to right, #FFFFFF, #A1A1AA)',
-                                                    WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                                                    WebkitMaskComposite: 'xor',
-                                                    maskComposite: 'exclude',
-                                                    opacity: 0.6,
-                                                }}
-                                            />
-                                        )}
+                                        <div
+                                            className="absolute inset-0 rounded-full pointer-events-none transition-opacity duration-300 group-hover:opacity-80"
+                                            style={{
+                                                padding: '1px',
+                                                background: 'linear-gradient(to right, #FFFFFF, #A1A1AA)',
+                                                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                                                WebkitMaskComposite: 'xor',
+                                                maskComposite: 'exclude',
+                                                opacity: 0.6,
+                                            }}
+                                        />
 
                                         {/* Inner Highlight for Standard Button */}
-                                        {!isSupport && (
-                                            <div
-                                                className="absolute inset-0 rounded-full pointer-events-none"
-                                                style={{
-                                                    boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.08)',
-                                                }}
-                                            />
-                                        )}
+                                        <div
+                                            className="absolute inset-0 rounded-full pointer-events-none"
+                                            style={{
+                                                boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.08)',
+                                            }}
+                                        />
 
                                         <AnimatePresence mode="wait" initial={false}>
                                             <motion.span
@@ -303,14 +272,9 @@ export const FeatureSpotlight: React.FC = () => {
                                                 className="flex items-center gap-2.5 relative z-10"
                                             >
                                                 <span>
-                                                    {isInterested && !isSupport
+                                                    {isInterested
                                                         ? 'Interested'
-                                                        : (isSupport ? (
-                                                            <span className="flex items-center gap-2">
-                                                                <Rocket size={14} className="text-[#1C1C1E]" strokeWidth={2.5} />
-                                                                Fund development
-                                                            </span>
-                                                        ) : (currentFeature.actionLabel || 'Mark interest'))
+                                                        : (currentFeature.actionLabel || 'Mark interest')
                                                     }
                                                 </span>
 
@@ -320,25 +284,14 @@ export const FeatureSpotlight: React.FC = () => {
                                                         hover: isInterested ? {
                                                             rotate: [0, -10, 10, -10, 10, 0],
                                                             transition: { duration: 0.5, repeat: Infinity, repeatDelay: 2 }
-                                                        } : (isSupport ? {
-                                                            x: [0, 4, 0],
-                                                            transition: { duration: 1.5, repeat: Infinity, ease: "easeInOut" }
-                                                        } : {})
+                                                        } : {}
                                                     }}
                                                 >
-                                                    {isSupport ? (
-                                                        <ArrowRight
-                                                            size={14}
-                                                            className="text-[#1C1C1E] transition-colors duration-300"
-                                                            strokeWidth={2}
-                                                        />
-                                                    ) : (
-                                                        <Bell
-                                                            size={14}
-                                                            className={`${isInterested ? 'text-blue-400' : 'opacity-80'}`}
-                                                            fill={isInterested ? "currentColor" : "none"}
-                                                        />
-                                                    )}
+                                                    <Bell
+                                                        size={14}
+                                                        className={`${isInterested ? 'text-blue-400' : 'opacity-80'}`}
+                                                        fill={isInterested ? "currentColor" : "none"}
+                                                    />
                                                 </motion.div>
                                             </motion.span>
                                         </AnimatePresence>

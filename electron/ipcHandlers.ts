@@ -623,29 +623,6 @@ export function initializeIpcHandlers(appState: AppState): void {
     }
   });
 
-  // Donation IPC Handlers
-  safeHandle('get-donation-status', async () => {
-    const { DonationManager } = require('./DonationManager');
-    const manager = DonationManager.getInstance();
-    return {
-      shouldShow: manager.shouldShowToaster(),
-      hasDonated: manager.getDonationState().hasDonated,
-      lifetimeShows: manager.getDonationState().lifetimeShows,
-    };
-  });
-
-  safeHandle('mark-donation-toast-shown', async () => {
-    const { DonationManager } = require('./DonationManager');
-    DonationManager.getInstance().markAsShown();
-    return { success: true };
-  });
-
-  safeHandle('set-donation-complete', async () => {
-    const { DonationManager } = require('./DonationManager');
-    DonationManager.getInstance().setHasDonated(true);
-    return { success: true };
-  });
-
   // Generate suggestion from transcript - Natively-style text-only reasoning
   safeHandle('generate-suggestion', async (event, context: string, lastQuestion: string) => {
     try {

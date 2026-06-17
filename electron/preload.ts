@@ -595,15 +595,6 @@ interface ElectronAPI {
     cb: (ev: { keyCode: number; chars: string; flags: number; isKeyDown: boolean }) => void,
   ) => () => void;
 
-  // Donation API
-  getDonationStatus: () => Promise<{
-    shouldShow: boolean;
-    hasDonated: boolean;
-    lifetimeShows: number;
-  }>;
-  markDonationToastShown: () => Promise<{ success: boolean }>;
-  setDonationComplete: () => Promise<{ success: boolean }>;
-
   // Profile Engine API
   profileUploadResume: (filePath: string) => Promise<{ success: boolean; error?: string }>;
   profileGetStatus: () => Promise<{
@@ -1935,11 +1926,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener('stealth-key-captured', sub);
     };
   },
-
-  // Donation API
-  getDonationStatus: () => ipcRenderer.invoke('get-donation-status'),
-  markDonationToastShown: () => ipcRenderer.invoke('mark-donation-toast-shown'),
-  setDonationComplete: () => ipcRenderer.invoke('set-donation-complete'),
 
   // Profile Engine API
   profileUploadResume: (filePath: string) => ipcRenderer.invoke('profile:upload-resume', filePath),

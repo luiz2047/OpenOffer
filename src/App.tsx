@@ -9,13 +9,12 @@ import SettingsOverlay from "./components/SettingsOverlay"
 import StartupSequence from "./components/StartupSequence"
 import { AnimatePresence, motion } from "framer-motion"
 import UpdateBanner from "./components/UpdateBanner"
-import { SupportToaster } from "./components/SupportToaster"
 import { PermissionsToaster }   from "./components/onboarding/PermissionsToaster"
 import { AlertCircle, RefreshCw } from "lucide-react"
 import { clampOverlayOpacity, OVERLAY_OPACITY_DEFAULT, getDefaultOverlayOpacity } from "./lib/overlayAppearance"
 import { getMeetingInterfaceTheme, type MeetingInterfaceTheme } from './lib/meetingInterfaceTheme'
 import { isMac } from "./utils/platformUtils"
-import { trackAppOpen, markToasterAsShown } from "./lib/toasterGating"
+import { trackAppOpen } from "./lib/toasterGating"
 import {
   JDAwarenessToaster,
   ProfileFeatureToaster,
@@ -728,7 +727,6 @@ const App: React.FC = () => {
       </AnimatePresence>
 
       <UpdateBanner />
-      <SupportToaster />
 
 
 
