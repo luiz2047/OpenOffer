@@ -15,6 +15,8 @@ import { CodexCliService } from './services/CodexCliService';
 import { PhoneMirrorService } from './services/PhoneMirrorService';
 import { SettingsManager } from './services/SettingsManager';
 import { SkillsManager } from './services/SkillsManager';
+import { createBetterSqliteExecutor, InterviewRepository } from './services/interviews/InterviewRepository';
+import { InterviewDomainError, InterviewService, safeInterviewHandle } from './services/interviews/InterviewService';
 
 import { TRIAL_SENTINEL_KEY, DOM_CONTEXT_MAX_CHARS } from './config/constants';
 import { AI_RESPONSE_LANGUAGES, RECOGNITION_LANGUAGES } from './config/languages';
@@ -325,6 +327,19 @@ export function initializeIpcHandlers(appState: AppState): void {
    */
   const isProOrTrialActive = (): boolean => {
     return true;
+  };
+
+  const getInterviewService = (): InterviewService => {
+    const db = DatabaseManager.getInstance().getDb();
+    if (!db) {
+      throw new InterviewDomainError(
+        'local_database_unavailable',
+        'The local interview database is not ready yet.',
+        true,
+        'retry',
+      );
+    }
+    return new InterviewService(new InterviewRepository(createBetterSqliteExecutor(db)));
   };
 
   // Clears premium-only context when the pro license is lost.
@@ -5156,7 +5171,14 @@ export function initializeIpcHandlers(appState: AppState): void {
 
   safeHandle('get-upcoming-events', async () => {
     const { CalendarManager } = require('./services/CalendarManager');
-    return CalendarManager.getInstance().getUpcomingEvents();
+    const { MacCalendarManager } = require('./services/MacCalendarManager');
+    const [googleEvents, macEvents] = await Promise.all([
+      CalendarManager.getInstance().getUpcomingEvents(),
+      MacCalendarManager.getInstance().getUpcomingEvents(),
+    ]);
+    return [...googleEvents, ...macEvents].sort((a: any, b: any) =>
+      new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+    );
   });
 
   safeHandle('calendar-refresh', async () => {
@@ -5950,6 +5972,58 @@ export function initializeIpcHandlers(appState: AppState): void {
       return false;
     }
   });
+
+  // ==========================================
+  // Interview Command Center IPC Handlers
+  // ==========================================
+
+  safeHandle('interviews:list', async (_, input?: unknown) => (
+    safeInterviewHandle(() => getInterviewService().list((input ?? {}) as any))
+  ));
+
+  safeHandle('interviews:get', async (_, input: unknown) => (
+    safeInterviewHandle(() => getInterviewService().get(input as any))
+  ));
+
+  safeHandle('interviews:create', async (_, operationId: string, payload: unknown) => (
+    safeInterviewHandle(() => getInterviewService().create(operationId, payload))
+  ));
+
+  safeHandle('interviews:update', async (_, id: string, patch: unknown) => (
+    safeInterviewHandle(() => getInterviewService().update(id, patch))
+  ));
+
+  safeHandle('interviews:archive', async (_, id: string) => (
+    safeInterviewHandle(() => getInterviewService().archive(id))
+  ));
+
+  safeHandle('interviews:delete', async (_, id: string, includeLinkedMeetings?: boolean) => (
+    safeInterviewHandle(() => getInterviewService().delete(id, includeLinkedMeetings))
+  ));
+
+  safeHandle('interviews:attach-meeting', async (_, interviewId: string, meetingId: string) => (
+    safeInterviewHandle(() => getInterviewService().attachMeeting(interviewId, meetingId))
+  ));
+
+  safeHandle('interviews:get-readiness', async (_, interviewId: string) => (
+    safeInterviewHandle(() => getInterviewService().getReadiness(interviewId))
+  ));
+
+  safeHandle('prep-briefs:save', async (_, interviewId: string, operationId: string, payload: unknown) => (
+    safeInterviewHandle(() => getInterviewService().savePrep(interviewId, operationId, payload))
+  ));
+
+  safeHandle('interview-retros:save', async (_, interviewId: string, operationId: string, payload: unknown) => (
+    safeInterviewHandle(() => getInterviewService().saveRetro(interviewId, operationId, payload))
+  ));
+
+  safeHandle('interview-questions:list', async (_, interviewId?: string) => (
+    safeInterviewHandle(() => getInterviewService().listQuestions(interviewId))
+  ));
+
+  safeHandle('interview-questions:save', async (_, interviewId: string, operationId: string, questions: unknown) => (
+    safeInterviewHandle(() => getInterviewService().saveQuestions(interviewId, operationId, questions))
+  ));
 
   // ==========================================
   // Modes IPC Handlers

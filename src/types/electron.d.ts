@@ -1,3 +1,19 @@
+import type {
+  InterviewCreatePayload,
+  InterviewDetail,
+  InterviewIpcResult,
+  InterviewListInput,
+  InterviewListItem,
+  InterviewQuestion,
+  InterviewQuestionPayload,
+  InterviewRetro,
+  InterviewRetroPayload,
+  InterviewUpdatePatch,
+  PrepBrief,
+  PrepBriefPayload,
+  ReadinessResult,
+} from './interviews'
+
 // Phase 3 — DynamicActionPayload mirrors electron/services/dynamic-actions/DynamicAction.ts.
 // Kept as a structural interface (not a class import) to preserve the strict main↔renderer
 // type boundary — the renderer never imports from electron/* directly.
@@ -250,6 +266,20 @@ export interface ElectronAPI {
   modesDeleteNoteSection: (id: string) => Promise<{ success: boolean; error?: string }>
   modesRemoveAllNoteSections: (modeId: string) => Promise<{ success: boolean; error?: string }>
 
+  // Interviews
+  interviewsList: (input?: InterviewListInput) => Promise<InterviewIpcResult<InterviewListItem[]>>
+  interviewsGet: (input: { id: string; include?: Array<'dossier' | 'prep' | 'retros' | 'questions' | 'contacts' | 'meetings'> }) => Promise<InterviewIpcResult<InterviewDetail>>
+  interviewsCreate: (operationId: string, payload: InterviewCreatePayload) => Promise<InterviewIpcResult<InterviewDetail>>
+  interviewsUpdate: (id: string, patch: InterviewUpdatePatch) => Promise<InterviewIpcResult<InterviewDetail>>
+  interviewsArchive: (id: string) => Promise<InterviewIpcResult<{ archived: boolean }>>
+  interviewsDelete: (id: string, includeLinkedMeetings?: boolean) => Promise<InterviewIpcResult<{ deleted: boolean }>>
+  interviewsAttachMeeting: (interviewId: string, meetingId: string) => Promise<InterviewIpcResult<{ attached: boolean }>>
+  interviewsGetReadiness: (interviewId: string) => Promise<InterviewIpcResult<ReadinessResult>>
+  prepBriefSave: (interviewId: string, operationId: string, payload: PrepBriefPayload) => Promise<InterviewIpcResult<PrepBrief>>
+  interviewRetroSave: (interviewId: string, operationId: string, payload: InterviewRetroPayload) => Promise<InterviewIpcResult<InterviewRetro>>
+  interviewQuestionsList: (interviewId?: string) => Promise<InterviewIpcResult<InterviewQuestion[]>>
+  interviewQuestionsSave: (interviewId: string, operationId: string, questions: InterviewQuestionPayload[]) => Promise<InterviewIpcResult<InterviewQuestion[]>>
+
   // Meeting Lifecycle
   startMeeting: (metadata?: any) => Promise<{ success: boolean; error?: string; code?: string }>
   endMeeting: () => Promise<{ success: boolean; error?: string }>
@@ -379,7 +409,7 @@ export interface ElectronAPI {
   calendarConnect: () => Promise<{ success: boolean; error?: string }>
   calendarDisconnect: () => Promise<{ success: boolean; error?: string }>
   getCalendarStatus: () => Promise<{ connected: boolean; email?: string }>
-  getUpcomingEvents: () => Promise<Array<{ id: string; title: string; startTime: string; endTime: string; link?: string; source: 'google'; attendees?: Array<{ email: string; name?: string; photoUrl?: string; response?: 'accepted' | 'declined' | 'tentative' | 'needsAction' }> }>>
+  getUpcomingEvents: () => Promise<Array<{ id: string; title: string; startTime: string; endTime: string; link?: string; source: 'google' | 'macos'; attendees?: Array<{ email: string; name?: string; photoUrl?: string; response?: 'accepted' | 'declined' | 'tentative' | 'needsAction' }> }>>
   calendarRefresh: () => Promise<{ success: boolean; error?: string }>
 
   // Auto-Update

@@ -38,7 +38,7 @@ export interface CalendarEvent {
     startTime: string; // ISO
     endTime: string; // ISO
     link?: string;
-    source: 'google';
+    source: 'google' | 'macos';
     attendees?: CalendarAttendee[];
 }
 

@@ -5,6 +5,7 @@ import { app } from 'electron';
 import fs from 'fs';
 import * as sqliteVec from 'sqlite-vec';
 import { buildLegacySpaceCaseSql } from '../rag/embeddingSpace';
+import { applyInterviewSchema } from '../services/interviews/schema';
 
 // Interfaces for our data objects
 export interface Meeting {
@@ -696,6 +697,15 @@ export class DatabaseManager {
                 console.error('[DatabaseManager] v16 migration backfill failed (non-fatal):', e);
             }
             this.db.pragma('user_version = 16');
+        }
+
+        // Version 16 → 17: Interview Command Center domain spine.
+        // Additive only: existing meetings remain readable and the nullable
+        // interview_event_id column is ignored by older code paths.
+        if (version < 17) {
+            console.log('[DatabaseManager] Applying migration v16 → v17: Interview domain schema');
+            applyInterviewSchema(this.db);
+            this.db.pragma('user_version = 17');
         }
 
         console.log('[DatabaseManager] Migrations completed.');

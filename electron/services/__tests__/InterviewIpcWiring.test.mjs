@@ -1,0 +1,61 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { findSafeHandle } from './ipcTestUtils.mjs';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(__dirname, '../../..');
+const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
+
+const channels = [
+  ['interviewsList', 'interviews:list'],
+  ['interviewsGet', 'interviews:get'],
+  ['interviewsCreate', 'interviews:create'],
+  ['interviewsUpdate', 'interviews:update'],
+  ['interviewsArchive', 'interviews:archive'],
+  ['interviewsDelete', 'interviews:delete'],
+  ['interviewsAttachMeeting', 'interviews:attach-meeting'],
+  ['interviewsGetReadiness', 'interviews:get-readiness'],
+  ['prepBriefSave', 'prep-briefs:save'],
+  ['interviewRetroSave', 'interview-retros:save'],
+  ['interviewQuestionsList', 'interview-questions:list'],
+  ['interviewQuestionsSave', 'interview-questions:save'],
+];
+
+test('Interview Command Center IPC handlers are registered through safeHandle', () => {
+  const source = read('electron/ipcHandlers.ts');
+
+  assert.match(source, /InterviewService/);
+  assert.match(source, /safeInterviewHandle/);
+  assert.match(source, /local_database_unavailable/);
+
+  for (const [, channel] of channels) {
+    assert.ok(findSafeHandle(source, channel) >= 0, `${channel} handler must be registered`);
+  }
+});
+
+test('preload exposes narrow wrappers for every interview IPC channel', () => {
+  const preload = read('electron/preload.ts');
+
+  for (const [method, channel] of channels) {
+    assert.match(preload, new RegExp(`${method}:\\s*\\(`), `${method} must be exposed`);
+    assert.match(
+      preload,
+      new RegExp(`ipcRenderer\\.invoke\\(['"]${channel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]`),
+      `${method} must call ${channel}`,
+    );
+  }
+});
+
+test('renderer electron.d.ts declares typed interview methods and shared result envelope', () => {
+  const types = read('src/types/electron.d.ts');
+
+  assert.match(types, /import type \{[\s\S]*InterviewIpcResult[\s\S]*\} from ['"]\.\/interviews['"]/);
+  assert.match(types, /interviewsList:\s*\(input\?: InterviewListInput\) => Promise<InterviewIpcResult<InterviewListItem\[\]>>/);
+  assert.match(types, /interviewsGet:\s*\(input: \{ id: string; include\?: Array<['"]dossier['"]/);
+  assert.match(types, /interviewsCreate:\s*\(operationId: string, payload: InterviewCreatePayload\) => Promise<InterviewIpcResult<InterviewDetail>>/);
+  assert.match(types, /prepBriefSave:\s*\(interviewId: string, operationId: string, payload: PrepBriefPayload\) => Promise<InterviewIpcResult<PrepBrief>>/);
+  assert.match(types, /interviewQuestionsSave:\s*\(interviewId: string, operationId: string, questions: InterviewQuestionPayload\[\]\) => Promise<InterviewIpcResult<InterviewQuestion\[\]>>/);
+});
