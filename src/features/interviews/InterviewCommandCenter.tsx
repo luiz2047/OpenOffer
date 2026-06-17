@@ -14,7 +14,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Sparkles,
   Trash2,
   UserRound,
   X,
@@ -163,9 +162,9 @@ function statusTone(status: InterviewStatus): string {
     case 'withdrawn':
       return 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20';
     case 'interviewing':
-      return 'text-sky-300 bg-sky-500/10 border-sky-500/20';
+      return 'text-cyan-300 bg-cyan-500/10 border-cyan-500/20';
     case 'screening':
-      return 'text-violet-300 bg-violet-500/10 border-violet-500/20';
+      return 'text-amber-300 bg-amber-500/10 border-amber-500/20';
     default:
       return 'text-zinc-200 bg-white/[0.04] border-white/[0.08]';
   }
@@ -263,9 +262,12 @@ function hasPrepPayload(payload?: Pick<PrepBriefPayload, 'expectedTopics' | 'che
   return Boolean(payload.cheatsheet || (payload.expectedTopics?.length ?? 0) > 0 || (payload.riskHandling?.length ?? 0) > 0);
 }
 
-const inputClass = 'w-full rounded-md border border-white/[0.08] bg-black/20 px-3 py-2 text-[13px] text-text-primary outline-none transition focus:border-sky-400/40 focus:bg-black/30';
-const labelClass = 'text-[11px] font-medium uppercase tracking-[0.08em] text-text-tertiary';
-const iconButtonClass = 'inline-flex h-8 w-8 items-center justify-center rounded-md text-text-secondary transition hover:bg-white/[0.06] hover:text-text-primary';
+const inputClass = 'min-h-11 w-full rounded-md border border-white/[0.08] bg-[#090b0d] px-3 py-2.5 text-[13px] text-text-primary outline-none transition focus:border-cyan-300/45 focus:bg-black/30';
+const labelClass = 'text-[11px] font-medium uppercase tracking-[0.06em] text-zinc-500';
+const iconButtonClass = 'inline-flex h-11 w-11 items-center justify-center rounded-md text-text-secondary transition hover:bg-white/[0.06] hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60';
+const paneHeaderClass = 'flex min-h-16 items-center justify-between border-b border-white/[0.07] px-4';
+const primaryButtonClass = 'inline-flex min-h-11 min-w-[44px] items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-[13px] font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40';
+const secondaryButtonClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-white/[0.08] px-3 py-2 text-[13px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
 
 const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   meetings,
@@ -653,12 +655,12 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   };
 
   return (
-    <div data-testid="interview-command-center" className="grid h-full min-h-0 grid-cols-[292px_minmax(300px,380px)_1fr] bg-[#0b0d0f] text-text-primary">
-      <aside className="flex min-h-0 flex-col border-r border-white/[0.07] bg-[#101316]">
-        <div className="flex h-14 items-center justify-between border-b border-white/[0.07] px-4">
+    <div data-testid="interview-command-center" className="grid h-full min-h-0 grid-cols-1 overflow-y-auto bg-[#0a0b0c] text-text-primary lg:grid-cols-[280px_minmax(320px,380px)_minmax(0,1fr)] lg:overflow-hidden">
+      <aside className="flex min-h-[520px] flex-col bg-[#101214] lg:min-h-0 lg:border-r lg:border-white/[0.07]">
+        <div className={paneHeaderClass}>
           <div className="flex items-center gap-2">
-            <CalendarDays size={18} className="text-sky-300" />
-            <span className="text-[14px] font-semibold">Calendar</span>
+            <CalendarDays size={18} className="text-cyan-300" />
+            <span className="text-[15px] font-semibold">Calendar</span>
           </div>
           <button className={iconButtonClass} onClick={refreshAll} title="Refresh">
             <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
@@ -666,18 +668,18 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         </div>
 
         <div className="border-b border-white/[0.07] p-3">
-          <div className="grid grid-cols-2 rounded-md bg-black/20 p-1">
+          <div className="grid grid-cols-2 rounded-md bg-black/25 p-1">
             {(['google', 'macos'] as CalendarProvider[]).map(provider => (
               <button
                 key={provider}
                 onClick={() => setActiveProvider(provider)}
-                className={`rounded px-2 py-1.5 text-[12px] font-medium transition ${activeProvider === provider ? 'bg-white/[0.08] text-white shadow-sm' : 'text-text-secondary hover:text-white'}`}
+                className={`min-h-11 rounded px-2 text-[12px] font-medium transition ${activeProvider === provider ? 'bg-white/[0.09] text-white shadow-sm' : 'text-white/70 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 {provider === 'google' ? 'Google' : 'Mac'}
               </button>
             ))}
           </div>
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-white/[0.07] bg-white/[0.03] px-3 py-2">
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-white/[0.035] px-3 py-2.5">
             <div className="min-w-0">
               <div className="text-[12px] font-medium text-text-primary">
                 {activeProvider === 'google' ? (calendarStatus?.connected ? 'Connected' : 'Not connected') : 'Local calendar'}
@@ -688,7 +690,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
             </div>
             {activeProvider === 'google' ? (
               <button
-                className="rounded-md bg-sky-500 px-2.5 py-1.5 text-[12px] font-semibold text-white transition hover:bg-sky-400"
+                className="min-h-11 rounded-md bg-cyan-500 px-3 text-[12px] font-semibold text-black transition hover:bg-cyan-300"
                 onClick={() => window.electronAPI?.calendarConnect?.().then(result => {
                   if (result.success) void loadCalendarStatus();
                   else setError(result.error || 'Calendar connection failed.');
@@ -698,7 +700,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               </button>
             ) : (
               <button
-                className="rounded-md border border-white/[0.08] px-2.5 py-1.5 text-[12px] font-semibold text-text-secondary"
+                className="min-h-11 rounded-md border border-white/[0.08] px-3 text-[12px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white"
                 onClick={() => onOpenSettings('calendar')}
               >
                 Settings
@@ -707,14 +709,14 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-1 border-b border-white/[0.07] p-3">
+        <div className="grid grid-cols-7 gap-1.5 border-b border-white/[0.07] p-3">
           {calendarDays.map(({ day, count }) => {
             const today = day.toDateString() === new Date().toDateString();
             return (
-              <div key={day.toISOString()} className={`flex h-14 flex-col items-center justify-center rounded-md border text-center ${today ? 'border-sky-400/30 bg-sky-500/10' : 'border-white/[0.06] bg-white/[0.025]'}`}>
-                <span className="text-[10px] uppercase text-text-tertiary">{day.toLocaleDateString([], { weekday: 'short' })}</span>
-                <span className="text-[14px] font-semibold">{day.getDate()}</span>
-                <span className="h-1.5 min-w-1.5 rounded-full bg-sky-400/80 px-1 text-[8px] leading-[6px] text-transparent">{count}</span>
+              <div key={day.toISOString()} className={`flex h-14 flex-col items-center justify-center rounded-md text-center transition ${today ? 'bg-cyan-400/10 text-white ring-1 ring-cyan-300/25' : 'text-text-secondary hover:bg-white/[0.035]'}`}>
+                <span className="text-[10px] uppercase text-zinc-500">{day.toLocaleDateString([], { weekday: 'short' })}</span>
+                <span className="text-[14px] font-semibold tabular-nums">{day.getDate()}</span>
+                {count > 0 ? <span className="mt-1 h-1.5 w-5 rounded-full bg-cyan-300/85" /> : <span className="mt-1 h-1.5 w-1.5 rounded-full bg-white/[0.12]" />}
               </div>
             );
           })}
@@ -730,7 +732,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               <button
                 key={event.id}
                 onClick={() => createFromEvent(event)}
-                className="w-full rounded-md border border-white/[0.07] bg-white/[0.035] p-3 text-left transition hover:border-sky-400/30 hover:bg-sky-500/10"
+                className="min-h-16 w-full rounded-md border border-transparent px-3 py-2.5 text-left transition hover:bg-white/[0.055] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -745,7 +747,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               </button>
             ))}
             {upcomingForProvider.length === 0 && (
-              <div className="rounded-md border border-white/[0.06] bg-white/[0.025] p-4 text-[12px] text-text-tertiary">
+              <div className="rounded-md bg-white/[0.025] p-4 text-[12px] text-text-tertiary">
                 No scheduled events.
               </div>
             )}
@@ -753,15 +755,15 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         </div>
       </aside>
 
-      <section className="flex min-h-0 flex-col border-r border-white/[0.07] bg-[#0d1013]">
-        <div className="flex h-14 items-center justify-between border-b border-white/[0.07] px-4">
+      <section className="flex min-h-[560px] flex-col bg-[#0c0e10] lg:min-h-0 lg:border-r lg:border-white/[0.07]">
+        <div className={paneHeaderClass}>
           <div>
-            <div className="text-[14px] font-semibold">Interview OS</div>
+            <div className="text-[15px] font-semibold">Interview OS</div>
             <div className="text-[11px] text-text-tertiary">{interviews.length} active process{interviews.length === 1 ? '' : 'es'}</div>
           </div>
           <button
             onClick={() => setShowCreate(true)}
-            className="inline-flex items-center gap-2 rounded-md bg-white text-black px-3 py-1.5 text-[12px] font-semibold transition hover:bg-zinc-200"
+            className={primaryButtonClass}
           >
             <Plus size={14} />
             Interview
@@ -769,13 +771,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         </div>
 
         <div className="border-b border-white/[0.07] p-3">
-          <div className="flex items-center gap-2 rounded-md border border-white/[0.08] bg-black/20 px-3 py-2">
+          <div className="flex min-h-11 items-center gap-2 rounded-md border border-white/[0.08] bg-black/20 px-3">
             <Search size={15} className="text-text-tertiary" />
             <input
               value={query}
               onChange={event => setQuery(event.target.value)}
               placeholder="Search company, role, stage"
-              className="w-full bg-transparent text-[13px] outline-none placeholder:text-text-tertiary"
+              className="min-h-11 w-full bg-transparent text-[13px] outline-none placeholder:text-text-tertiary"
             />
           </div>
         </div>
@@ -786,7 +788,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               <button
                 key={item.id}
                 onClick={() => setSelectedId(item.id)}
-                className={`w-full rounded-md border p-3 text-left transition ${selectedId === item.id ? 'border-sky-400/35 bg-sky-500/10' : 'border-white/[0.07] bg-white/[0.03] hover:bg-white/[0.055]'}`}
+                className={`min-h-24 w-full rounded-md border p-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60 ${selectedId === item.id ? 'border-cyan-300/35 bg-cyan-300/[0.08]' : 'border-transparent bg-transparent hover:bg-white/[0.045]'}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -806,7 +808,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               </button>
             ))}
             {filteredInterviews.length === 0 && (
-              <div className="rounded-md border border-white/[0.06] bg-white/[0.025] p-4 text-[13px] text-text-tertiary">
+              <div className="rounded-md bg-white/[0.025] p-4 text-[13px] text-text-tertiary">
                 No interviews yet.
               </div>
             )}
@@ -816,13 +818,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         <div className="border-t border-white/[0.07] p-3">
           <div className="mb-2 flex items-center justify-between">
             <span className={labelClass}>Recordings</span>
-            <button onClick={startSelectedInterview} className="text-[11px] font-semibold text-sky-300 hover:text-sky-200">
+            <button onClick={startSelectedInterview} className="min-h-11 px-2 text-[11px] font-semibold text-cyan-300 hover:text-cyan-200" style={{ minWidth: 44 }}>
               {isMeetingActive ? 'Open live' : 'Start'}
             </button>
           </div>
           <div className="space-y-1.5">
             {meetings.slice(0, 3).map(meeting => (
-              <button key={meeting.id} onClick={() => onOpenMeeting(meeting)} className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-[12px] transition hover:bg-white/[0.05]">
+              <button key={meeting.id} onClick={() => onOpenMeeting(meeting)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-2 text-left text-[12px] transition hover:bg-white/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60">
                 <span className="truncate text-text-secondary">{meeting.title}</span>
                 <ChevronRight size={14} className="shrink-0 text-text-tertiary" />
               </button>
@@ -831,14 +833,14 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         </div>
       </section>
 
-      <section className="flex min-h-0 flex-col bg-[#0b0d0f]">
-        <div className="flex h-14 items-center justify-between border-b border-white/[0.07] px-5">
+      <section className="flex min-h-[680px] flex-col bg-[#0a0b0c] lg:min-h-0">
+        <div className="flex min-h-16 items-center justify-between border-b border-white/[0.07] px-5">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-sky-500/10 text-sky-300">
+            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-300/10 text-cyan-300">
               <BriefcaseBusiness size={17} />
             </div>
             <div className="min-w-0">
-              <div className="truncate text-[14px] font-semibold">{detail?.title ?? 'No interview selected'}</div>
+              <div className="truncate text-[15px] font-semibold">{detail?.title ?? 'No interview selected'}</div>
               <div className="truncate text-[11px] text-text-tertiary">{detail ? [detail.company, detail.roleTitle].filter(Boolean).join(' · ') || 'Vacancy context pending' : 'Create or select a process'}</div>
             </div>
           </div>
@@ -846,14 +848,15 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
             <div className="flex items-center gap-2">
               <button
                 onClick={startSelectedInterview}
-                className="rounded-md bg-white px-3 py-1.5 text-[12px] font-semibold text-black transition hover:bg-zinc-200"
+                className={primaryButtonClass}
+                style={{ minWidth: 44 }}
               >
                 {isMeetingActive ? 'Open live' : 'Start'}
               </button>
               <select
                 value={detail.status}
                 onChange={event => updateStatus(detail.id, event.target.value as InterviewStatus)}
-                className="rounded-md border border-white/[0.08] bg-black/20 px-2 py-1.5 text-[12px] outline-none"
+                className="min-h-11 rounded-md border border-white/[0.08] bg-black/20 px-3 text-[12px] outline-none focus:border-cyan-300/45"
               >
                 {STATUS_OPTIONS.map(status => <option key={status} value={status}>{status}</option>)}
               </select>
@@ -875,14 +878,14 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         )}
 
         {detail ? (
-          <div className="grid min-h-0 flex-1 grid-cols-[1fr_268px]">
+          <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_252px]">
             <div className="min-h-0 overflow-y-auto p-5 custom-scrollbar">
-              <div className="mb-5 flex items-center gap-1 rounded-md border border-white/[0.07] bg-white/[0.025] p-1">
+              <div className="mb-5 flex items-center gap-1 border-b border-white/[0.07]">
                 {DETAIL_TABS.map(tab => (
                   <button
                     key={tab}
                     onClick={() => setDetailTab(tab)}
-                    className={`flex-1 rounded px-3 py-1.5 text-[12px] font-semibold transition ${detailTab === tab ? 'bg-white/[0.08] text-white' : 'text-text-secondary hover:text-white'}`}
+                    className={`min-h-11 flex-1 px-3 text-[12px] font-semibold transition ${detailTab === tab ? 'border-b-2 border-cyan-300 text-white' : 'border-b-2 border-transparent text-text-secondary hover:text-white'}`}
                   >
                     {tab}
                   </button>
@@ -891,29 +894,29 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
               {detailTab === 'Vacancy' && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <InfoTile icon={<BriefcaseBusiness size={16} />} label="Company" value={detail.company || 'Unfilled'} />
                     <InfoTile icon={<UserRound size={16} />} label="Role" value={detail.roleTitle || 'Unfilled'} />
                     <InfoTile icon={<CircleDot size={16} />} label="Stage" value={detail.stage || 'Unfilled'} />
                     <InfoTile icon={<Clock3 size={16} />} label="Schedule" value={formatDateTime(detail.startsAt)} />
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <button
-                      className="flex items-center justify-between rounded-md border border-white/[0.07] bg-white/[0.03] p-3 text-left transition hover:border-sky-400/30"
+                      className="flex min-h-14 items-center justify-between rounded-md bg-white/[0.025] p-3 text-left transition hover:bg-white/[0.055] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60"
                       onClick={() => detail.vacancyUrl && window.electronAPI?.openExternal?.(detail.vacancyUrl)}
                     >
                       <span className="text-[13px] text-text-secondary">Vacancy URL</span>
                       <ArrowUpRight size={15} className="text-text-tertiary" />
                     </button>
                     <button
-                      className="flex items-center justify-between rounded-md border border-white/[0.07] bg-white/[0.03] p-3 text-left transition hover:border-sky-400/30"
+                      className="flex min-h-14 items-center justify-between rounded-md bg-white/[0.025] p-3 text-left transition hover:bg-white/[0.055] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60"
                       onClick={() => detail.meetingUrl && window.electronAPI?.openExternal?.(detail.meetingUrl)}
                     >
                       <span className="text-[13px] text-text-secondary">Meeting URL</span>
                       <LinkIcon size={15} className="text-text-tertiary" />
                     </button>
                   </div>
-                  <div className="rounded-md border border-white/[0.07] bg-white/[0.025] p-4">
+                  <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
                     <div className={labelClass}>Raw vacancy / HR context</div>
                     <div className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-text-secondary">
                       {detail.rawSourceText || 'No source text yet.'}
@@ -935,14 +938,14 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                     ]}
                     onChange={(key, value) => updateDraft('dossier', setDossierDraft, key, value)}
                   />
-                  <div className="rounded-md border border-white/[0.07] bg-white/[0.025] p-4">
+                  <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
                     <div className={labelClass}>Attach recording</div>
                     <div className="mt-3 flex gap-2">
                       <select value={attachMeetingId} onChange={event => setAttachMeetingId(event.target.value)} className={inputClass}>
                         <option value="">Select meeting</option>
                         {meetings.map(meeting => <option key={meeting.id} value={meeting.id}>{meeting.title}</option>)}
                       </select>
-                      <button onClick={attachMeeting} disabled={!attachMeetingId || busy} className="rounded-md bg-sky-500 px-3 text-[12px] font-semibold text-white disabled:opacity-40">
+                      <button onClick={attachMeeting} disabled={!attachMeetingId || busy} className={secondaryButtonClass}>
                         Link
                       </button>
                     </div>
@@ -977,9 +980,9 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       <div className="text-[13px] font-semibold text-amber-100">Retro is due</div>
                       <div className="mt-1 text-[12px] text-amber-100/75">Capture what changed before the interview context decays.</div>
                       <div className="mt-3 flex gap-2">
-                        <button onClick={() => setDetailTab('Retro')} className="rounded-md bg-amber-300 px-3 py-1.5 text-[12px] font-semibold text-black">Write</button>
-                        <button onClick={() => updateRetroPrompt('snooze')} className="rounded-md border border-amber-300/25 px-3 py-1.5 text-[12px] font-semibold text-amber-100">Snooze</button>
-                        <button onClick={() => updateRetroPrompt('dismiss')} className="rounded-md border border-white/[0.08] px-3 py-1.5 text-[12px] font-semibold text-text-secondary">Dismiss</button>
+                        <button onClick={() => setDetailTab('Retro')} className="min-h-11 rounded-md bg-amber-300 px-3 text-[12px] font-semibold text-black">Write</button>
+                        <button onClick={() => updateRetroPrompt('snooze')} className="min-h-11 rounded-md border border-amber-300/25 px-3 text-[12px] font-semibold text-amber-100">Snooze</button>
+                        <button onClick={() => updateRetroPrompt('dismiss')} className="min-h-11 rounded-md border border-white/[0.08] px-3 text-[12px] font-semibold text-text-secondary">Dismiss</button>
                       </div>
                     </div>
                   )}
@@ -1004,16 +1007,16 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
               {detailTab === 'Questions' && (
                 <div className="space-y-4">
-                  <div className="rounded-md border border-white/[0.07] bg-white/[0.025] p-4">
-                    <div className="grid grid-cols-[1fr_150px_auto] gap-2">
+                  <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                    <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_150px_auto]">
                       <input value={questionText} onChange={event => setQuestionText(event.target.value)} className={inputClass} placeholder="Question" />
                       <input value={questionCategory} onChange={event => setQuestionCategory(event.target.value)} className={inputClass} placeholder="Category" />
-                      <button onClick={addQuestion} className="rounded-md bg-white px-3 text-[12px] font-semibold text-black">Add</button>
+                      <button onClick={addQuestion} className={primaryButtonClass}>Add</button>
                     </div>
                   </div>
                   <div className="space-y-2">
                     {questionDrafts.map((question, index) => (
-                      <div key={`${question.id ?? 'draft'}-${index}`} className="flex items-start justify-between gap-3 rounded-md border border-white/[0.07] bg-white/[0.03] p-3">
+                      <div key={`${question.id ?? 'draft'}-${index}`} className="flex items-start justify-between gap-3 rounded-md bg-white/[0.025] p-3">
                         <div>
                           <div className="text-[13px] font-medium">{question.questionText}</div>
                           <div className="mt-1 text-[11px] text-text-tertiary">{question.category || 'uncategorized'}</div>
@@ -1024,13 +1027,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       </div>
                     ))}
                   </div>
-                  <button onClick={saveQuestions} disabled={busy} className="rounded-md bg-sky-500 px-4 py-2 text-[12px] font-semibold text-white disabled:opacity-40">Save questions</button>
+                  <button onClick={saveQuestions} disabled={busy} className={primaryButtonClass}>Save questions</button>
                 </div>
               )}
             </div>
 
-            <aside className="min-h-0 overflow-y-auto border-l border-white/[0.07] bg-[#101316] p-4 custom-scrollbar">
-              <div className={`rounded-md border px-3 py-2 ${readinessTone(readiness?.level)}`}>
+            <aside className="min-h-0 overflow-y-auto border-t border-white/[0.07] bg-[#0e1012] p-4 custom-scrollbar lg:border-l lg:border-t-0">
+              <div className={`rounded-md px-3 py-3 ring-1 ring-current/15 ${readinessTone(readiness?.level)}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-[12px] font-semibold">Readiness</span>
                   <span className="text-[18px] font-bold tabular-nums">{readiness?.score ?? 0}</span>
@@ -1040,7 +1043,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               <SideMetric icon={<ListChecks size={15} />} label="Checklist" value={`${detail.prep?.lastChecklist?.length ?? 0} items`} />
               <SideMetric icon={<MessageSquareText size={15} />} label="Questions" value={`${detail.questions?.length ?? 0} saved`} />
               <SideMetric icon={<FileText size={15} />} label="Retros" value={`${detail.retros?.length ?? 0} notes`} />
-              <div className="mt-4 rounded-md border border-white/[0.07] bg-white/[0.025] p-3">
+              <div className="mt-4 rounded-md bg-white/[0.025] p-3">
                 <div className={labelClass}>Linked recordings</div>
                 <div className="mt-3 space-y-2">
                   {(detail.linkedMeetings ?? []).map(meeting => (
@@ -1053,11 +1056,11 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
           </div>
         ) : (
           <div className="flex flex-1 items-center justify-center">
-            <div className="w-[360px] rounded-md border border-white/[0.07] bg-white/[0.03] p-6 text-center">
-              <Sparkles size={26} className="mx-auto text-sky-300" />
+            <div className="w-full max-w-[360px] p-6 text-center">
+              <BriefcaseBusiness size={26} className="mx-auto text-cyan-300" />
               <div className="mt-3 text-[15px] font-semibold">Start a process</div>
               <div className="mt-2 text-[13px] leading-5 text-text-tertiary">No active process selected.</div>
-              <button onClick={() => setShowCreate(true)} className="mt-4 rounded-md bg-white px-4 py-2 text-[12px] font-semibold text-black">New interview</button>
+              <button onClick={() => setShowCreate(true)} className={`${primaryButtonClass} mt-4`}>New interview</button>
             </div>
           </div>
         )}
@@ -1065,7 +1068,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
       {showCreate && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/55 backdrop-blur-sm">
-          <div className="w-[680px] rounded-lg border border-white/[0.1] bg-[#111417] p-5 shadow-2xl">
+          <div className="max-h-[calc(100vh-24px)] w-[min(760px,calc(100vw-24px))] overflow-y-auto rounded-md bg-[#111417] p-5 shadow-2xl ring-1 ring-white/[0.1]">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <div className="text-[16px] font-semibold">New interview</div>
@@ -1080,7 +1083,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 <X size={15} />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <Field label="Title"><input className={inputClass} value={createForm.title} onChange={event => setCreateForm(prev => ({ ...prev, title: event.target.value }))} /></Field>
               <Field label="Company"><input className={inputClass} value={createForm.company ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, company: event.target.value }))} /></Field>
               <Field label="Role"><input className={inputClass} value={createForm.roleTitle ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, roleTitle: event.target.value }))} /></Field>
@@ -1106,10 +1109,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                   <option value="macos">Create in Mac Calendar</option>
                 </select>
               </Field>
-              <div className="self-end pb-2 text-[11px] leading-4 text-text-tertiary">
-                Requires start and end time.
-              </div>
-              <div className="col-span-2">
+              <div className="md:col-span-2">
                 <Field label="Source text">
                   <textarea
                     className={`${inputClass} min-h-[130px] resize-none`}
@@ -1123,15 +1123,15 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 </Field>
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <div className="min-w-0 truncate text-[11px] text-text-tertiary">
-                    {sourceParsePreview ? `${sourceParsePreview.fieldCount} fields detected` : 'Paste HH, Getmatch, Telegram, or calendar context.'}
+                    {sourceParsePreview ? `${sourceParsePreview.fieldCount} fields detected` : 'Unparsed source'}
                     {parseWarnings.length > 0 ? ` · ${parseWarnings.join(', ')}` : ''}
                   </div>
                   <button
                     onClick={parseSourceText}
                     disabled={busy || !(createForm.rawSourceText ?? '').trim()}
-                    className="inline-flex items-center gap-2 rounded-md border border-white/[0.08] px-3 py-1.5 text-[12px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white disabled:opacity-40"
+                    className={secondaryButtonClass}
                   >
-                    <Sparkles size={14} />
+                    <FileText size={14} />
                     Parse
                   </button>
                 </div>
@@ -1143,8 +1143,8 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 setCreateCalendarProvider('none');
                 setSourceParsePreview(null);
                 setParseWarnings([]);
-              }} className="rounded-md border border-white/[0.08] px-4 py-2 text-[12px] font-semibold text-text-secondary">Cancel</button>
-              <button onClick={createInterview} disabled={busy || !createForm.title.trim()} className="rounded-md bg-sky-500 px-4 py-2 text-[12px] font-semibold text-white disabled:opacity-40">
+              }} className={secondaryButtonClass}>Cancel</button>
+              <button onClick={createInterview} disabled={busy || !createForm.title.trim()} className={primaryButtonClass}>
                 Create
               </button>
             </div>
@@ -1163,7 +1163,7 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
 );
 
 const InfoTile: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
-  <div className="rounded-md border border-white/[0.07] bg-white/[0.03] p-3">
+  <div className="rounded-md bg-white/[0.025] p-3 ring-1 ring-white/[0.04]">
     <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.08em] text-text-tertiary">
       {icon}
       {label}
@@ -1173,7 +1173,7 @@ const InfoTile: React.FC<{ icon: React.ReactNode; label: string; value: string }
 );
 
 const SideMetric: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
-  <div className="mt-3 flex items-center justify-between rounded-md border border-white/[0.07] bg-white/[0.025] px-3 py-2">
+  <div className="mt-3 flex min-h-11 items-center justify-between rounded-md bg-white/[0.025] px-3 py-2">
     <div className="flex items-center gap-2 text-[12px] text-text-secondary">
       {icon}
       {label}
@@ -1199,20 +1199,22 @@ const EditorPanel: React.FC<{
           {status === 'dirty' ? 'Draft changed' : status === 'saved' ? 'Draft saved locally' : status === 'failed' ? 'Draft not saved locally' : 'Synced'}
         </div>
       </div>
-      <button onClick={onSave} disabled={busy} className="rounded-md bg-sky-500 px-4 py-2 text-[12px] font-semibold text-white disabled:opacity-40">
+      <button onClick={onSave} disabled={busy} className={primaryButtonClass}>
         {action}
       </button>
     </div>
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {fields.map(field => (
-        <Field key={field.key} label={field.label}>
-          <textarea
-            className={`${inputClass} resize-none ${field.rows > 4 ? 'col-span-2' : ''}`}
-            rows={field.rows}
-            value={field.value}
-            onChange={event => onChange(field.key, event.target.value)}
-          />
-        </Field>
+        <div key={field.key} className={field.rows > 4 ? 'md:col-span-2' : undefined}>
+          <Field label={field.label}>
+            <textarea
+              className={`${inputClass} resize-none`}
+              rows={field.rows}
+              value={field.value}
+              onChange={event => onChange(field.key, event.target.value)}
+            />
+          </Field>
+        </div>
       ))}
     </div>
   </div>
