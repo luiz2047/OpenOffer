@@ -1,6 +1,6 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import type { CalendarEvent } from './CalendarManager';
+import type { CalendarCreateEventInput, CalendarEvent } from './CalendarManager';
 
 const execFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT_MS = 4_000;
@@ -82,6 +82,64 @@ Calendar.calendars().forEach(function(calendar) {
 JSON.stringify(result);
 `;
 
+const MAC_CALENDAR_CREATE_JXA = `
+ObjC.import('stdlib');
+
+function stringValue(value, fallback) {
+  try {
+    if (value === null || value === undefined) return fallback;
+    return String(value);
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function eventId(calendarName, event, startDate, title) {
+  try {
+    if (typeof event.uid === 'function') {
+      var uid = event.uid();
+      if (uid) return 'macos:' + String(uid);
+    }
+  } catch (_) {}
+  try {
+    if (typeof event.id === 'function') {
+      var id = event.id();
+      if (id) return 'macos:' + String(id);
+    }
+  } catch (_) {}
+  return 'macos:' + calendarName + ':' + startDate.toISOString() + ':' + title;
+}
+
+var input = JSON.parse($.getenv('OPENOFFER_MAC_CALENDAR_CREATE_JSON') || '{}');
+var Calendar = Application('Calendar');
+Calendar.includeStandardAdditions = true;
+var calendars = Calendar.calendars();
+if (!calendars.length) throw new Error('No macOS calendars available');
+var calendar = calendars[0];
+var calendarName = stringValue(calendar.name(), 'Calendar');
+var startDate = new Date(input.startTime);
+var endDate = new Date(input.endTime);
+var title = stringValue(input.title, 'Interview');
+var description = [stringValue(input.description, ''), stringValue(input.link, '')].filter(Boolean).join('\\n\\n');
+var event = Calendar.Event({
+  summary: title,
+  startDate: startDate,
+  endDate: endDate,
+  description: description,
+  url: stringValue(input.link, '')
+});
+calendar.events.push(event);
+JSON.stringify({
+  id: eventId(calendarName, event, startDate, title),
+  title: title,
+  startTime: startDate.toISOString(),
+  endTime: endDate.toISOString(),
+  link: stringValue(input.link, ''),
+  source: 'macos',
+  calendarName: calendarName
+});
+`;
+
 export class MacCalendarManager {
   private static instance: MacCalendarManager;
 
@@ -127,6 +185,30 @@ export class MacCalendarManager {
       console.warn('[MacCalendarManager] macOS Calendar read failed:', error?.message || error);
       return [];
     }
+  }
+
+  public async createEvent(input: CalendarCreateEventInput): Promise<CalendarEvent> {
+    if (!this.isAvailable()) {
+      throw new Error('macOS Calendar is only available on Darwin.');
+    }
+    const { stdout } = await execFileAsync('/usr/bin/osascript', ['-l', 'JavaScript', '-e', MAC_CALENDAR_CREATE_JXA], {
+      timeout: DEFAULT_TIMEOUT_MS,
+      maxBuffer: 1024 * 1024,
+      env: {
+        ...process.env,
+        OPENOFFER_MAC_CALENDAR_CREATE_JSON: JSON.stringify(input),
+      },
+    });
+    const parsed = JSON.parse(stdout.trim()) as CalendarEvent;
+    return {
+      id: parsed.id,
+      title: parsed.title || input.title,
+      startTime: parsed.startTime || input.startTime,
+      endTime: parsed.endTime || input.endTime,
+      link: parsed.link || input.link,
+      source: 'macos',
+      attendees: [],
+    };
   }
 
   private extractMeetingLink(text: string): string | undefined {

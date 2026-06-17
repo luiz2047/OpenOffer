@@ -818,6 +818,7 @@ interface ElectronAPI {
   interviewsArchive: (id: string) => Promise<InterviewIpcResult<{ archived: boolean }>>;
   interviewsDelete: (id: string, includeLinkedMeetings?: boolean) => Promise<InterviewIpcResult<{ deleted: boolean }>>;
   interviewsAttachMeeting: (interviewId: string, meetingId: string) => Promise<InterviewIpcResult<{ attached: boolean }>>;
+  interviewsCreateCalendarEvent: (interviewId: string, provider: 'google' | 'macos') => Promise<InterviewIpcResult<InterviewDetail>>;
   interviewsGetReadiness: (interviewId: string) => Promise<InterviewIpcResult<ReadinessResult>>;
   interviewsGetRetroPrompt: (interviewId: string) => Promise<InterviewIpcResult<RetroPromptDecision>>;
   interviewsUpdateRetroPrompt: (interviewId: string, payload: RetroPromptActionPayload) => Promise<InterviewIpcResult<RetroPromptDecision>>;
@@ -2156,6 +2157,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('interviews:delete', id, includeLinkedMeetings),
   interviewsAttachMeeting: (interviewId: string, meetingId: string) =>
     ipcRenderer.invoke('interviews:attach-meeting', interviewId, meetingId),
+  interviewsCreateCalendarEvent: (interviewId: string, provider: 'google' | 'macos') =>
+    ipcRenderer.invoke('interviews:create-calendar-event', interviewId, provider),
   interviewsGetReadiness: (interviewId: string) =>
     ipcRenderer.invoke('interviews:get-readiness', interviewId),
   interviewsGetRetroPrompt: (interviewId: string) =>

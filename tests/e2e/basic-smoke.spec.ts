@@ -127,6 +127,21 @@ test.describe('OpenOffer E2E smoke', () => {
         interviewsArchive: async () => ({ ok: true, data: { archived: true } }),
         interviewsDelete: async () => ({ ok: true, data: { deleted: true } }),
         interviewsAttachMeeting: async () => ({ ok: true, data: { attached: true } }),
+        interviewsCreateCalendarEvent: async () => ({
+          ok: true,
+          data: {
+            id: 'interview_mock',
+            title: 'Mock interview',
+            status: 'active',
+            priority: 'normal',
+            calendarProvider: 'google',
+            calendarId: 'primary',
+            calendarEventId: 'calendar_mock',
+            calendarSyncStatus: 'linked',
+            createdAt: '2026-06-18T00:00:00.000Z',
+            updatedAt: '2026-06-18T00:00:00.000Z',
+          },
+        }),
         interviewsGetReadiness: async () => ({ ok: true, data: { score: 0, level: 'not_started', blockers: [], warnings: [], completed: [], nextAction: null } }),
         interviewsParseSourceText: async (input: any) => ({
           ok: true,

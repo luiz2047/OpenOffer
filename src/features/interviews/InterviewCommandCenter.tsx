@@ -289,6 +289,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const [query, setQuery] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<InterviewCreatePayload>(initialCreateForm);
+  const [createCalendarProvider, setCreateCalendarProvider] = useState<'none' | 'google' | 'macos'>('none');
   const [sourceParsePreview, setSourceParsePreview] = useState<InterviewSourceParseResult | null>(null);
   const [parseWarnings, setParseWarnings] = useState<string[]>([]);
   const [dossierDraft, setDossierDraft] = useState(initialDossierDraft);
@@ -485,8 +486,16 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
           riskHandling: sourceParsePreview.prep.riskHandling ?? [],
         });
       }
+      if (createCalendarProvider !== 'none' && createForm.startsAt && createForm.endsAt) {
+        try {
+          await interviewApi.createCalendarEvent(created.id, createCalendarProvider);
+        } catch (err: any) {
+          setError(`Created locally. Calendar sync failed: ${err?.message || 'unknown error'}`);
+        }
+      }
       setShowCreate(false);
       setCreateForm(initialCreateForm());
+      setCreateCalendarProvider('none');
       setSourceParsePreview(null);
       setParseWarnings([]);
       await loadInterviews();
@@ -1064,6 +1073,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               </div>
               <button className={iconButtonClass} onClick={() => {
                 setShowCreate(false);
+                setCreateCalendarProvider('none');
                 setSourceParsePreview(null);
                 setParseWarnings([]);
               }} aria-label="Close">
@@ -1089,6 +1099,16 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               <Field label="Ends"><input className={inputClass} type="datetime-local" value={toLocalInputValue(createForm.endsAt)} onChange={event => setCreateForm(prev => ({ ...prev, endsAt: fromLocalInputValue(event.target.value) }))} /></Field>
               <Field label="Vacancy URL"><input className={inputClass} value={createForm.vacancyUrl ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, vacancyUrl: event.target.value }))} /></Field>
               <Field label="Meeting URL"><input className={inputClass} value={createForm.meetingUrl ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, meetingUrl: event.target.value }))} /></Field>
+              <Field label="Calendar sync">
+                <select className={inputClass} value={createCalendarProvider} onChange={event => setCreateCalendarProvider(event.target.value as 'none' | 'google' | 'macos')}>
+                  <option value="none">Do not add</option>
+                  <option value="google">Create in Google Calendar</option>
+                  <option value="macos">Create in Mac Calendar</option>
+                </select>
+              </Field>
+              <div className="self-end pb-2 text-[11px] leading-4 text-text-tertiary">
+                Requires start and end time.
+              </div>
               <div className="col-span-2">
                 <Field label="Source text">
                   <textarea
@@ -1120,6 +1140,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
             <div className="mt-5 flex justify-end gap-2">
               <button onClick={() => {
                 setShowCreate(false);
+                setCreateCalendarProvider('none');
                 setSourceParsePreview(null);
                 setParseWarnings([]);
               }} className="rounded-md border border-white/[0.08] px-4 py-2 text-[12px] font-semibold text-text-secondary">Cancel</button>

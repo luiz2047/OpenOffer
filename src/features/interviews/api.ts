@@ -69,6 +69,10 @@ export const interviewApi = {
     return unwrap(await requireBridge().interviewsAttachMeeting(interviewId, meetingId));
   },
 
+  async createCalendarEvent(interviewId: string, provider: 'google' | 'macos'): Promise<InterviewDetail> {
+    return unwrap(await requireBridge().interviewsCreateCalendarEvent(interviewId, provider));
+  },
+
   async getReadiness(interviewId: string): Promise<ReadinessResult> {
     return unwrap(await requireBridge().interviewsGetReadiness(interviewId));
   },

@@ -6009,6 +6009,74 @@ export function initializeIpcHandlers(appState: AppState): void {
     safeInterviewHandle(() => getInterviewService().attachMeeting(interviewId, meetingId))
   ));
 
+  safeHandle('interviews:create-calendar-event', async (_, interviewId: string, provider: unknown) => (
+    safeInterviewHandle(async () => {
+      if (provider !== 'google' && provider !== 'macos') {
+        throw new InterviewDomainError('invalid_payload', 'calendar provider is invalid.', false, 'fix_input');
+      }
+      const service = getInterviewService();
+      const detail = service.get({ id: interviewId, include: ['dossier', 'prep'] });
+      if (!detail.startsAt || !detail.endsAt) {
+        throw new InterviewDomainError('invalid_payload', 'Interview must have a start and end time before calendar sync.', false, 'fix_input');
+      }
+      const description = [
+        detail.company ? `Company: ${detail.company}` : null,
+        detail.roleTitle ? `Role: ${detail.roleTitle}` : null,
+        detail.stage ? `Stage: ${detail.stage}` : null,
+        detail.vacancyUrl ? `Vacancy: ${detail.vacancyUrl}` : null,
+        detail.prep?.oneLineGoal ? `Goal: ${detail.prep.oneLineGoal}` : null,
+        detail.dossier?.questionsToAsk?.length ? `Questions:\n${detail.dossier.questionsToAsk.map(item => `- ${item}`).join('\n')}` : null,
+      ].filter(Boolean).join('\n');
+      let event: any;
+      try {
+        event = provider === 'google'
+          ? await require('./services/CalendarManager').CalendarManager.getInstance().createEvent({
+            title: detail.title,
+            startTime: new Date(detail.startsAt).toISOString(),
+            endTime: new Date(detail.endsAt).toISOString(),
+            description,
+            link: detail.meetingUrl ?? undefined,
+            calendarId: 'primary',
+          })
+          : await require('./services/MacCalendarManager').MacCalendarManager.getInstance().createEvent({
+            title: detail.title,
+            startTime: new Date(detail.startsAt).toISOString(),
+            endTime: new Date(detail.endsAt).toISOString(),
+            description,
+            link: detail.meetingUrl ?? undefined,
+            calendarId: 'macos',
+          });
+      } catch (error: any) {
+        throw new InterviewDomainError(
+          'calendar_refresh_failed',
+          error?.message || 'Could not create calendar event.',
+          true,
+          provider === 'google' ? 'connect_calendar' : 'refresh_calendar',
+        );
+      }
+      const snapshot = {
+        provider,
+        calendarId: provider === 'google' ? 'primary' : 'macos',
+        eventId: event.id,
+        title: event.title,
+        startsAt: new Date(event.startTime).getTime(),
+        endsAt: new Date(event.endTime).getTime(),
+        meetingUrl: event.link,
+        attendeeEmails: (event.attendees ?? []).map((attendee: any) => attendee.email).filter(Boolean),
+        attendeeNames: (event.attendees ?? []).map((attendee: any) => attendee.name || attendee.email).filter(Boolean),
+        capturedAt: Date.now(),
+      };
+      return service.update(detail.id, {
+        calendarProvider: provider,
+        calendarId: snapshot.calendarId,
+        calendarEventId: event.id,
+        calendarSnapshot: snapshot,
+        calendarLastSeenAt: Date.now(),
+        calendarSyncStatus: 'linked',
+      });
+    })
+  ));
+
   safeHandle('interviews:get-readiness', async (_, interviewId: string) => (
     safeInterviewHandle(() => getInterviewService().getReadiness(interviewId))
   ));

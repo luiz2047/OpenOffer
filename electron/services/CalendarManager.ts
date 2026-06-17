@@ -12,7 +12,7 @@ import { EventEmitter } from 'events';
 // holds the secret.
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "YOUR_CLIENT_ID_HERE";
 const REDIRECT_URI = "http://localhost:11111/auth/callback";
-const SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"];
+const SCOPES = ["https://www.googleapis.com/auth/calendar.readonly", "https://www.googleapis.com/auth/calendar.events"];
 const TOKEN_PATH = path.join(app.getPath('userData'), 'calendar_tokens.enc');
 // Explicit proxy only. Default-disabled means no network is attempted until the
 // user configures a self-hosted or OpenOffer calendar proxy URL.
@@ -40,6 +40,15 @@ export interface CalendarEvent {
     link?: string;
     source: 'google' | 'macos';
     attendees?: CalendarAttendee[];
+}
+
+export interface CalendarCreateEventInput {
+    title: string;
+    startTime: string;
+    endTime: string;
+    description?: string;
+    link?: string;
+    calendarId?: string;
 }
 
 export class CalendarManager extends EventEmitter {
@@ -413,6 +422,51 @@ export class CalendarManager extends EventEmitter {
         const events = await this.fetchEventsInternal();
         this.scheduleReminders(events);
         return events;
+    }
+
+    public async createEvent(input: CalendarCreateEventInput): Promise<CalendarEvent> {
+        if (!this.isConnected || !this.accessToken) {
+            throw new Error('Google Calendar is not connected.');
+        }
+        if (this.expiryDate && Date.now() > this.expiryDate - 60_000) {
+            await this.refreshAccessToken();
+        }
+
+        const calendarId = input.calendarId || 'primary';
+        const response = await fetch(
+            `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`,
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    summary: input.title,
+                    description: [input.description, input.link].filter(Boolean).join('\n\n'),
+                    start: { dateTime: input.startTime },
+                    end: { dateTime: input.endTime },
+                    location: input.link || undefined,
+                }),
+                signal: AbortSignal.timeout(15_000),
+            },
+        );
+
+        if (!response.ok) {
+            const body = await response.text().catch(() => '');
+            throw new Error(`Google Calendar event create failed: HTTP ${response.status} ${body.slice(0, 200)}`.trim());
+        }
+
+        const data = await response.json();
+        return {
+            id: String(data.id),
+            title: data.summary || input.title,
+            startTime: data.start?.dateTime || input.startTime,
+            endTime: data.end?.dateTime || input.endTime,
+            link: data.hangoutLink || input.link || data.htmlLink,
+            source: 'google',
+            attendees: [],
+        };
     }
 
     private async fetchEventsInternal(): Promise<CalendarEvent[]> {

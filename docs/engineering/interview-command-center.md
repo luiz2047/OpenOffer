@@ -19,6 +19,7 @@ Core tables:
 
 `meetings.interview_event_id` links existing recordings to an interview without changing the old meeting lifecycle.
 Starting a meeting from a selected interview passes `interviewEventId` through the renderer, main process, session snapshot, and `MeetingPersistence`. Explicit interview metadata wins; otherwise `DatabaseManager.saveMeeting` preserves a placeholder link or auto-links by `calendar_event_id` only when exactly one active interview matches.
+Manual interview creation can also create an outbound calendar event. The local interview is created first, then `interviews:create-calendar-event` writes to Google Calendar or macOS Calendar and updates the interview calendar link/snapshot.
 
 ## Main Process
 
@@ -30,7 +31,7 @@ The domain boundary is:
 - `ipcHandlers.ts`: thin IPC bridge returning `InterviewIpcResult<T>`.
 - `preload.ts` and `src/types/electron.d.ts`: typed renderer contract.
 
-Calendar support uses the existing Google Calendar manager plus `MacCalendarManager`, which reads local macOS Calendar.app events via a bounded `/usr/bin/osascript` JXA bridge. If macOS calendar access is denied or unavailable, the reader returns `[]`.
+Calendar support uses the existing Google Calendar manager plus `MacCalendarManager`. Google reads events and creates interview events through the Calendar API while token exchange/refresh stay behind the explicit proxy. macOS reads and creates Calendar.app events through bounded `/usr/bin/osascript` JXA bridges. If macOS calendar access is denied or unavailable, the reader returns `[]`.
 
 ## Renderer
 
@@ -40,6 +41,7 @@ Calendar support uses the existing Google Calendar manager plus `MacCalendarMana
 - middle process list with search, creation, and recent recordings;
 - detail pane for editable vacancy dossier, prep brief, retro, question bank, readiness, and meeting attachment;
 - manual intake parser that can prefill an interview and save the parsed dossier/prep immediately after creation;
+- manual intake calendar sync selector for creating the scheduled interview in Google Calendar or Mac Calendar when start/end times are present;
 - local draft recovery for vacancy, prep, and retro editors under `openoffer:interviews:draft:*`, cleared after successful save.
 
 `src/components/Launcher.tsx` keeps the existing app chrome, search, settings, modes, profile, and meeting-detail navigation, but renders the command center as the default launcher body.
@@ -53,6 +55,7 @@ Targeted coverage:
 - `InterviewIpcWiring.test.mjs`: handler/preload/types bridge.
 - `InterviewMeetingLinkContract.test.mjs`: start-from-interview metadata, persistence snapshot, DB auto-link contract.
 - `InterviewCommandCenterHardening.test.mjs`: local draft recovery and paste/privacy invariants.
+- `InterviewCalendarWriteContract.test.mjs`: Google/macOS outbound event creation and renderer/IPC contract.
 - `InterviewTaxonomy.test.mjs`: Obsidian workflow mapping.
 - `MacCalendarManagerContract.test.mjs`: local macOS calendar bridge contract.
 - `OpenOfferCommercialRemoval.test.mjs`: removed creator/donation/commercial surfaces stay absent.

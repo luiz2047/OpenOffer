@@ -18,6 +18,7 @@ const channels = [
   ['interviewsArchive', 'interviews:archive'],
   ['interviewsDelete', 'interviews:delete'],
   ['interviewsAttachMeeting', 'interviews:attach-meeting'],
+  ['interviewsCreateCalendarEvent', 'interviews:create-calendar-event'],
   ['interviewsGetReadiness', 'interviews:get-readiness'],
   ['interviewsGetRetroPrompt', 'interviews:get-retro-prompt'],
   ['interviewsUpdateRetroPrompt', 'interviews:update-retro-prompt'],
@@ -61,6 +62,7 @@ test('renderer electron.d.ts declares typed interview methods and shared result 
   assert.match(types, /interviewsGet:\s*\(input: \{ id: string; include\?: Array<['"]dossier['"]/);
   assert.match(types, /interviewsCreate:\s*\(operationId: string, payload: InterviewCreatePayload\) => Promise<InterviewIpcResult<InterviewDetail>>/);
   assert.match(types, /interviewsParseSourceText:\s*\(input: InterviewSourceParseInput \| string\) => Promise<InterviewIpcResult<InterviewSourceParseResult>>/);
+  assert.match(types, /interviewsCreateCalendarEvent:\s*\(interviewId: string, provider: ['"]google['"] \| ['"]macos['"]\) => Promise<InterviewIpcResult<InterviewDetail>>/);
   assert.match(types, /vacancyDossierSave:\s*\(interviewId: string, operationId: string, payload: VacancyDossierPayload\) => Promise<InterviewIpcResult<VacancyDossier>>/);
   assert.match(types, /interviewsUpdateRetroPrompt:\s*\(interviewId: string, payload: RetroPromptActionPayload\) => Promise<InterviewIpcResult<RetroPromptDecision>>/);
   assert.match(types, /prepBriefSave:\s*\(interviewId: string, operationId: string, payload: PrepBriefPayload\) => Promise<InterviewIpcResult<PrepBrief>>/);
