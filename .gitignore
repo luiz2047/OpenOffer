@@ -363,6 +363,7 @@ profileresume/
 playwright-report/
 negotiation-routing-eval/
 benchmarks/
+.eval-runs/
 .playwright-mcp/
 
 
@@ -372,3 +373,4 @@ _external_research/
 # Filled-in credentials intake (never commit real values)
 docs/CREDENTIALS-INTAKE.local.md
 CREDENTIALS-INTAKE.local.md
+.gstack/

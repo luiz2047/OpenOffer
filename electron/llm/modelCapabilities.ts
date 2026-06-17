@@ -47,6 +47,7 @@ function isCloudIdentifier(id: string): boolean {
   // DeepSeek cloud API (OpenAI-compatible). The local Ollama "deepseek-coder"
   // family is handled by the isOllama branch above.
   if (/^deepseek-v\d/.test(s)) return true;
+  if (s.startsWith('yandex/')) return true;
   return false;
 }
 

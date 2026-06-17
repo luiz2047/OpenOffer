@@ -112,6 +112,7 @@ export function createProviderRateLimiters() {
         openai: new RateLimiter(120, 2.0),    // 120 req/min
         claude: new RateLimiter(120, 2.0),    // 120 req/min
         deepseek: new RateLimiter(120, 2.0),  // OpenAI-compatible — conservative default
+        yandex: new RateLimiter(120, 2.0),    // OpenAI-compatible AI Studio — conservative default
         litellm: new RateLimiter(120, 2.0),   // OpenAI-compatible proxy — conservative default
     };
 }

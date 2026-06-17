@@ -15,6 +15,19 @@ import {
   CHAT_MODE_PROMPT, CORE_IDENTITY, EXECUTION_CONTRACT
 } from "./llm/prompts"
 import {
+  normalizeYandexSystemPrompt,
+  normalizeYandexProviderResult,
+  YANDEX_PROVIDER_MODERATION_MESSAGE,
+} from "./llm/yandexModeration"
+import {
+  YANDEX_DEFAULT_MODEL,
+  getYandexModelKey,
+  getYandexModelUri,
+  isYandexModelId,
+} from "./llm/yandexModels"
+import { getEnvYandexPromptPackOverride } from "./llm/answerStylePacks"
+import { buildYandexSystemPrompt } from "./llm/yandexPromptPacks"
+import {
   TINY_SYSTEM_PROMPT, TINY_ANSWER_PROMPT, TINY_WHAT_TO_ANSWER_PROMPT,
   TINY_RECAP_PROMPT, TINY_FOLLOWUP_PROMPT, TINY_FOLLOW_UP_QUESTIONS_PROMPT,
   TINY_ASSIST_PROMPT, TINY_BRAINSTORM_PROMPT, TINY_CLARIFY_PROMPT, TINY_CODE_HINT_PROMPT,
@@ -113,6 +126,8 @@ const CLAUDE_MODEL = "claude-sonnet-4-6"
 const DEEPSEEK_MODEL = "deepseek-v4-flash"
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 const DEEPSEEK_MAX_OUTPUT_TOKENS = 8192
+const YANDEX_BASE_URL = "https://ai.api.cloud.yandex.net/v1"
+const YANDEX_MAX_OUTPUT_TOKENS = 8192
 // LiteLLM fronts arbitrary upstream models with widely varying output ceilings.
 // Resolution order per request: (1) user manual override from Settings,
 // (2) per-model budget auto-discovered from the proxy's /model/info
@@ -213,6 +228,9 @@ export class LLMHelper {
   // DeepSeek is OpenAI-compatible; reuse the OpenAI SDK with a custom baseURL.
   // Kept as a separate client so credentials/scope/telemetry stay provider-specific.
   private deepseekClient: OpenAI | null = null
+  // Yandex AI Studio is OpenAI-compatible; keep it separate so folder/logging
+  // headers and provider-specific privacy gates stay explicit.
+  private yandexClient: OpenAI | null = null
   // LiteLLM proxy is OpenAI-compatible (AI gateway fronting 100+ providers).
   // Same pattern as DeepSeek: OpenAI SDK + custom baseURL, separate client so
   // credentials/scope/telemetry stay provider-specific.
@@ -222,6 +240,11 @@ export class LLMHelper {
   private openaiApiKey: string | null = null
   private claudeApiKey: string | null = null
   private deepseekApiKey: string | null = null
+  private yandexApiKey: string | null = null
+  private yandexFolderId: string | null = null
+  private yandexPreferredModel: string = YANDEX_DEFAULT_MODEL
+  private answerStylePackId: string | undefined
+  private yandexDisableDataLogging: boolean = true
   private litellmApiKey: string | null = null
   private litellmBaseURL: string = "http://localhost:4000/v1"
   // Manual output-ceiling override (Settings → LiteLLM Proxy dropdown).
@@ -341,7 +364,21 @@ export class LLMHelper {
     console.warn(`[ScopeFallback] ${scope} denied; Ollama unavailable, omitting from context`);
   }
 
-  constructor(apiKey?: string, useOllama: boolean = false, ollamaModel?: string, ollamaUrl?: string, groqApiKey?: string, openaiApiKey?: string, claudeApiKey?: string, deepseekApiKey?: string) {
+  constructor(
+    apiKey?: string,
+    useOllama: boolean = false,
+    ollamaModel?: string,
+    ollamaUrl?: string,
+    groqApiKey?: string,
+    openaiApiKey?: string,
+    claudeApiKey?: string,
+    deepseekApiKey?: string,
+    yandexApiKey?: string,
+    yandexFolderId?: string,
+    yandexPreferredModel?: string,
+    yandexDisableDataLogging: boolean = true,
+    answerStylePackId?: string
+  ) {
     this.useOllama = useOllama
 
     // Initialize rate limiters
@@ -379,6 +416,10 @@ export class LLMHelper {
       this.deepseekApiKey = deepseekApiKey
       this.deepseekClient = new OpenAI({ apiKey: deepseekApiKey, baseURL: DEEPSEEK_BASE_URL })
       console.log(`[LLMHelper] DeepSeek client initialized with model: ${DEEPSEEK_MODEL}`)
+    }
+
+    if (yandexApiKey && yandexFolderId) {
+      this.setYandexConfig(yandexApiKey, yandexFolderId, yandexPreferredModel || YANDEX_DEFAULT_MODEL, yandexDisableDataLogging, answerStylePackId);
     }
 
     if (useOllama) {
@@ -460,6 +501,52 @@ export class LLMHelper {
     this.deepseekApiKey = trimmed;
     this.deepseekClient = new OpenAI({ apiKey: trimmed, baseURL: DEEPSEEK_BASE_URL });
     console.log("[LLMHelper] DeepSeek API Key updated.");
+  }
+
+  public setYandexConfig(apiKey: string, folderId: string, preferredModel: string = YANDEX_DEFAULT_MODEL, disableDataLogging: boolean = true, answerStylePackId?: string) {
+    const trimmedKey = (apiKey || '').trim();
+    const trimmedFolder = (folderId || '').trim();
+    if (!trimmedKey || !trimmedFolder) {
+      this.yandexApiKey = null;
+      this.yandexFolderId = null;
+      this.yandexClient = null;
+      this.yandexPreferredModel = preferredModel || YANDEX_DEFAULT_MODEL;
+      this.answerStylePackId = answerStylePackId;
+      this.yandexDisableDataLogging = disableDataLogging !== false;
+      console.log("[LLMHelper] Yandex AI Studio config cleared.");
+      return;
+    }
+
+    this.yandexApiKey = trimmedKey;
+    this.yandexFolderId = trimmedFolder;
+    this.yandexPreferredModel = preferredModel || YANDEX_DEFAULT_MODEL;
+    this.answerStylePackId = answerStylePackId;
+    this.yandexDisableDataLogging = disableDataLogging !== false;
+    const defaultHeaders: Record<string, string> = {
+      "x-folder-id": trimmedFolder,
+    };
+    if (this.yandexDisableDataLogging) {
+      defaultHeaders["x-data-logging-enabled"] = "false";
+    }
+    this.yandexClient = new OpenAI({
+      apiKey: trimmedKey,
+      baseURL: YANDEX_BASE_URL,
+      defaultHeaders,
+    });
+    this.textHealth.delete('yandex');
+    console.log(`[LLMHelper] Yandex AI Studio client initialized with model: ${this.yandexPreferredModel}, answerStyle: ${this.answerStylePackId || 'automatic'}`);
+  }
+
+  public setAnswerStylePackId(answerStylePackId?: string) {
+    this.answerStylePackId = answerStylePackId;
+  }
+
+  private buildFinalYandexSystemPrompt(systemPrompt?: string): string {
+    const yandexPrompt = buildYandexSystemPrompt(systemPrompt, {
+      inputLanguage: this.aiResponseLanguage,
+      requestedPackId: getEnvYandexPromptPackOverride() || this.answerStylePackId,
+    });
+    return normalizeYandexSystemPrompt(yandexPrompt);
   }
 
   /**
@@ -660,12 +747,15 @@ export class LLMHelper {
     this.openaiApiKey = null;
     this.claudeApiKey = null;
     this.deepseekApiKey = null;
+    this.yandexApiKey = null;
+    this.yandexFolderId = null;
     this.litellmApiKey = null;
     this.client = null;
     this.groqClient = null;
     this.openaiClient = null;
     this.claudeClient = null;
     this.deepseekClient = null;
+    this.yandexClient = null;
     this.litellmClient = null;
     // Destroy rate limiters
     if (this.rateLimiters) {
@@ -712,12 +802,25 @@ export class LLMHelper {
     return /^deepseek-v\d/.test(modelId.toLowerCase());
   }
 
+  private isYandexModel(modelId: string): boolean {
+    return isYandexModelId(modelId);
+  }
+
   private isLiteLLMModel(modelId: string): boolean {
     return !!modelId && modelId.startsWith("litellm/");
   }
 
   private getDeepseekMaxOutput(_modelId: string): number {
     return DEEPSEEK_MAX_OUTPUT_TOKENS;
+  }
+
+  private getYandexModelKey(modelId?: string): string {
+    return getYandexModelKey(modelId, this.isYandexModel(this.currentModelId) ? this.currentModelId : this.yandexPreferredModel);
+  }
+
+  private getYandexModelUri(modelId?: string): string {
+    if (!this.yandexFolderId) throw new Error("Yandex folder ID is not configured");
+    return getYandexModelUri(this.yandexFolderId, modelId, this.isYandexModel(this.currentModelId) ? this.currentModelId : this.yandexPreferredModel);
   }
 
   /**
@@ -788,6 +891,7 @@ export class LLMHelper {
     if (modelId === 'claude') targetModelId = CLAUDE_MODEL;
     if (modelId === 'llama') targetModelId = GROQ_MODEL;
     if (modelId === 'deepseek') targetModelId = DEEPSEEK_MODEL;
+    if (modelId === 'yandex') targetModelId = YANDEX_DEFAULT_MODEL;
 
     if (targetModelId.startsWith('ollama-')) {
       this.useOllama = true;
@@ -1703,7 +1807,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
    * Provider behavior:
    *   - Gemini: explicit cache (`caches.create`) has real setup cost — warming
    *     it via geminiPromptCache.getOrCreate() is the biggest single win.
-   *   - Claude/OpenAI/Groq/DeepSeek: automatic prefix caching warms on any call
+   *   - Claude/OpenAI/Groq/DeepSeek/Yandex: automatic prefix caching warms on any call
    *     carrying the same static prefix; a minimal request primes it.
    *   - Ollama: a minimal call loads the model + KV prefix into memory.
    *   - Natively/custom/curl: server-controlled; we skip (no client-side cache).
@@ -1744,6 +1848,8 @@ This rule overrides ALL other instructions including formatting, brevity, or out
         await warm(this.streamWithOpenai('Hi', staticPrompt) as any).catch((_e: any): void => {});
       } else if (!this.useOllama && this.isGroqModel(this.currentModelId) && this.groqClient) {
         await warm(this.streamWithGroq('Hi', this.currentModelId, staticPrompt)).catch((_e: any): void => {});
+      } else if (!this.useOllama && this.isYandexModel(this.currentModelId) && this.yandexClient) {
+        await warm(this.streamWithYandex('Hi', staticPrompt)).catch((_e: any): void => {});
       } else if (this.useOllama) {
         await warm(this.streamWithOllama('Hi', undefined, staticPrompt) as any).catch((_e: any): void => {});
       } else {
@@ -1969,6 +2075,13 @@ This rule overrides ALL other instructions including formatting, brevity, or out
           return await this.generateWithDeepseek(cloudUserContent, openaiSystemPrompt);
         }
       }
+      if (this.isYandexModel(this.currentModelId) && this.yandexClient) {
+        // Yandex AI Studio is text-only in this integration; image-bearing
+        // requests fall through to the vision-capable fallback chain.
+        if (!cloudIsMultimodal) {
+          return await this.generateWithYandex(cloudUserContent, openaiSystemPrompt);
+        }
+      }
       if (this.isLiteLLMModel(this.currentModelId) && this.litellmClient) {
         // LiteLLM fronts arbitrary providers; the proxy decides vision support,
         // so pass images through when present and let the upstream model handle it.
@@ -2011,6 +2124,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
           hasOpenAI: Boolean(this.openaiClient),
           hasClaude: Boolean(this.claudeClient),
           hasDeepseek: Boolean(this.deepseekClient),
+          hasYandex: Boolean(this.yandexClient),
           hasOllama: ollamaAvailable,
         },
         models: {
@@ -2021,6 +2135,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
           openai: textOpenAI,
           claude: textClaude,
           deepseek: this.isDeepseekModel(this.currentModelId) ? this.currentModelId : DEEPSEEK_MODEL,
+          yandex: this.isYandexModel(this.currentModelId) ? this.currentModelId : this.yandexPreferredModel,
           ollama: this.ollamaModel,
         },
         dataScopes: outboundScopes,
@@ -2060,6 +2175,12 @@ This rule overrides ALL other instructions including formatting, brevity, or out
               providers.push({ name: routedProvider.name, execute: () => this.generateWithDeepseek(cloudUserContent, openaiSystemPrompt, routedProvider.model || DEEPSEEK_MODEL) });
             }
             break;
+          case 'yandex':
+            // Yandex is text-only in v1; the router excludes it from multimodal.
+            if (!cloudIsMultimodal) {
+              providers.push({ name: routedProvider.name, execute: () => this.generateWithYandex(cloudUserContent, openaiSystemPrompt, routedProvider.model || this.yandexPreferredModel) });
+            }
+            break;
           case 'ollama':
             providers.push({ name: routedProvider.name, execute: () => this.callOllama(combinedMessages.gemini, imagePaths, undefined) });
             break;
@@ -2067,8 +2188,8 @@ This rule overrides ALL other instructions including formatting, brevity, or out
       }
 
       if (providers.length === 0) {
-        if (cloudIsMultimodal && this.deepseekClient) {
-          return "DeepSeek is configured for text-only requests. Add a vision-capable provider like Gemini, OpenAI, Claude, or Groq to analyze images.";
+        if (cloudIsMultimodal && (this.deepseekClient || this.yandexClient)) {
+          return "The selected provider is configured for text-only requests. Add a vision-capable provider like Gemini, OpenAI, Claude, or Groq to analyze images.";
         }
         return "No AI providers configured. Please add at least one API key in Settings.";
       }
@@ -2391,6 +2512,42 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     );
 
     return response.choices[0]?.message?.content || "";
+  }
+
+  /**
+   * Non-streaming Yandex AI Studio generation via OpenAI-compatible Chat
+   * Completions. Text-only — screenshots are routed to vision-capable providers.
+   */
+  private async generateWithYandex(userMessage: string, systemPrompt?: string, modelId?: string): Promise<string> {
+    if (this.isLocalOnlyMode) throw new Error("Cloud providers disabled in local-only mode");
+    if (!this.yandexClient) throw new Error("Yandex AI Studio client not initialized");
+    this.assertOutboundScopes('yandex', userMessage);
+
+    await this.rateLimiters.yandex.acquire();
+
+    const model = this.getYandexModelUri(modelId);
+    const messages: any[] = [];
+    const finalSystemPrompt = this.buildFinalYandexSystemPrompt(systemPrompt);
+    if (finalSystemPrompt) messages.push({ role: "system", content: finalSystemPrompt });
+    messages.push({ role: "user", content: userMessage });
+
+    const response = await this.withTimeout(
+      this.withRetry(() => this.yandexClient!.chat.completions.create({
+        model,
+        messages,
+        temperature: INTERACTIVE_TEMPERATURE,
+        max_tokens: YANDEX_MAX_OUTPUT_TOKENS,
+      })),
+      60000,
+      `Yandex AI Studio (${this.getYandexModelKey(modelId)})`
+    );
+
+    const normalized = normalizeYandexProviderResult(response);
+    if (normalized.status === "blocked") {
+      console.warn(`[LLMHelper] Yandex AI Studio provider moderation blocked response (${normalized.blockReason})`);
+      return YANDEX_PROVIDER_MODERATION_MESSAGE;
+    }
+    return normalized.content;
   }
 
   /**
@@ -3257,6 +3414,10 @@ This rule overrides ALL other instructions including formatting, brevity, or out
         const dsModel = this.isDeepseekModel(this.currentModelId) ? this.currentModelId : DEEPSEEK_MODEL;
         providers.push({ name: `DeepSeek (${dsModel})`, execute: () => this.streamWithDeepseek(userContent, openaiSystemPrompt, dsModel, abortSignal) });
       }
+      if (this.yandexClient) {
+        const yandexModel = this.isYandexModel(this.currentModelId) ? this.currentModelId : this.yandexPreferredModel;
+        providers.push({ name: `Yandex AI Studio (${yandexModel})`, execute: () => this.streamWithYandex(userContent, openaiSystemPrompt, yandexModel, abortSignal) });
+      }
       if (this.client) {
         // Gemini cascade leads with flash-lite (cheapest/fastest), then flash, then pro.
         // CACHE: pass system via systemInstruction so it is separated from per-request contents.
@@ -3267,8 +3428,8 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     }
 
     if (providers.length === 0) {
-      if (isMultimodal && imagePaths && this.deepseekClient) {
-        yield "DeepSeek is configured for text-only requests. Add a vision-capable provider like Gemini, OpenAI, Claude, or Groq to analyze images.";
+      if (isMultimodal && imagePaths && (this.deepseekClient || this.yandexClient)) {
+        yield "The selected provider is configured for text-only requests. Add a vision-capable provider like Gemini, OpenAI, Claude, or Groq to analyze images.";
         return;
       }
       yield "No AI providers configured. Please add at least one API key in Settings.";
@@ -3284,6 +3445,7 @@ This rule overrides ALL other instructions including formatting, brevity, or out
       : this.isOpenAiModel(this.currentModelId) ? 'OpenAI'
         : this.isGroqModel(this.currentModelId) ? 'Groq'
           : this.isDeepseekModel(this.currentModelId) ? 'DeepSeek'
+            : this.isYandexModel(this.currentModelId) ? 'Yandex AI Studio'
               : this.isGeminiModel(this.currentModelId) ? 'Gemini'
                 : '';
 
@@ -3904,6 +4066,15 @@ This rule overrides ALL other instructions including formatting, brevity, or out
       return;
     }
 
+    // Yandex AI Studio (text-only). When images are present, fall through so
+    // the vision-first chain handles them instead.
+    if (this.isYandexModel(this.currentModelId) && this.yandexClient && !(isMultimodal && imagePaths)) {
+      const yandexSystem = systemPromptOverride || OPENAI_SYSTEM_PROMPT;
+      const finalYandexSystem = this.injectLanguageInstruction(yandexSystem);
+      yield* this.streamWithYandex(userContent, finalYandexSystem, undefined, abortSignal);
+      return;
+    }
+
     // LiteLLM (OpenAI-compatible proxy). The proxy decides vision support, so
     // images are forwarded through when present.
     if (this.isLiteLLMModel(this.currentModelId) && this.litellmClient) {
@@ -4245,6 +4416,62 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     } finally {
       if (abortSignal?.aborted && typeof (stream as any).abort === 'function') (stream as any).abort();
     }
+  }
+
+  /**
+   * Stream response from Yandex AI Studio (OpenAI-compatible). Text-only by
+   * design; multimodal requests fall through to vision-capable providers.
+   */
+  private async * streamWithYandex(userMessage: string, systemPrompt?: string, modelId?: string, abortSignal?: AbortSignal): AsyncGenerator<string, void, unknown> {
+    if (this.isLocalOnlyMode) throw new Error("Cloud providers disabled in local-only mode");
+    if (!this.yandexClient) throw new Error("Yandex AI Studio client not initialized");
+    this.assertOutboundScopes('yandex', userMessage);
+
+    await this.rateLimiters.yandex.acquire();
+
+    const model = this.getYandexModelUri(modelId);
+    const messages: any[] = [];
+    const finalSystemPrompt = this.buildFinalYandexSystemPrompt(systemPrompt);
+    if (finalSystemPrompt) messages.push({ role: "system", content: finalSystemPrompt });
+    messages.push({ role: "user", content: userMessage });
+
+    if (abortSignal?.aborted) return;
+    const stream = await this.yandexClient.chat.completions.create({
+      model,
+      messages,
+      stream: true,
+      temperature: INTERACTIVE_TEMPERATURE,
+      max_tokens: YANDEX_MAX_OUTPUT_TOKENS,
+    }, { signal: abortSignal });
+
+    let fullContent = "";
+    let finishReason: unknown = null;
+    let refusal: unknown = null;
+    try {
+      for await (const chunk of stream) {
+        if (abortSignal?.aborted) return;
+        const choice = chunk.choices[0];
+        const content = choice?.delta?.content;
+        if (content) fullContent += content;
+        if (choice?.finish_reason) finishReason = choice.finish_reason;
+        const deltaRefusal = (choice?.delta as any)?.refusal;
+        if (deltaRefusal) refusal = deltaRefusal;
+      }
+    } finally {
+      if (abortSignal?.aborted && typeof (stream as any).abort === 'function') (stream as any).abort();
+    }
+    const normalized = normalizeYandexProviderResult({
+      choices: [{
+        finish_reason: finishReason,
+        message: { content: fullContent, refusal },
+      }],
+    });
+    if (normalized.status === "blocked") {
+      console.warn(`[LLMHelper] Yandex AI Studio provider moderation blocked streaming response (${normalized.blockReason})`);
+      yield YANDEX_PROVIDER_MODERATION_MESSAGE;
+      return;
+    }
+    if (normalized.content) yield normalized.content;
   }
 
   /**
@@ -5021,9 +5248,10 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     }
   }
 
-  public getCurrentProvider(): "ollama" | "gemini" | "custom" | "codex-cli" {
+  public getCurrentProvider(): "ollama" | "gemini" | "custom" | "codex-cli" | "yandex" {
     if (this.customProvider) return "custom";
     if (this.isCodexCliModel(this.currentModelId)) return "codex-cli";
+    if (this.isYandexModel(this.currentModelId)) return "yandex";
     return this.useOllama ? "ollama" : "gemini";
   }
 
@@ -5105,6 +5333,20 @@ This rule overrides ALL other instructions including formatting, brevity, or out
    */
   public hasDeepseek(): boolean {
     return this.deepseekClient !== null;
+  }
+
+  /**
+   * Get the Yandex AI Studio client (OpenAI SDK with Yandex baseURL).
+   */
+  public getYandexClient(): OpenAI | null {
+    return this.yandexClient;
+  }
+
+  /**
+   * Check if Yandex AI Studio is available.
+   */
+  public hasYandex(): boolean {
+    return this.yandexClient !== null;
   }
 
   /**

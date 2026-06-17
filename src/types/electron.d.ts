@@ -115,11 +115,11 @@ export interface ElectronAPI {
   onOpenSettingsTab: (callback: (tab: string) => void) => () => void
 
   // LLM Model Management
-  getCurrentLlmConfig: () => Promise<{ provider: "ollama" | "gemini" | "custom" | "codex-cli"; model: string; isOllama: boolean }>
+  getCurrentLlmConfig: () => Promise<{ provider: "ollama" | "gemini" | "custom" | "codex-cli" | "yandex"; model: string; isOllama: boolean }>
   getAvailableOllamaModels: () => Promise<string[]>
   switchToOllama: (model?: string, url?: string) => Promise<{ success: boolean; error?: string }>
   switchToGemini: (apiKey?: string, modelId?: string) => Promise<{ success: boolean; error?: string }>
-  testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek', apiKey?: string) => Promise<{ success: boolean; error?: string }>
+  testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek' | 'yandex', apiKey?: string) => Promise<{ success: boolean; error?: string }>
   selectServiceAccount: () => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>
 
   // API Key Management
@@ -128,9 +128,16 @@ export interface ElectronAPI {
   setOpenaiApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   setClaudeApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
   setDeepseekApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
+  setYandexConfig: (config: { apiKey?: string; folderId: string; preferredModel?: string; disableDataLogging?: boolean; promptPackId?: string; answerStylePackId?: string }) => Promise<{ success: boolean; error?: string }>
+  removeYandexConfig: () => Promise<{ success: boolean; error?: string }>
+  testYandexConnection: (config: { apiKey?: string; folderId?: string; preferredModel?: string; disableDataLogging?: boolean }) => Promise<{ success: boolean; error?: string }>
   setLitellmConfig: (config: { apiKey: string; baseURL: string; maxTokens?: number }) => Promise<{ success: boolean; error?: string }>
   getAvailableLiteLLMModels: () => Promise<string[]>
-  getStoredCredentials: () => Promise<{ hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; hasDeepseekKey: boolean; hasLitellmBaseURL?: boolean; litellmBaseURL?: string | null; litellmMaxTokens?: number | null; googleServiceAccountPath: string | null; sttProvider: 'none' | 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'local-whisper' | 'gigastt'; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; groqSttModel?: string; hasSonioxKey?: boolean; hasTavilyKey?: boolean; geminiPreferredModel?: string; groqPreferredModel?: string; openaiPreferredModel?: string; claudePreferredModel?: string; deepseekPreferredModel?: string; sttGroqKey?: string; sttOpenaiKey?: string; sttDeepgramKey?: string; sttElevenLabsKey?: string; sttAzureKey?: string; sttIbmKey?: string; sttSonioxKey?: string; openAiSttBaseUrl?: string }>
+  getStoredCredentials: () => Promise<{ hasGeminiKey: boolean; hasGroqKey: boolean; hasOpenaiKey: boolean; hasClaudeKey: boolean; hasDeepseekKey: boolean; hasYandexKey?: boolean; yandexFolderId?: string; yandexPreferredModel?: string; yandexPromptPackId?: string; yandexDisableDataLogging?: boolean; hasLitellmBaseURL?: boolean; litellmBaseURL?: string | null; litellmMaxTokens?: number | null; googleServiceAccountPath: string | null; sttProvider: 'none' | 'google' | 'groq' | 'openai' | 'deepgram' | 'elevenlabs' | 'azure' | 'ibmwatson' | 'soniox' | 'local-whisper' | 'gigastt'; hasSttGroqKey: boolean; hasSttOpenaiKey: boolean; hasDeepgramKey: boolean; hasElevenLabsKey: boolean; hasAzureKey: boolean; azureRegion: string; hasIbmWatsonKey: boolean; ibmWatsonRegion: string; groqSttModel?: string; hasSonioxKey?: boolean; hasTavilyKey?: boolean; geminiPreferredModel?: string; groqPreferredModel?: string; openaiPreferredModel?: string; claudePreferredModel?: string; deepseekPreferredModel?: string; sttGroqKey?: string; sttOpenaiKey?: string; sttDeepgramKey?: string; sttElevenLabsKey?: string; sttAzureKey?: string; sttIbmKey?: string; sttSonioxKey?: string; openAiSttBaseUrl?: string }>
+  getAnswerStylePacks: (scope?: { provider?: string; modelId?: string }) => Promise<{ selectedId?: string; recommendedId: string; effectiveId: string; language: string; automaticSummary: string; packs: Array<{ id: string; label: string; shortLabel: string; description: string; sample: string; language: 'any'; recommended: boolean }> }>
+  setAnswerStylePack: (styleId?: string, scope?: { provider?: string; modelId?: string }) => Promise<{ success: boolean; selectedId?: string; recommendedId?: string; effectiveId?: string; automaticSummary?: string; error?: string }>
+  getYandexPromptPacks: () => Promise<{ selectedId?: string; recommendedId: string; language: string; automaticSummary?: string; packs: Array<{ id: string; label: string; shortLabel?: string; description: string; sample?: string; language: 'any'; recommended: boolean }> }>
+  setYandexPromptPack: (promptPackId?: string) => Promise<{ success: boolean; selectedId?: string; recommendedId?: string; effectiveId?: string; automaticSummary?: string; error?: string }>
   // Permissions
   checkPermissions:     () => Promise<{ microphone: 'granted'|'denied'|'not-determined'|'restricted'; screen: 'granted'|'denied'|'not-determined'|'restricted'; platform: string }>
   requestMicPermission: () => Promise<boolean>
@@ -467,8 +474,8 @@ export interface ElectronAPI {
   setTavilyApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>
 
   // Dynamic Model Discovery
-  fetchProviderModels: (provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek', apiKey: string) => Promise<{ success: boolean; models?: {id: string, label: string}[]; error?: string }>
-  setProviderPreferredModel: (provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek', modelId: string) => Promise<void>
+  fetchProviderModels: (provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek' | 'yandex', apiKey: string) => Promise<{ success: boolean; models?: {id: string, label: string}[]; error?: string }>
+  setProviderPreferredModel: (provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek' | 'yandex', modelId: string) => Promise<void>
 
   // Overlay Opacity (Stealth Mode)
   setOverlayOpacity: (opacity: number) => Promise<void>;

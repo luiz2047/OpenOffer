@@ -104,6 +104,13 @@ export interface AppSettings {
     sttMaxSampleRate?: number;
     sttMaxChannels?: number;
     sttAllowDualStream?: boolean;
+    // Non-secret prompt behavior preference. 'automatic' is represented by an
+    // absent value so provider/language recommendations can evolve safely.
+    answerStylePreference?: {
+        global?: string;
+        byProvider?: Record<string, string | undefined>;
+        byModel?: Record<string, string | undefined>;
+    };
 }
 
 export const VALID_SCREEN_UNDERSTANDING_MODES = ['vision_first', 'vision_only', 'private_vision'] as const;
@@ -164,6 +171,33 @@ export class SettingsManager {
 
     public set<K extends keyof AppSettings>(key: K, value: AppSettings[K]): void {
         this.settings[key] = value;
+        this.saveSettings();
+    }
+
+    public getAnswerStylePreference(provider?: string, modelId?: string): string | undefined {
+        const prefs = this.settings.answerStylePreference;
+        if (!prefs) return undefined;
+        if (modelId && prefs.byModel?.[modelId]) return prefs.byModel[modelId];
+        if (provider && prefs.byProvider?.[provider]) return prefs.byProvider[provider];
+        return prefs.global;
+    }
+
+    public setAnswerStylePreference(styleId?: string, provider?: string, modelId?: string): void {
+        const prefs = this.settings.answerStylePreference || {};
+        if (modelId) {
+            prefs.byModel = { ...(prefs.byModel || {}) };
+            if (styleId) prefs.byModel[modelId] = styleId;
+            else delete prefs.byModel[modelId];
+        } else if (provider) {
+            prefs.byProvider = { ...(prefs.byProvider || {}) };
+            if (styleId) prefs.byProvider[provider] = styleId;
+            else delete prefs.byProvider[provider];
+        } else if (styleId) {
+            prefs.global = styleId;
+        } else {
+            delete prefs.global;
+        }
+        this.settings.answerStylePreference = prefs;
         this.saveSettings();
     }
 

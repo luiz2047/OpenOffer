@@ -49,7 +49,7 @@ interface ElectronAPI {
     modelId?: string,
   ) => Promise<{ success: boolean; error?: string }>;
   testLlmConnection: (
-    provider: 'gemini' | 'groq' | 'openai' | 'claude',
+    provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek' | 'yandex',
     apiKey?: string,
   ) => Promise<{ success: boolean; error?: string }>;
   selectServiceAccount: () => Promise<{
@@ -65,6 +65,9 @@ interface ElectronAPI {
   setOpenaiApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>;
   setClaudeApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>;
   setDeepseekApiKey: (apiKey: string) => Promise<{ success: boolean; error?: string }>;
+  setYandexConfig: (config: { apiKey?: string; folderId: string; preferredModel?: string; disableDataLogging?: boolean }) => Promise<{ success: boolean; error?: string }>;
+  removeYandexConfig: () => Promise<{ success: boolean; error?: string }>;
+  testYandexConnection: (config: { apiKey?: string; folderId?: string; preferredModel?: string; disableDataLogging?: boolean }) => Promise<{ success: boolean; error?: string }>;
   setLitellmConfig: (config: { apiKey: string; baseURL: string; maxTokens?: number }) => Promise<{ success: boolean; error?: string }>;
   getAvailableLiteLLMModels: () => Promise<string[]>;
   getStoredCredentials: () => Promise<{
@@ -73,6 +76,10 @@ interface ElectronAPI {
     hasOpenaiKey: boolean;
     hasClaudeKey: boolean;
     hasDeepseekKey: boolean;
+    hasYandexKey?: boolean;
+    yandexFolderId?: string;
+    yandexPreferredModel?: string;
+    yandexDisableDataLogging?: boolean;
     googleServiceAccountPath: string | null;
     sttProvider: string;
     hasSttGroqKey: boolean;
@@ -336,6 +343,23 @@ interface ElectronAPI {
   getDefaultModel: () => Promise<{ model: string }>;
   setModel: (modelId: string) => Promise<{ success: boolean; error?: string }>;
   setDefaultModel: (modelId: string) => Promise<{ success: boolean; error?: string }>;
+  getYandexPromptPacks: () => Promise<{
+    selectedId?: string;
+    recommendedId: string;
+    language: string;
+    automaticSummary?: string;
+    packs: Array<{ id: string; label: string; shortLabel?: string; description: string; sample?: string; language: "any"; recommended: boolean }>;
+  }>;
+  setYandexPromptPack: (promptPackId?: string) => Promise<{ success: boolean; selectedId?: string; recommendedId?: string; error?: string }>;
+  getAnswerStylePacks: (scope?: { provider?: string; modelId?: string }) => Promise<{
+    selectedId?: string;
+    recommendedId: string;
+    effectiveId: string;
+    language: string;
+    automaticSummary: string;
+    packs: Array<{ id: string; label: string; shortLabel: string; description: string; sample: string; language: "any"; recommended: boolean }>;
+  }>;
+  setAnswerStylePack: (styleId?: string, scope?: { provider?: string; modelId?: string }) => Promise<{ success: boolean; selectedId?: string; recommendedId?: string; effectiveId?: string; automaticSummary?: string; error?: string }>;
   toggleModelSelector: (coords: { x: number; y: number; activate?: boolean }) => Promise<void>;
   modelSelectorCloseIfOpen: () => Promise<void>;
   forceRestartOllama: () => Promise<void>;
@@ -1053,7 +1077,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('switch-to-ollama', model, url),
   switchToGemini: (apiKey?: string, modelId?: string) =>
     ipcRenderer.invoke('switch-to-gemini', apiKey, modelId),
-  testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek', apiKey: string) =>
+  testLlmConnection: (provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek' | 'yandex', apiKey: string) =>
     ipcRenderer.invoke('test-llm-connection', provider, apiKey),
   selectServiceAccount: () => ipcRenderer.invoke('select-service-account'),
 
@@ -1063,6 +1087,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setOpenaiApiKey: (apiKey: string) => ipcRenderer.invoke('set-openai-api-key', apiKey),
   setClaudeApiKey: (apiKey: string) => ipcRenderer.invoke('set-claude-api-key', apiKey),
   setDeepseekApiKey: (apiKey: string) => ipcRenderer.invoke('set-deepseek-api-key', apiKey),
+  setYandexConfig: (config: { apiKey?: string; folderId: string; preferredModel?: string; disableDataLogging?: boolean }) =>
+    ipcRenderer.invoke('set-yandex-config', config),
+  removeYandexConfig: () => ipcRenderer.invoke('remove-yandex-config'),
+  testYandexConnection: (config: { apiKey?: string; folderId?: string; preferredModel?: string; disableDataLogging?: boolean }) =>
+    ipcRenderer.invoke('test-yandex-connection', config),
   setLitellmConfig: (config: { apiKey: string; baseURL: string; maxTokens?: number }) => ipcRenderer.invoke('set-litellm-config', config),
   getAvailableLiteLLMModels: () => ipcRenderer.invoke('get-available-litellm-models'),
   getStoredCredentials: () => ipcRenderer.invoke('get-stored-credentials'),
@@ -1585,6 +1614,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getDefaultModel: () => ipcRenderer.invoke('get-default-model'),
   setModel: (modelId: string) => ipcRenderer.invoke('set-model', modelId),
   setDefaultModel: (modelId: string) => ipcRenderer.invoke('set-default-model', modelId),
+  getAnswerStylePacks: (scope?: { provider?: string; modelId?: string }) => ipcRenderer.invoke('get-answer-style-packs', scope),
+  setAnswerStylePack: (styleId?: string, scope?: { provider?: string; modelId?: string }) => ipcRenderer.invoke('set-answer-style-pack', styleId, scope),
+  getYandexPromptPacks: () => ipcRenderer.invoke('get-yandex-prompt-packs'),
+  setYandexPromptPack: (promptPackId?: string) => ipcRenderer.invoke('set-yandex-prompt-pack', promptPackId),
   toggleModelSelector: (coords: { x: number; y: number; activate?: boolean }) =>
     ipcRenderer.invoke('toggle-model-selector', coords),
   modelSelectorCloseIfOpen: () => ipcRenderer.invoke('model-selector:close-if-open'),
@@ -1934,9 +1967,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setTavilyApiKey: (apiKey: string) => ipcRenderer.invoke('set-tavily-api-key', apiKey),
 
   // Dynamic Model Discovery
-  fetchProviderModels: (provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek', apiKey: string) =>
+  fetchProviderModels: (provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek' | 'yandex', apiKey: string) =>
     ipcRenderer.invoke('fetch-provider-models', provider, apiKey),
-  setProviderPreferredModel: (provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek', modelId: string) =>
+  setProviderPreferredModel: (provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek' | 'yandex', modelId: string) =>
     ipcRenderer.invoke('set-provider-preferred-model', provider, modelId),
 
   onModesActiveCleared: (callback: () => void) => {

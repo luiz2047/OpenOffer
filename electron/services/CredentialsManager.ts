@@ -6,6 +6,7 @@
 import { app, safeStorage } from 'electron';
 import fs from 'fs';
 import path from 'path';
+import type { YandexPromptPackId } from '../llm/yandexPromptPacks';
 
 const CREDENTIALS_PATH = path.join(app.getPath('userData'), 'credentials.enc');
 
@@ -39,6 +40,12 @@ export interface StoredCredentials {
     openaiApiKey?: string;
     claudeApiKey?: string;
     deepseekApiKey?: string;
+    yandexApiKey?: string;
+    yandexFolderId?: string;
+    yandexPreferredModel?: string;
+    yandexPromptPackId?: YandexPromptPackId;
+    /** true/default = send x-data-logging-enabled:false on every Yandex request. */
+    yandexDisableDataLogging?: boolean;
     litellmApiKey?: string;
     litellmBaseURL?: string;
     /** Manual output ceiling for LiteLLM-proxied models. Unset → Auto (per-model via /model/info). */
@@ -126,6 +133,26 @@ export class CredentialsManager {
 
     public getDeepseekApiKey(): string | undefined {
         return this.credentials.deepseekApiKey;
+    }
+
+    public getYandexApiKey(): string | undefined {
+        return this.credentials.yandexApiKey;
+    }
+
+    public getYandexFolderId(): string | undefined {
+        return this.credentials.yandexFolderId;
+    }
+
+    public getYandexPreferredModel(): string {
+        return this.credentials.yandexPreferredModel || 'yandex/yandexgpt-5-lite';
+    }
+
+    public getYandexPromptPackId(): YandexPromptPackId | undefined {
+        return this.credentials.yandexPromptPackId;
+    }
+
+    public getYandexDisableDataLogging(): boolean {
+        return this.credentials.yandexDisableDataLogging !== false;
     }
 
     public getLitellmApiKey(): string | undefined {
@@ -301,6 +328,36 @@ export class CredentialsManager {
     }
 
     /**
+     * Persist Yandex AI Studio config. Empty apiKey preserves an existing stored
+     * key so Settings can update folder/model/logging while the key field stays
+     * masked. Use clearYandexConfig() to remove the provider.
+     */
+    public setYandexConfig(apiKey: string, folderId: string, preferredModel?: string, disableDataLogging: boolean = true, promptPackId?: YandexPromptPackId): void {
+        const trimmedKey = (apiKey || '').trim();
+        const trimmedFolder = (folderId || '').trim();
+        this.credentials.yandexApiKey = trimmedKey || this.credentials.yandexApiKey || undefined;
+        this.credentials.yandexFolderId = trimmedFolder || undefined;
+        this.credentials.yandexPreferredModel = (preferredModel || '').trim() || this.credentials.yandexPreferredModel || 'yandex/yandexgpt-5-lite';
+        this.credentials.yandexPromptPackId = promptPackId || this.credentials.yandexPromptPackId;
+        this.credentials.yandexDisableDataLogging = disableDataLogging !== false;
+        this.saveCredentials();
+        console.log('[CredentialsManager] Yandex AI Studio config updated');
+    }
+
+    public clearYandexConfig(): void {
+        delete this.credentials.yandexApiKey;
+        delete this.credentials.yandexFolderId;
+        delete this.credentials.yandexPreferredModel;
+        delete this.credentials.yandexPromptPackId;
+        delete this.credentials.yandexDisableDataLogging;
+        if (this.credentials.defaultModel?.startsWith('yandex/')) {
+            this.credentials.defaultModel = 'gemini-3.1-flash-lite';
+        }
+        this.saveCredentials();
+        console.log('[CredentialsManager] Yandex AI Studio config cleared');
+    }
+
+    /**
      * Persist LiteLLM proxy config. baseURL is the proxy location (required to
      * enable the provider); apiKey is the optional virtual/master key;
      * maxTokens is the optional user-set output ceiling (0/undefined → default).
@@ -445,16 +502,33 @@ export class CredentialsManager {
         console.log('[CredentialsManager] Removed hosted API key ignored and cleared');
     }
 
-    public getPreferredModel(provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek'): string | undefined {
+    public getPreferredModel(provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek' | 'yandex'): string | undefined {
+        if (provider === 'yandex') return this.getYandexPreferredModel();
         const key = `${provider}PreferredModel` as keyof StoredCredentials;
         return this.credentials[key] as string | undefined;
     }
 
-    public setPreferredModel(provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek', modelId: string): void {
+    public setPreferredModel(provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek' | 'yandex', modelId: string): void {
+        if (provider === 'yandex') {
+            this.credentials.yandexPreferredModel = modelId || 'yandex/yandexgpt-5-lite';
+            this.saveCredentials();
+            console.log(`[CredentialsManager] yandex preferred model set to: ${this.credentials.yandexPreferredModel}`);
+            return;
+        }
         const key = `${provider}PreferredModel` as keyof StoredCredentials;
         (this.credentials as any)[key] = modelId;
         this.saveCredentials();
         console.log(`[CredentialsManager] ${provider} preferred model set to: ${modelId}`);
+    }
+
+    public setYandexPromptPackId(promptPackId?: YandexPromptPackId): void {
+        if (promptPackId) {
+            this.credentials.yandexPromptPackId = promptPackId;
+        } else {
+            delete this.credentials.yandexPromptPackId;
+        }
+        this.saveCredentials();
+        console.log(`[CredentialsManager] Yandex prompt pack set to: ${this.credentials.yandexPromptPackId || 'recommended'}`);
     }
 
     public saveCustomProvider(provider: CustomProvider): void {

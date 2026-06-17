@@ -20,6 +20,7 @@ describe('Hosted provider removal', () => {
         hasOpenAI: true,
         hasClaude: true,
         hasDeepseek: true,
+        hasYandex: true,
       },
       models: {
         groq: 'groq-text',
@@ -29,6 +30,7 @@ describe('Hosted provider removal', () => {
         openai: 'openai-text',
         claude: 'claude-text',
         deepseek: 'deepseek-v4-flash',
+        yandex: 'yandex/yandexgpt-5-lite',
       },
     });
 
@@ -40,6 +42,7 @@ describe('Hosted provider removal', () => {
       'openai',
       'claude',
       'deepseek',
+      'yandex',
     ]);
   });
 

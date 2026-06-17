@@ -10,7 +10,7 @@ export interface ProviderModel {
     label: string;
 }
 
-type Provider = 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek';
+type Provider = 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek' | 'yandex';
 
 /**
  * Fetch available models from a provider's API.
@@ -18,7 +18,8 @@ type Provider = 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek';
  */
 export async function fetchProviderModels(
     provider: Provider,
-    apiKey: string
+    apiKey: string,
+    folderId?: string
 ): Promise<ProviderModel[]> {
     switch (provider) {
         case 'openai':
@@ -31,6 +32,8 @@ export async function fetchProviderModels(
             return fetchGeminiModels(apiKey);
         case 'deepseek':
             return fetchDeepSeekModels(apiKey);
+        case 'yandex':
+            return fetchYandexModels(apiKey, folderId);
         default:
             throw new Error(`Unknown provider: ${provider}`);
     }
@@ -170,6 +173,55 @@ async function fetchDeepSeekModels(apiKey: string): Promise<ProviderModel[]> {
             throw new Error('Invalid or unauthorized DeepSeek API key');
         }
         return DEEPSEEK_DEFAULT_MODELS;
+    }
+}
+
+// ─── Yandex AI Studio ────────────────────────────────────────────────────────
+
+const YANDEX_DEFAULT_MODELS: ProviderModel[] = [
+    { id: 'yandex/yandexgpt-5-lite', label: 'YandexGPT 5 Lite' },
+    { id: 'yandex/yandexgpt-5-pro', label: 'YandexGPT 5 Pro' },
+    { id: 'yandex/yandexgpt-5.1', label: 'YandexGPT Pro 5.1' },
+    { id: 'yandex/aliceai-llm', label: 'Alice AI LLM' },
+    { id: 'yandex/aliceai-llm-flash', label: 'Alice AI LLM Flash' },
+];
+
+async function fetchYandexModels(apiKey: string, folderId?: string): Promise<ProviderModel[]> {
+    const folder = (folderId || '').trim();
+    if (!folder) return YANDEX_DEFAULT_MODELS;
+
+    try {
+        const response = await axios.get('https://ai.api.cloud.yandex.net/v1/models', {
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                'x-folder-id': folder,
+                'x-data-logging-enabled': 'false',
+            },
+            timeout: 15000,
+        });
+
+        const models: any[] = response.data?.data || [];
+        const filtered = models
+            .map((m: any) => String(m?.id || '').trim())
+            .filter((id: string) =>
+                id &&
+                !/embed|vision|image|audio|speech|realtime|art/i.test(id) &&
+                /yandexgpt|aliceai-llm/i.test(id)
+            )
+            .map((id: string) => {
+                const key = id.startsWith('gpt://')
+                    ? id.split('/').pop() || id
+                    : id.replace(/^yandex\//, '');
+                return { id: `yandex/${key}`, label: key };
+            });
+
+        return filtered.length > 0 ? filtered : YANDEX_DEFAULT_MODELS;
+    } catch (error: any) {
+        const status = error?.response?.status;
+        if (status === 401 || status === 403) {
+            throw new Error('Invalid or unauthorized Yandex AI Studio API key or folder');
+        }
+        return YANDEX_DEFAULT_MODELS;
     }
 }
 

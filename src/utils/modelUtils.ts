@@ -3,7 +3,7 @@ export const STANDARD_CLOUD_MODELS: Record<string, {
     ids: string[];
     names: string[];
     descs: string[];
-    pmKey: 'geminiPreferredModel' | 'openaiPreferredModel' | 'claudePreferredModel' | 'groqPreferredModel' | 'deepseekPreferredModel';
+    pmKey: 'geminiPreferredModel' | 'openaiPreferredModel' | 'claudePreferredModel' | 'groqPreferredModel' | 'deepseekPreferredModel' | 'yandexPreferredModel';
 }> = {
     gemini: {
         hasKeyCheck: (creds) => !!creds?.hasGeminiKey,
@@ -39,6 +39,13 @@ export const STANDARD_CLOUD_MODELS: Record<string, {
         names: ['DeepSeek V4 Flash', 'DeepSeek V4 Pro'],
         descs: ['Fast • Text-only', 'Reasoning • Text-only'],
         pmKey: 'deepseekPreferredModel'
+    },
+    yandex: {
+        hasKeyCheck: (creds) => !!creds?.hasYandexKey && !!creds?.yandexFolderId,
+        ids: ['yandex/yandexgpt-5-lite', 'yandex/yandexgpt-5-pro', 'yandex/yandexgpt-5.1', 'yandex/aliceai-llm', 'yandex/aliceai-llm-flash'],
+        names: ['YandexGPT 5 Lite', 'YandexGPT 5 Pro', 'YandexGPT Pro 5.1', 'Alice AI LLM', 'Alice AI LLM Flash'],
+        descs: ['Fast • Text-only', 'Reasoning • Text-only', 'Pro • Text-only', '64K • Text-only', 'Fast 64K • Text-only'],
+        pmKey: 'yandexPreferredModel'
     },
 };
 

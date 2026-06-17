@@ -137,8 +137,23 @@ exports.default = async function (context) {
                     execSync(`codesign --force ${hardenedOpt}--entitlements "${entitlementsPath}" --sign - "${nodePath}"`, { stdio: 'inherit' });
                 } catch (error) {
                     console.error(`[Ad-Hoc Signing] Failed to sign ${file}:`, error);
+                    throw error;
                 }
             }
         }
+    }
+
+    // ── Step 2c: Re-seal the top-level app after mutating nested .node signatures ──
+    // Re-signing files inside Contents/Resources changes their bytes, which invalidates
+    // the app bundle's CodeResources seal. Sign the top-level bundle again without
+    // --deep so the seal is refreshed while the entitlement-signed .node files stay
+    // untouched.
+    console.log('[Ad-Hoc Signing] Re-sealing main app after native module signing...');
+    try {
+        execSync(`codesign --force ${hardenedOpt}--entitlements "${entitlementsPath}" --sign - "${appPath}"`, { stdio: 'inherit' });
+        console.log('[Ad-Hoc Signing] Main app seal refreshed.');
+    } catch (error) {
+        console.error('[Ad-Hoc Signing] Failed to re-seal the application:', error);
+        throw error;
     }
 };

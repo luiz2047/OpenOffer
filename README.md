@@ -100,7 +100,7 @@ OpenOffer's privacy model is simple: local first, explicit provider use when you
 
 Data can be sent to providers you configure, such as:
 
-- AI providers: OpenAI, Anthropic, Google Gemini, Groq, Ollama-compatible endpoints, or OpenAI-compatible/self-hosted endpoints.
+- AI providers: OpenAI, Anthropic, Google Gemini, Groq, DeepSeek, Yandex AI Studio, Ollama-compatible endpoints, or OpenAI-compatible/self-hosted endpoints.
 - Speech providers: Local Whisper, GigaSTT, OpenAI Whisper, Deepgram, ElevenLabs, Google, Azure, IBM Watson, Soniox, or Groq Whisper.
 - Search providers such as Tavily when web research is enabled.
 - GitHub release infrastructure for update checks.
@@ -157,6 +157,7 @@ npm run app:dev
 ```
 
 This starts Vite on port 5180 and launches Electron after the dev server is ready.
+Use `npm run app:dev:fast` when you only changed renderer code and want to reuse the last Electron build. If you changed `electron/` or `preload`, run `npm run build:electron` first or use `npm run app:dev`.
 
 ### Build the App
 
@@ -200,12 +201,16 @@ You only need one speech provider and one model provider to get started.
 
 | Provider type | Examples |
 | :------------ | :------- |
-| LLMs | OpenAI, Anthropic, Google Gemini, Groq, DeepSeek, OpenAI-compatible endpoints |
+| LLMs | OpenAI, Anthropic, Google Gemini, Groq, DeepSeek, Yandex AI Studio, OpenAI-compatible endpoints |
 | Speech-to-text | OpenAI Whisper, Deepgram, ElevenLabs, Google, Azure, IBM Watson, Soniox |
 | Search | Tavily |
 | Local models | Ollama, LocalAI, LM Studio, vLLM, other OpenAI-compatible endpoints |
 
 Cloud providers are compatibility options, not the core requirement. The public OpenOffer build does not meter, proxy, resell, or bill for provider usage.
+
+Yandex AI Studio needs both an API key and folder ID. See [Yandex AI Studio setup](docs/YANDEX_AI_STUDIO_SETUP.md).
+
+For contributor-side Russian prompt reliability checks, see [Yandex Russian prompt eval](docs/testing/YANDEX_RUSSIAN_PROMPT_EVAL.md).
 
 ## Development
 
@@ -213,10 +218,12 @@ Cloud providers are compatibility options, not the core requirement. The public 
 
 ```bash
 npm run app:dev          # run Vite + Electron in development
+npm run app:dev:fast     # run without rebuilding Electron; requires an existing dist-electron build
 npm run build            # clean, typecheck frontend, and build Vite output
 npm run build:electron   # build Electron main/preload code
 npm run typecheck:electron
 npm run build:native     # build native audio module
+npm run test:answer-style-yandex
 npm run test             # node/electron test gate through repo script
 npm run app:build        # production package build
 ```

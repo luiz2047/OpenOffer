@@ -36,8 +36,10 @@ export type { ConversationIntent, IntentResult } from "./IntentClassifier";
 export { planNextAssistantAction } from "./PlannerDecision";
 export type { PlannerDecision, PlannerDecisionKind, PlannerInput } from "./PlannerDecision";
 export { planAnswer, formatAnswerPlanForPrompt, isCodingAnswerType, shouldScaffold, isStealthEvasionQuestion } from "./AnswerPlanner";
-export { detectAnswerStyle, styleSuppressesScaffold } from "./answerStyle";
+export { detectAnswerStyle, getAnswerStyleDirective, styleSuppressesScaffold } from "./answerStyle";
 export type { AnswerStyle, AnswerStyleResult } from "./answerStyle";
+export { coerceAnswerStylePackId, getAutomaticAnswerStyleSummary, getEnvAnswerStylePackId, getEnvYandexPromptPackOverride, getPlannerAnswerStyleForPackId, listAnswerStylePacks, normalizeAnswerStylePackId, providerForModelId, resolveYandexAdapterPromptPackId } from "./answerStylePacks";
+export type { AnswerStylePack, AnswerStylePackId, AnswerStylePackSelection } from "./answerStylePacks";
 export type { AnswerPlan, AnswerSource, AnswerType, ContextLayer, OutputPerspective, SpeakerPerspective } from "./AnswerPlanner";
 export { applyModeFallback, MODE_CONTEXT_PROFILES } from "./modeProfiles";
 export type { ActiveModeInfo, ModeContextProfile, ModeTemplateType } from "./modeProfiles";
@@ -88,6 +90,8 @@ export {
 export type { CustomContextCategory, CustomContextChunk, ClassifiedCustomContext, CustomContextSelection } from "./customContextClassifier";
 export { routeLLMProviders } from "./ProviderRouter";
 export type { LLMProviderId, ProviderAttempt, ProviderAttemptStatus, ProviderAvailabilityState, ProviderCapability, ProviderModelState, ProviderRouteOptions, ProviderUnavailableReason } from "./ProviderRouter";
+export { buildYandexSystemPrompt, getYandexPromptPack, listYandexPromptPacks, selectYandexPromptPack, YANDEX_DEFAULT_PROMPT_PACK_ID } from "./yandexPromptPacks";
+export type { YandexPromptPack, YandexPromptPackId, YandexPromptPackSelection } from "./yandexPromptPacks";
 export { MODE_CONFIGS } from "./types";
 export type { GenerationConfig, GeminiContent, LLMClient } from "./types";
 export {

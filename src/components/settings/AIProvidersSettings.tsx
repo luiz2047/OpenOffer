@@ -38,6 +38,25 @@ interface ModelOption {
     name: string;
 }
 
+interface AnswerStylePackOption {
+    id: string;
+    label: string;
+    shortLabel?: string;
+    description: string;
+    sample?: string;
+    language: 'any';
+    recommended: boolean;
+}
+
+const DEFAULT_ANSWER_STYLE_PACKS: AnswerStylePackOption[] = [
+    { id: 'automatic', label: 'Automatic', shortLabel: 'Auto', description: 'Uses the recommended behavior for this model and language.', sample: 'Question-aware defaults.', language: 'any', recommended: true },
+    { id: 'standard', label: 'Standard', shortLabel: 'Standard', description: 'Balanced, speakable answers.', sample: 'Direct answer with natural context.', language: 'any', recommended: false },
+    { id: 'strict', label: 'Strict', shortLabel: 'Strict', description: 'Short, firm answers with no filler.', sample: '2-4 sentences or tight bullets.', language: 'any', recommended: false },
+    { id: 'expanded', label: 'Expanded', shortLabel: 'Expanded', description: 'More complete answers with tradeoffs.', sample: 'Fuller reasoning while staying interview-ready.', language: 'any', recommended: false },
+    { id: 'hint', label: 'Hint mode', shortLabel: 'Hint', description: 'Coaching cues instead of a full script.', sample: 'Structure and key points to emphasize.', language: 'any', recommended: false },
+    { id: 'grounded', label: 'Grounded', shortLabel: 'Grounded', description: 'Conservative about personal facts and metrics.', sample: 'Admits missing context instead of inventing.', language: 'any', recommended: false },
+];
+
 interface ModelSelectProps {
     value: string;
     options: ModelOption[];
@@ -68,7 +87,7 @@ const ModelSelect: React.FC<ModelSelectProps> = ({ value, options, onChange, pla
         <div className="relative" ref={containerRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`w-40 bg-bg-input border border-border-subtle rounded-lg px-3 ${paddingClass} ${className} text-xs text-text-primary focus:outline-none focus:border-accent-primary flex items-center justify-between hover:bg-bg-elevated transition-colors`}
+                className={`w-full min-w-0 bg-bg-input border border-border-subtle rounded-lg px-3 ${paddingClass} ${className} text-xs text-text-primary focus:outline-none focus:border-accent-primary flex items-center justify-between hover:bg-bg-elevated transition-colors`}
                 type="button"
             >
                 <span className="truncate pr-2">{selectedOption ? selectedOption.name : placeholder}</span>
@@ -143,6 +162,14 @@ export const AIProvidersSettings: React.FC = () => {
     const [openaiApiKey, setOpenaiApiKey] = useState('');
     const [claudeApiKey, setClaudeApiKey] = useState('');
     const [deepseekApiKey, setDeepseekApiKey] = useState('');
+    const [yandexApiKey, setYandexApiKey] = useState('');
+    const [yandexFolderId, setYandexFolderId] = useState('');
+    const [yandexDisableDataLogging, setYandexDisableDataLogging] = useState(true);
+    const [answerStylePacks, setAnswerStylePacks] = useState<AnswerStylePackOption[]>([]);
+    const [yandexAnswerStyleId, setYandexAnswerStyleId] = useState<string | undefined>(undefined);
+    const [yandexRecommendedAnswerStyleId, setYandexRecommendedAnswerStyleId] = useState<string>('automatic');
+    const [yandexAnswerStyleLanguage, setYandexAnswerStyleLanguage] = useState<string>('auto');
+    const [yandexAnswerStyleSummary, setYandexAnswerStyleSummary] = useState<string>('Question-aware default behavior');
 
     // --- LiteLLM proxy (OpenAI-compatible gateway: baseURL + optional virtual key) ---
     const [litellmBaseURL, setLitellmBaseURL] = useState('');
@@ -196,6 +223,22 @@ export const AIProvidersSettings: React.FC = () => {
     // --- Cloud Provider Data Scopes (fail-closed cloud share controls) ---
     const [providerDataScopes, setProviderDataScopes] = useState<{ transcript?: boolean; screenshots?: boolean; reference_files?: boolean; profile_history?: boolean; embeddings?: boolean; post_call_summary?: boolean }>({});
 
+    const applyYandexAnswerStyleState = (answerStyleState: any) => {
+        setAnswerStylePacks(answerStyleState.packs || []);
+        setYandexAnswerStyleId(answerStyleState.selectedId);
+        setYandexRecommendedAnswerStyleId(answerStyleState.recommendedId || 'automatic');
+        setYandexAnswerStyleLanguage(answerStyleState.language || 'auto');
+        setYandexAnswerStyleSummary(answerStyleState.automaticSummary || 'Question-aware default behavior');
+    };
+
+    const loadYandexAnswerStyle = async (modelId: string) => {
+        const answerStyleState = await window.electronAPI?.getAnswerStylePacks?.({
+            provider: 'yandex',
+            modelId,
+        });
+        if (answerStyleState) applyYandexAnswerStyleState(answerStyleState);
+    };
+
     // Load Initial Data
     useEffect(() => {
         const loadCredentials = async () => {
@@ -213,8 +256,11 @@ export const AIProvidersSettings: React.FC = () => {
                         openai: creds.hasOpenaiKey,
                         claude: creds.hasClaudeKey,
                         deepseek: creds.hasDeepseekKey || false,
+                        yandex: !!(creds.hasYandexKey && creds.yandexFolderId),
                         litellm: creds.hasLitellmBaseURL || false
                     });
+                    if (creds.yandexFolderId) setYandexFolderId(creds.yandexFolderId);
+                    setYandexDisableDataLogging(creds.yandexDisableDataLogging !== false);
                     // Prefill stored LiteLLM config so re-saving doesn't silently reset it.
                     // (baseURL is config, not a secret; the key stays masked/blank = keep.)
                     if (creds.litellmBaseURL) setLitellmBaseURL(creds.litellmBaseURL);
@@ -226,6 +272,7 @@ export const AIProvidersSettings: React.FC = () => {
                     if (creds.openaiPreferredModel) pm.openai = creds.openaiPreferredModel;
                     if (creds.claudePreferredModel) pm.claude = creds.claudePreferredModel;
                     if (creds.deepseekPreferredModel) pm.deepseek = creds.deepseekPreferredModel;
+                    if (creds.yandexPreferredModel) pm.yandex = creds.yandexPreferredModel;
                     setPreferredModels(pm);
                 }
 
@@ -253,6 +300,8 @@ export const AIProvidersSettings: React.FC = () => {
                 if (result && result.model) {
                     setDefaultModel(sanitizeDefaultModel(result.model));
                 }
+
+                await loadYandexAnswerStyle(creds?.yandexPreferredModel || 'yandex/yandexgpt-5-lite');
 
                 // Check Ollama
                 checkOllama();
@@ -503,6 +552,100 @@ export const AIProvidersSettings: React.FC = () => {
         }
     };
 
+    const handleSaveYandex = async () => {
+        const folderId = yandexFolderId.trim();
+        const preferredModel = preferredModels.yandex || 'yandex/yandexgpt-5-lite';
+        if (!folderId || (!yandexApiKey.trim() && !hasStoredKey.yandex)) return;
+        setSavingStatus(prev => ({ ...prev, yandex: true }));
+        try {
+            const result = await window.electronAPI.setYandexConfig({
+                apiKey: yandexApiKey.trim(),
+                folderId,
+                preferredModel,
+                answerStylePackId: yandexAnswerStyleId,
+                disableDataLogging: yandexDisableDataLogging,
+            });
+            if (result && result.success) {
+                setSavedStatus(prev => ({ ...prev, yandex: true }));
+                setHasStoredKey(prev => ({ ...prev, yandex: true }));
+                setYandexApiKey('');
+                setTimeout(() => setSavedStatus(prev => ({ ...prev, yandex: false })), 2000);
+            } else if (result?.error) {
+                setTestStatus(prev => ({ ...prev, yandex: 'error' }));
+                setTestError(prev => ({ ...prev, yandex: result.error || 'Save failed' }));
+            }
+        } catch (e: any) {
+            setTestStatus(prev => ({ ...prev, yandex: 'error' }));
+            setTestError(prev => ({ ...prev, yandex: e.message || 'Save failed' }));
+        } finally {
+            setSavingStatus(prev => ({ ...prev, yandex: false }));
+        }
+    };
+
+    const handleRemoveYandex = async () => {
+        if (!confirm('Are you sure you want to remove the Yandex AI Studio configuration?')) return;
+        try {
+            const result = await window.electronAPI.removeYandexConfig();
+            if (result && result.success) {
+                setHasStoredKey(prev => ({ ...prev, yandex: false }));
+                setYandexApiKey('');
+                setYandexFolderId('');
+                setYandexDisableDataLogging(true);
+                setYandexAnswerStyleId(undefined);
+                setPreferredModels(prev => {
+                    const next = { ...prev };
+                    delete next.yandex;
+                    return next;
+                });
+                if (defaultModel.startsWith('yandex/')) {
+                    setDefaultModel('gemini-3.1-flash-lite');
+                }
+            }
+        } catch (e) {
+            console.error('Failed to remove Yandex config:', e);
+        }
+    };
+
+    const handleYandexAnswerStyleChange = async (styleId: string) => {
+        setYandexAnswerStyleId(styleId === 'automatic' ? undefined : styleId);
+        const result = await window.electronAPI?.setAnswerStylePack?.(styleId, {
+            provider: 'yandex',
+            modelId: preferredModels.yandex || 'yandex/yandexgpt-5-lite',
+        });
+        if (result && !result.success) {
+            setTestStatus(prev => ({ ...prev, yandex: 'error' }));
+            setTestError(prev => ({ ...prev, yandex: result.error || 'Failed to set answer style' }));
+            return;
+        }
+        setYandexAnswerStyleId(result?.selectedId);
+        if (result?.recommendedId) setYandexRecommendedAnswerStyleId(result.recommendedId);
+        if (result?.automaticSummary) setYandexAnswerStyleSummary(result.automaticSummary);
+    };
+
+    const handleTestYandexConnection = async () => {
+        if (!yandexFolderId.trim() || (!yandexApiKey.trim() && !hasStoredKey.yandex)) return;
+        setTestStatus(prev => ({ ...prev, yandex: 'testing' }));
+        setTestError(prev => ({ ...prev, yandex: '' }));
+        try {
+            const result = await window.electronAPI.testYandexConnection({
+                apiKey: yandexApiKey.trim(),
+                folderId: yandexFolderId.trim(),
+                preferredModel: preferredModels.yandex || 'yandex/yandexgpt-5-lite',
+                disableDataLogging: yandexDisableDataLogging,
+            });
+            if (result.success) {
+                setTestStatus(prev => ({ ...prev, yandex: 'success' }));
+                setTimeout(() => setTestStatus(prev => ({ ...prev, yandex: 'idle' })), 3000);
+            } else {
+                setTestStatus(prev => ({ ...prev, yandex: 'error' }));
+                setTestError(prev => ({ ...prev, yandex: result.error || 'Connection failed' }));
+            }
+        } catch (e: any) {
+            setTestStatus(prev => ({ ...prev, yandex: 'error' }));
+            setTestError(prev => ({ ...prev, yandex: e.message || 'Connection failed' }));
+        }
+    };
+
     const handleRemoveKey = async (provider: string, setter: (val: string) => void) => {
         if (!confirm(`Are you sure you want to remove the ${provider} API key?`)) return;
         try {
@@ -638,6 +781,9 @@ export const AIProvidersSettings: React.FC = () => {
             console.error("Failed to delete provider:", e);
         }
     };
+
+    const yandexStyleOptions = answerStylePacks.length ? answerStylePacks : DEFAULT_ANSWER_STYLE_PACKS;
+    const selectedYandexAnswerStyle = yandexStyleOptions.find(style => style.id === (yandexAnswerStyleId || 'automatic')) || yandexStyleOptions[0];
 
     return (
         <div className="space-y-5 animated fadeIn pb-10">
@@ -833,6 +979,144 @@ export const AIProvidersSettings: React.FC = () => {
                         keyUrl="https://platform.deepseek.com/api_keys"
                         onPreferredModelChange={(model) => setPreferredModels(prev => ({ ...prev, deepseek: model }))}
                     />
+
+                    {/* Yandex AI Studio — text-only OpenAI-compatible provider with folder-scoped model URIs. */}
+                    <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-4">
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <label className="block text-xs font-bold text-text-primary mb-0">Yandex AI Studio</label>
+                                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-border-subtle text-text-secondary">Cloud BYOK</span>
+                                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-border-subtle text-text-secondary">Text only</span>
+                                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-sky-500/20 text-sky-500">Answer styles</span>
+                                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-emerald-500/20 text-emerald-500">Logging off</span>
+                                </div>
+                                <p className="text-[10px] text-text-secondary mt-1">
+                                    Uses your Yandex AI Studio key and folder ID. Automatic picks the recommended answer behavior for the current model and AI response language.{' '}
+                                    <a href="https://aistudio.yandex.ru/docs/en/ai-studio/quickstart/" target="_blank" rel="noreferrer" className="text-accent-primary hover:underline">Docs</a>
+                                </p>
+                            </div>
+                            {hasStoredKey.yandex && (
+                                <span className="text-[10px] font-medium text-emerald-500 uppercase tracking-wide shrink-0">Configured</span>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <label className="space-y-1 block">
+                                <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">API Key</span>
+                                <input
+                                    type="password"
+                                    value={yandexApiKey}
+                                    onChange={e => setYandexApiKey(e.target.value)}
+                                    className="w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-xs text-text-primary font-mono focus:outline-none focus:border-accent-primary"
+                                    placeholder={hasStoredKey.yandex ? '•••••••• (leave blank to keep)' : 'y0_...'}
+                                />
+                            </label>
+
+                            <label className="space-y-1 block">
+                                <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Folder ID</span>
+                                <input
+                                    value={yandexFolderId}
+                                    onChange={e => setYandexFolderId(e.target.value)}
+                                    className="w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-xs text-text-primary font-mono focus:outline-none focus:border-accent-primary"
+                                    placeholder="b1g..."
+                                />
+                            </label>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3 items-end">
+                            <div className="space-y-1 min-w-0">
+                                <span className="block text-[10px] font-medium text-text-secondary uppercase tracking-wide">Model</span>
+                                <ModelSelect
+                                    value={preferredModels.yandex || 'yandex/yandexgpt-5-lite'}
+                                    options={STANDARD_CLOUD_MODELS.yandex.ids.map((id, i) => ({ id, name: STANDARD_CLOUD_MODELS.yandex.names[i] }))}
+                                    onChange={async (model) => {
+                                        setPreferredModels(prev => ({ ...prev, yandex: model }));
+                                        await window.electronAPI?.setProviderPreferredModel?.('yandex', model);
+                                        await loadYandexAnswerStyle(model);
+                                    }}
+                                    placeholder="YandexGPT 5 Lite"
+                                    className="py-2"
+                                />
+                            </div>
+
+                            <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className="block text-[10px] font-medium text-text-secondary uppercase tracking-wide">Answer style</span>
+                                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-emerald-500/20 text-emerald-500 truncate">
+                                        {yandexRecommendedAnswerStyleId === 'automatic' ? 'Auto' : 'Recommended'}
+                                    </span>
+                                </div>
+                                <ModelSelect
+                                    value={yandexAnswerStyleId || 'automatic'}
+                                    options={yandexStyleOptions.map(style => ({
+                                        id: style.id,
+                                        name: `${style.label}${style.recommended ? ' (recommended)' : ''}`,
+                                    }))}
+                                    onChange={handleYandexAnswerStyleChange}
+                                    placeholder="Answer style"
+                                    className="py-2"
+                                />
+                                <p className="text-[10px] text-text-secondary">
+                                    {selectedYandexAnswerStyle?.id === 'automatic' ? yandexAnswerStyleSummary : (selectedYandexAnswerStyle?.sample || selectedYandexAnswerStyle?.description)}
+                                    <span className="text-text-tertiary"> Language: {yandexAnswerStyleLanguage}</span>
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setYandexDisableDataLogging(!yandexDisableDataLogging)}
+                                className="flex items-center justify-between gap-3 min-w-0 w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-xs text-text-primary hover:bg-bg-elevated transition-colors"
+                            >
+                                <span>Request data logging</span>
+                                <span className={`font-medium ${yandexDisableDataLogging ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                    {yandexDisableDataLogging ? 'Off' : 'On'}
+                                </span>
+                            </button>
+                        </div>
+
+                        <p className="text-[10px] text-text-secondary">
+                            Sends <span className="font-mono">x-data-logging-enabled: false</span> on connection tests, generation, and streaming when logging is Off.
+                        </p>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handleSaveYandex}
+                                disabled={!yandexFolderId.trim() || (!yandexApiKey.trim() && !hasStoredKey.yandex) || !!savingStatus.yandex}
+                                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent-primary text-white disabled:opacity-50 transition-opacity flex items-center gap-1.5"
+                            >
+                                {savingStatus.yandex ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                                {savingStatus.yandex ? 'Saving...' : savedStatus.yandex ? 'Saved' : 'Save'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleTestYandexConnection}
+                                disabled={!yandexFolderId.trim() || (!yandexApiKey.trim() && !hasStoredKey.yandex) || testStatus.yandex === 'testing'}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border border-border-subtle flex items-center gap-1.5 ${testStatus.yandex === 'success' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
+                                    testStatus.yandex === 'error' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
+                                        'bg-bg-input hover:bg-bg-elevated text-text-primary'
+                                    }`}
+                            >
+                                {testStatus.yandex === 'testing' ? <><Loader2 size={12} className="animate-spin" /> Testing...</> :
+                                    testStatus.yandex === 'success' ? <><CheckCircle size={12} /> Connected</> :
+                                        testStatus.yandex === 'error' ? <><AlertCircle size={12} /> Error</> :
+                                            <>Test Connection</>}
+                            </button>
+                            {hasStoredKey.yandex && (
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveYandex}
+                                    className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border-subtle text-text-secondary hover:text-red-500 transition-colors flex items-center gap-1.5"
+                                >
+                                    <Trash2 size={12} />
+                                    Remove
+                                </button>
+                            )}
+                        </div>
+
+                        {testError.yandex && <p className="text-[10px] text-red-400 mt-1.5">{testError.yandex}</p>}
+                    </div>
 
                     {/* LiteLLM — OpenAI-compatible AI gateway (100+ providers via one proxy).
                         Three fields: proxy base URL (required), optional virtual key, and an

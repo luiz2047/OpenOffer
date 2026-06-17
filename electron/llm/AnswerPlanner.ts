@@ -1,7 +1,7 @@
 import type { IntentResult } from './IntentClassifier';
 import type { ExtractedQuestion } from './transcriptQuestionExtractor';
 import { CODING_CONTRACT, CODING_VERIFICATION_INSTRUCTION } from './codingContract';
-import { detectAnswerStyle, type AnswerStyle } from './answerStyle';
+import { detectAnswerStyle, getAnswerStyleDirective, type AnswerStyle } from './answerStyle';
 import { applyModeFallback, type ActiveModeInfo } from './modeProfiles';
 
 export type AnswerType =
@@ -145,6 +145,8 @@ export interface PlanAnswerInput {
    * Optional — absent keeps the mode-blind behavior byte-for-byte.
    */
   activeMode?: ActiveModeInfo | null;
+  /** User-selected answer style. Form-only; never changes routing, voice, or context policy. */
+  answerStyleOverride?: AnswerStyle | null;
 }
 
 // Derives from the single canonical CODING_CONTRACT (codingContract.ts) so the
@@ -2107,6 +2109,11 @@ export const planAnswer = (input: PlanAnswerInput): AnswerPlan => {
       ? 800
       : 1500;
 
+  const detectedStyle = detectAnswerStyle(question);
+  const selectedStyle = input.answerStyleOverride && input.answerStyleOverride !== 'default'
+    ? input.answerStyleOverride
+    : detectedStyle.style;
+
   return {
     answerType,
     source: input.source,
@@ -2122,21 +2129,20 @@ export const planAnswer = (input: PlanAnswerInput): AnswerPlan => {
     maxInitialLatencyMs: latencyMs, // deprecated alias
     requiresLLM: !fastPathTypes.includes(answerType),
     canUseFastPath: fastPathTypes.includes(answerType),
-    shouldShowImmediateScaffold: shouldScaffold(answerType) && !styleSuppressesScaffoldSafe(answerType, question),
+    shouldShowImmediateScaffold: shouldScaffold(answerType) && !styleSuppressesScaffoldSafe(answerType, selectedStyle),
     question,
     confidence: Math.max(input.intentResult?.confidence || input.extractedQuestion?.confidence || 0.7, 0),
-    answerStyle: detectAnswerStyle(question).style,
-    answerStyleTargetSeconds: detectAnswerStyle(question).targetSeconds,
+    answerStyle: selectedStyle,
+    answerStyleTargetSeconds: selectedStyle === detectedStyle.style ? detectedStyle.targetSeconds : 0,
   };
 };
 
 // Only let a style suppress the coding scaffold for CODING answer types (a "code only"
 // cue on a non-coding answer must not change anything). Keeps the scaffold for the
 // common case; suppresses it for an explicit "just the code" / "one line" coding ask.
-const styleSuppressesScaffoldSafe = (answerType: AnswerType, question: string): boolean => {
+const styleSuppressesScaffoldSafe = (answerType: AnswerType, style: AnswerStyle): boolean => {
   if (!isCodingAnswerType(answerType)) return false;
-  const s = detectAnswerStyle(question).style;
-  return s === 'code_only' || s === 'one_liner';
+  return style === 'code_only' || style === 'one_liner';
 };
 
 /**
@@ -2170,7 +2176,7 @@ const SCAFFOLDED_PROFILE_TYPES: ReadonlySet<AnswerType> = new Set<AnswerType>([
 
 // Styles that explicitly request visible structure — sections/bullets stay.
 const STRUCTURE_REQUESTING_STYLES: ReadonlySet<AnswerStyle> = new Set<AnswerStyle>([
-  'detailed', 'bullets', 'exam', 'notes',
+  'detailed', 'expanded', 'hint', 'bullets', 'exam', 'notes',
 ]);
 
 /** True when this plan should render as speakable prose (headings suppressed). */
@@ -2220,7 +2226,7 @@ export const formatAnswerPlanForPrompt = (plan: AnswerPlan, includeVerificationS
   // Adaptive style directive (form only) — appended when the question requested a
   // specific style/length. Never overrides VOICE/GROUNDING/leak boundaries.
   const styleDirective = plan.answerStyle && plan.answerStyle !== 'default'
-    ? `\n\n${detectAnswerStyle(plan.question).directive}`
+    ? `\n\n${getAnswerStyleDirective(plan.answerStyle, plan.answerStyleTargetSeconds)}`
     : '';
   // Speakable-by-default (manual regression 2026-06-12): scaffolded profile
   // templates become internal thinking structure; the rendered answer is

@@ -67,6 +67,7 @@ describe('LiteLLM rate limiter', () => {
 
   test('factory provisions a litellm bucket like every other cloud provider', () => {
     const limiters = createProviderRateLimiters();
+    assert.ok(limiters.yandex instanceof RateLimiter, 'yandex rate limiter created');
     assert.ok(limiters.litellm instanceof RateLimiter, 'litellm rate limiter created');
   });
 
@@ -98,6 +99,7 @@ describe('LiteLLM outbound data-scope gating (privacy)', () => {
     );
     // Sanity: deepseek behaves the same, proving litellm is not special-cased.
     assert.throws(() => assertProviderDataScopes('deepseek', ['transcript'], policy), ProviderScopeError);
+    assert.throws(() => assertProviderDataScopes('yandex', ['transcript'], policy), ProviderScopeError);
   });
 
   test('litellm passes when the payload carries only allowed scopes', () => {

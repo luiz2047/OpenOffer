@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import * as http from 'http';
 import * as os from 'os';
 import * as path from 'path';
+import OpenAI from 'openai';
 import { AudioDevices } from './audio/AudioDevices';
 import { ensureManagedGigaSTTServer, getGigaSTTBinaryStatus } from './audio/GigaSTTStreamingSTT';
 import { DatabaseManager } from './db/DatabaseManager'; // Import Database Manager
@@ -30,6 +31,17 @@ import { SearchOrchestrator, type SearchCandidate } from './intelligence/SearchO
 import { CHAT_MODE_PROMPT } from './llm/prompts';
 import { isAssistantIdentityQuestion, profileFactsReady } from './llm/manualProfileIntelligence';
 import { buildManualProfileBackendAnswer } from './llm/profileAnswerBackend';
+import { getYandexModelUri } from './llm/yandexModels';
+import {
+  coerceAnswerStylePackId,
+  getAutomaticAnswerStyleSummary,
+  getEnvAnswerStylePackId,
+  getPlannerAnswerStyleForPackId,
+  listAnswerStylePacks,
+  normalizeAnswerStylePackId,
+  providerForModelId,
+} from './llm/answerStylePacks';
+import type { AnswerStyle } from './llm/answerStyle';
 
 type SttRuntimeProviderState =
   | 'ready'
@@ -52,6 +64,98 @@ type LocalHttpCheckResult = {
 
 const GIGASTT_HTTP_BASE_URL = 'http://127.0.0.1:9876';
 const GIGASTT_LOG_PATH = path.join(os.homedir(), '.gigastt', 'openoffer-gigastt.log');
+const YANDEX_AI_STUDIO_BASE_URL = 'https://ai.api.cloud.yandex.net/v1';
+
+type AnswerStyleScope = { provider?: string; modelId?: string };
+
+function resolveAnswerStyleScope(scope?: AnswerStyleScope): Required<AnswerStyleScope> {
+  const modelId = scope?.modelId || '';
+  const provider = scope?.provider || providerForModelId(modelId) || '';
+  return { provider, modelId };
+}
+
+function getAnswerStyleState(scope?: AnswerStyleScope) {
+  const { CredentialsManager } = require('./services/CredentialsManager');
+  const cm = CredentialsManager.getInstance();
+  const settings = SettingsManager.getInstance();
+  const resolvedScope = resolveAnswerStyleScope(scope);
+  const language = cm.getAiResponseLanguage();
+  const envSelectedId = getEnvAnswerStylePackId();
+  const selectedId = coerceAnswerStylePackId(
+    envSelectedId
+      || settings.getAnswerStylePreference(resolvedScope.provider || undefined, resolvedScope.modelId || undefined),
+  );
+  return {
+    selectedId,
+    recommendedId: 'automatic',
+    effectiveId: selectedId || 'automatic',
+    language,
+    automaticSummary: getAutomaticAnswerStyleSummary({
+      provider: resolvedScope.provider || undefined,
+      modelId: resolvedScope.modelId || undefined,
+      inputLanguage: language,
+    }),
+    packs: listAnswerStylePacks().map(pack => ({
+      id: pack.id,
+      label: pack.label,
+      shortLabel: pack.shortLabel,
+      description: pack.description,
+      sample: pack.sample,
+      language: pack.language,
+      recommended: pack.id === 'automatic',
+    })),
+  };
+}
+
+function getCurrentAnswerStyleOverride(appState: AppState): AnswerStyle | undefined {
+  try {
+    const modelId = appState.processingHelper.getLLMHelper().getCurrentModel();
+    const provider = providerForModelId(modelId);
+    const styleId = getEnvAnswerStylePackId()
+      || SettingsManager.getInstance().getAnswerStylePreference(provider, modelId);
+    return getPlannerAnswerStyleForPackId(styleId);
+  } catch {
+    return undefined;
+  }
+}
+
+function getYandexAnswerStylePreference(modelId?: string): string | undefined {
+  try {
+    return getEnvAnswerStylePackId()
+      || SettingsManager.getInstance().getAnswerStylePreference('yandex', modelId);
+  } catch {
+    return undefined;
+  }
+}
+
+function applyCurrentModelAnswerStyle(appState: AppState, modelId: string): void {
+  if (providerForModelId(modelId) !== 'yandex') return;
+  appState.processingHelper.getLLMHelper().setAnswerStylePackId(
+    getYandexAnswerStylePreference(modelId),
+  );
+}
+
+async function testYandexChatCompletion(
+  apiKey: string,
+  folderId: string,
+  preferredModel: string,
+  disableDataLogging: boolean,
+): Promise<void> {
+  const client = new OpenAI({
+    apiKey,
+    baseURL: YANDEX_AI_STUDIO_BASE_URL,
+    defaultHeaders: {
+      'x-folder-id': folderId,
+      ...(disableDataLogging ? { 'x-data-logging-enabled': 'false' } : {}),
+    },
+  });
+
+  await client.chat.completions.create({
+    model: getYandexModelUri(folderId, preferredModel || 'yandex/yandexgpt-5-lite'),
+    max_tokens: 10,
+    messages: [{ role: 'user', content: 'Hello' }],
+  });
+}
 
 function requestLocalJson(url: string, timeoutMs = 1200): Promise<LocalHttpCheckResult> {
   return new Promise(resolve => {
@@ -840,6 +944,7 @@ export function initializeIpcHandlers(appState: AppState): void {
           source: 'manual_input',
           speakerPerspective: 'user',
           activeMode: manualActiveMode,
+          answerStyleOverride: getCurrentAnswerStyleOverride(appState),
         });
         const isCodingChat = isCodingAnswerType(answerPlan.answerType);
         chatTrace.mark('answer_type_selected', { answerType: answerPlan.answerType, isCoding: isCodingChat });
@@ -1509,7 +1614,7 @@ export function initializeIpcHandlers(appState: AppState): void {
               // already ran inside planAnswer (answerStyle on the plan).
               SCAFFOLD_LABEL_RE.lastIndex = 0;
               const hasVisibleScaffold = SCAFFOLD_LABEL_RE.test(fullResponse);
-              const structureRequested = ['detailed', 'bullets', 'star', 'exam', 'notes'].includes(answerPlan.answerStyle as string);
+              const structureRequested = ['detailed', 'expanded', 'bullets', 'star', 'exam', 'notes', 'hint'].includes(answerPlan.answerStyle as string);
               if (hasVisibleScaffold && !structureRequested) {
                 const speakable = compressToSpeakable(fullResponse);
                 if (speakable.length >= 40) {
@@ -2428,6 +2533,77 @@ export function initializeIpcHandlers(appState: AppState): void {
     }
   });
 
+  safeHandle('set-yandex-config', async (_, config: { apiKey?: string; folderId?: string; preferredModel?: string; disableDataLogging?: boolean; promptPackId?: string; answerStylePackId?: string }) => {
+    try {
+      const { CredentialsManager } = require('./services/CredentialsManager');
+      const cm = CredentialsManager.getInstance();
+      const settings = SettingsManager.getInstance();
+      const folderId = (config?.folderId || '').trim();
+      if (!folderId) {
+        return { success: false, error: 'Yandex folder ID is required' };
+      }
+      const preferredModel = config?.preferredModel || 'yandex/yandexgpt-5-lite';
+      const requestedStyle = config?.answerStylePackId ?? config?.promptPackId;
+      if (requestedStyle !== undefined) {
+        settings.setAnswerStylePreference(undefined, 'yandex');
+        settings.setAnswerStylePreference(normalizeAnswerStylePackId(requestedStyle), 'yandex', preferredModel);
+      }
+      const answerStylePackId = getYandexAnswerStylePreference(preferredModel);
+
+      cm.setYandexConfig(
+        config?.apiKey || '',
+        folderId,
+        preferredModel,
+        config?.disableDataLogging !== false,
+      );
+
+      const effectiveKey = cm.getYandexApiKey();
+      if (!effectiveKey) {
+        return { success: false, error: 'Yandex API key is required' };
+      }
+
+      const llmHelper = appState.processingHelper.getLLMHelper();
+      llmHelper.setYandexConfig(
+        effectiveKey,
+        folderId,
+        cm.getYandexPreferredModel(),
+        cm.getYandexDisableDataLogging(),
+        answerStylePackId,
+      );
+
+      appState.getIntelligenceManager().resetEngine();
+      appState.getIntelligenceManager().initializeLLMs();
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error saving Yandex AI Studio config:', sanitizeErrorMessage(error?.message || String(error)));
+      return { success: false, error: sanitizeErrorMessage(error?.message || 'Failed to save Yandex config') };
+    }
+  });
+
+  safeHandle('remove-yandex-config', async () => {
+    try {
+      const { CredentialsManager } = require('./services/CredentialsManager');
+      CredentialsManager.getInstance().clearYandexConfig();
+      const cm = CredentialsManager.getInstance();
+
+      const llmHelper = appState.processingHelper.getLLMHelper();
+      llmHelper.setYandexConfig('', '', 'yandex/yandexgpt-5-lite', true);
+      const allProviders = [...(cm.getCurlProviders() || []), ...(cm.getCustomProviders() || [])];
+      const fallbackModel = cm.getDefaultModel();
+      llmHelper.setModel(fallbackModel, allProviders);
+
+      appState.getIntelligenceManager().resetEngine();
+      appState.getIntelligenceManager().initializeLLMs();
+      appState.sendModelChanged(fallbackModel);
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error removing Yandex AI Studio config:', sanitizeErrorMessage(error?.message || String(error)));
+      return { success: false, error: sanitizeErrorMessage(error?.message || 'Failed to remove Yandex config') };
+    }
+  });
+
   safeHandle('set-litellm-config', async (_, config: { apiKey: string; baseURL: string; maxTokens?: number }) => {
     try {
       const { CredentialsManager } = require('./services/CredentialsManager');
@@ -2689,6 +2865,10 @@ export function initializeIpcHandlers(appState: AppState): void {
         hasOpenaiKey: hasKey(creds.openaiApiKey),
         hasClaudeKey: hasKey(creds.claudeApiKey),
         hasDeepseekKey: hasKey(creds.deepseekApiKey),
+        hasYandexKey: hasKey(creds.yandexApiKey),
+        yandexFolderId: creds.yandexFolderId || '',
+        yandexDisableDataLogging: creds.yandexDisableDataLogging !== false,
+        yandexPromptPackId: creds.yandexPromptPackId || undefined,
         hasLitellmBaseURL: hasKey(creds.litellmBaseURL),
         // The base URL is config, not a secret — returned in full so Settings can
         // prefill it (unlike API keys, which are only reported as booleans).
@@ -2724,6 +2904,7 @@ export function initializeIpcHandlers(appState: AppState): void {
         openaiPreferredModel: creds.openaiPreferredModel || undefined,
         claudePreferredModel: creds.claudePreferredModel || undefined,
         deepseekPreferredModel: creds.deepseekPreferredModel || undefined,
+        yandexPreferredModel: creds.yandexPreferredModel || 'yandex/yandexgpt-5-lite',
       };
     } catch (error: any) {
       // SECURITY FIX (P0): Error fallback returns masked keys, not raw strings
@@ -2733,6 +2914,11 @@ export function initializeIpcHandlers(appState: AppState): void {
         hasOpenaiKey: false,
         hasClaudeKey: false,
         hasDeepseekKey: false,
+        hasYandexKey: false,
+        yandexFolderId: '',
+        yandexPreferredModel: 'yandex/yandexgpt-5-lite',
+        yandexPromptPackId: undefined,
+        yandexDisableDataLogging: true,
         hasLitellmBaseURL: false,
         litellmBaseURL: null,
         litellmMaxTokens: null,
@@ -2766,7 +2952,7 @@ export function initializeIpcHandlers(appState: AppState): void {
 
   safeHandle(
     'fetch-provider-models',
-    async (_, provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek', apiKey: string) => {
+    async (_, provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek' | 'yandex', apiKey: string) => {
       try {
         // Fall back to stored key if no key was explicitly provided
         let key = apiKey?.trim();
@@ -2778,6 +2964,7 @@ export function initializeIpcHandlers(appState: AppState): void {
           else if (provider === 'openai') key = cm.getOpenaiApiKey();
           else if (provider === 'claude') key = cm.getClaudeApiKey();
           else if (provider === 'deepseek') key = cm.getDeepseekApiKey();
+          else if (provider === 'yandex') key = cm.getYandexApiKey();
         }
 
         if (!key) {
@@ -2785,7 +2972,11 @@ export function initializeIpcHandlers(appState: AppState): void {
         }
 
         const { fetchProviderModels } = require('./utils/modelFetcher');
-        const models = await fetchProviderModels(provider, key);
+        const { CredentialsManager } = require('./services/CredentialsManager');
+        const folderId = provider === 'yandex'
+          ? CredentialsManager.getInstance().getYandexFolderId()
+          : undefined;
+        const models = await fetchProviderModels(provider, key, folderId);
         return { success: true, models };
       } catch (error: any) {
         console.error(`[IPC] Failed to fetch ${provider} models:`, error);
@@ -2798,15 +2989,111 @@ export function initializeIpcHandlers(appState: AppState): void {
 
   safeHandle(
     'set-provider-preferred-model',
-    async (_, provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek', modelId: string) => {
+    async (_, provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek' | 'yandex', modelId: string) => {
       try {
         const { CredentialsManager } = require('./services/CredentialsManager');
-        CredentialsManager.getInstance().setPreferredModel(provider, modelId);
+        const cm = CredentialsManager.getInstance();
+        cm.setPreferredModel(provider, modelId);
+        if (provider === 'yandex') {
+          const key = cm.getYandexApiKey();
+          const folderId = cm.getYandexFolderId();
+          if (key && folderId) {
+            const answerStylePackId = getYandexAnswerStylePreference(modelId);
+            appState.processingHelper.getLLMHelper().setYandexConfig(
+              key,
+              folderId,
+              cm.getYandexPreferredModel(),
+              cm.getYandexDisableDataLogging(),
+              answerStylePackId,
+            );
+          }
+        }
       } catch (error: any) {
         console.error(`[IPC] Failed to set preferred model for ${provider}:`, error);
       }
     },
   );
+
+  safeHandle('get-answer-style-packs', async (_, scope?: AnswerStyleScope) => {
+    return getAnswerStyleState(scope);
+  });
+
+  safeHandle('set-answer-style-pack', async (_, styleId?: string, scope?: AnswerStyleScope) => {
+    try {
+      const { CredentialsManager } = require('./services/CredentialsManager');
+      const cm = CredentialsManager.getInstance();
+      const settings = SettingsManager.getInstance();
+      const resolvedScope = resolveAnswerStyleScope(scope);
+      const normalized = normalizeAnswerStylePackId(styleId);
+      if (resolvedScope.provider === 'yandex' && resolvedScope.modelId) {
+        settings.setAnswerStylePreference(undefined, 'yandex');
+      }
+      settings.setAnswerStylePreference(
+        normalized,
+        resolvedScope.provider || undefined,
+        resolvedScope.modelId || undefined,
+      );
+
+      if ((resolvedScope.provider || providerForModelId(resolvedScope.modelId)) === 'yandex') {
+        const key = cm.getYandexApiKey();
+        const folderId = cm.getYandexFolderId();
+        if (key && folderId) {
+          appState.processingHelper.getLLMHelper().setYandexConfig(
+            key,
+            folderId,
+            cm.getYandexPreferredModel(),
+            cm.getYandexDisableDataLogging(),
+            normalized,
+          );
+        } else {
+          appState.processingHelper.getLLMHelper().setAnswerStylePackId(normalized);
+        }
+      }
+
+      return {
+        success: true,
+        ...getAnswerStyleState(resolvedScope),
+      };
+    } catch (error: any) {
+      console.error('[IPC] Failed to set answer style:', error);
+      return { success: false, error: error?.message || 'Failed to set answer style' };
+    }
+  });
+
+  // Backward-compatible wrappers. The renderer now uses answer-style APIs; these
+  // keep older windows and stored calls from breaking.
+  safeHandle('get-yandex-prompt-packs', async () => {
+    return getAnswerStyleState({ provider: 'yandex' });
+  });
+
+  safeHandle('set-yandex-prompt-pack', async (_, promptPackId?: string) => {
+    try {
+      const { CredentialsManager } = require('./services/CredentialsManager');
+      const cm = CredentialsManager.getInstance();
+      const normalized = normalizeAnswerStylePackId(promptPackId);
+      SettingsManager.getInstance().setAnswerStylePreference(normalized, 'yandex');
+
+      const key = cm.getYandexApiKey();
+      const folderId = cm.getYandexFolderId();
+      if (key && folderId) {
+        appState.processingHelper.getLLMHelper().setYandexConfig(
+          key,
+          folderId,
+          cm.getYandexPreferredModel(),
+          cm.getYandexDisableDataLogging(),
+          normalized,
+        );
+      }
+
+      return {
+        success: true,
+        ...getAnswerStyleState({ provider: 'yandex' }),
+      };
+    } catch (error: any) {
+      console.error('[IPC] Failed to set Yandex answer style:', error);
+      return { success: false, error: error?.message || 'Failed to set Yandex answer style' };
+    }
+  });
 
   // ==========================================
   // STT Provider Management Handlers
@@ -3393,9 +3680,19 @@ export function initializeIpcHandlers(appState: AppState): void {
 
   safeHandle(
     'test-llm-connection',
-    async (_, provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek', apiKey?: string) => {
+    async (_, provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek' | 'yandex', apiKey?: string) => {
       console.log(`[IPC] Received test-llm-connection request for provider: ${provider}`);
       try {
+        let yandexFolderId = '';
+        let yandexPreferredModel = 'yandex/yandexgpt-5-lite';
+        let yandexDisableDataLogging = true;
+        if (provider === 'yandex') {
+          const { CredentialsManager } = require('./services/CredentialsManager');
+          const creds = CredentialsManager.getInstance();
+          yandexFolderId = creds.getYandexFolderId() || '';
+          yandexPreferredModel = creds.getYandexPreferredModel();
+          yandexDisableDataLogging = creds.getYandexDisableDataLogging();
+        }
         if (!apiKey || !apiKey.trim()) {
           const { CredentialsManager } = require('./services/CredentialsManager');
           const creds = CredentialsManager.getInstance();
@@ -3404,6 +3701,9 @@ export function initializeIpcHandlers(appState: AppState): void {
           else if (provider === 'openai') apiKey = creds.getOpenaiApiKey();
           else if (provider === 'claude') apiKey = creds.getClaudeApiKey();
           else if (provider === 'deepseek') apiKey = creds.getDeepseekApiKey();
+          else if (provider === 'yandex') {
+            apiKey = creds.getYandexApiKey();
+          }
         }
 
         if (!apiKey || !apiKey.trim()) {
@@ -3482,6 +3782,12 @@ export function initializeIpcHandlers(appState: AppState): void {
               timeout: 15000,
             },
           );
+        } else if (provider === 'yandex') {
+          if (!yandexFolderId.trim()) {
+            return { success: false, error: 'Yandex folder ID is required' };
+          }
+          await testYandexChatCompletion(apiKey, yandexFolderId, yandexPreferredModel, yandexDisableDataLogging);
+          return { success: true };
         }
 
         if (response && (response.status === 200 || response.status === 201)) {
@@ -3511,6 +3817,42 @@ export function initializeIpcHandlers(appState: AppState): void {
           'Connection failed';
         const msg = sanitizeErrorMessage(rawMsg);
         return { success: false, error: msg };
+      }
+    },
+  );
+
+  safeHandle(
+    'test-yandex-connection',
+    async (_, config: { apiKey?: string; folderId?: string; preferredModel?: string; disableDataLogging?: boolean }) => {
+      try {
+        const { CredentialsManager } = require('./services/CredentialsManager');
+        const cm = CredentialsManager.getInstance();
+        const apiKey = (config?.apiKey || cm.getYandexApiKey() || '').trim();
+        const folderId = (config?.folderId || cm.getYandexFolderId() || '').trim();
+        const preferredModel = config?.preferredModel || cm.getYandexPreferredModel();
+        const disableDataLogging = config?.disableDataLogging !== false;
+
+        if (!apiKey) return { success: false, error: 'Yandex API key is required' };
+        if (!folderId) return { success: false, error: 'Yandex folder ID is required' };
+
+        await testYandexChatCompletion(apiKey, folderId, preferredModel, disableDataLogging);
+        return { success: true };
+      } catch (error: any) {
+        const safeInfo = {
+          provider: 'yandex',
+          status: error?.response?.status,
+          statusText: error?.response?.statusText,
+          code: error?.code,
+          message: error?.message,
+          responseError: error?.response?.data?.error?.message || error?.response?.data?.message,
+        };
+        console.error('Yandex connection test failed:', safeInfo);
+        const rawMsg =
+          error?.response?.data?.error?.message ||
+          error?.response?.data?.message ||
+          error.message ||
+          'Connection failed';
+        return { success: false, error: sanitizeErrorMessage(rawMsg) };
       }
     },
   );
@@ -3607,6 +3949,7 @@ export function initializeIpcHandlers(appState: AppState): void {
       const allProviders = [...curlProviders, ...legacyProviders];
 
       llmHelper.setModel(modelId, allProviders);
+      applyCurrentModelAnswerStyle(appState, modelId);
 
       appState.sendModelChanged(modelId);
 
@@ -3633,6 +3976,7 @@ export function initializeIpcHandlers(appState: AppState): void {
       const legacyProviders = cm.getCustomProviders() || [];
       const allProviders = [...curlProviders, ...legacyProviders];
       llmHelper.setModel(modelId, allProviders);
+      applyCurrentModelAnswerStyle(appState, modelId);
 
       appState.sendModelChanged(modelId);
 

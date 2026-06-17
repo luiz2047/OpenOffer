@@ -13,13 +13,40 @@ interface CustomProvider {
     curlCommand: string;
 }
 
+interface AnswerStylePackOption {
+    id: string;
+    label: string;
+    shortLabel?: string;
+    description: string;
+    sample?: string;
+    language: 'any';
+    recommended: boolean;
+}
+
 export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSelectModel }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'cloud' | 'custom' | 'local'>('cloud');
     const [ollamaModels, setOllamaModels] = useState<string[]>([]);
     const [customProviders, setCustomProviders] = useState<CustomProvider[]>([]);
     const [cloudModels, setCloudModels] = useState<{ id: string; name: string; desc: string; provider: string }[]>([]);
+    const [answerStylePacks, setAnswerStylePacks] = useState<AnswerStylePackOption[]>([]);
+    const [answerStyleSelectedId, setAnswerStyleSelectedId] = useState<string>('automatic');
+    const [answerStyleLabel, setAnswerStyleLabel] = useState<string>('Automatic');
+    const [answerStyleSummary, setAnswerStyleSummary] = useState<string>('Question-aware default behavior');
+    const [answerStyleSavingId, setAnswerStyleSavingId] = useState<string | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const applyAnswerStyleState = (answerStyleState: any) => {
+        const selectedId = answerStyleState?.selectedId || 'automatic';
+        const packs = (answerStyleState?.packs || []) as AnswerStylePackOption[];
+        const selected = packs.find(pack => pack.id === selectedId);
+        setAnswerStylePacks(packs);
+        setAnswerStyleSelectedId(selectedId);
+        setAnswerStyleLabel(selected?.shortLabel || selected?.label || 'Automatic');
+        setAnswerStyleSummary(selectedId === 'automatic'
+            ? (answerStyleState?.automaticSummary || 'Question-aware default behavior')
+            : (selected?.sample || selected?.description || 'Custom answer behavior'));
+    };
 
     // Close on click outside
     useEffect(() => {
@@ -60,12 +87,17 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
                     }
                 }
                 setCloudModels(cModels);
+
+                const answerStyleState = await window.electronAPI?.getAnswerStylePacks?.({ modelId: currentModel });
+                if (answerStyleState) {
+                    applyAnswerStyleState(answerStyleState);
+                }
             } catch (e) {
                 console.error("Failed to load models:", e);
             }
         };
         loadData();
-    }, [isOpen]);
+    }, [isOpen, currentModel]);
 
     const handleSelect = (model: string) => {
         // For custom/local, we might need to pass an ID or specific format
@@ -79,6 +111,20 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
         setIsOpen(false);
     };
 
+    const handleAnswerStyleSelect = async (styleId: string) => {
+        setAnswerStyleSavingId(styleId);
+        try {
+            const result = await window.electronAPI?.setAnswerStylePack?.(styleId, { modelId: currentModel });
+            if (result?.success) {
+                applyAnswerStyleState(result);
+            }
+        } catch (e) {
+            console.error("Failed to set answer style:", e);
+        } finally {
+            setAnswerStyleSavingId(null);
+        }
+    };
+
     const getModelDisplayName = (model: string) => {
         const codexCliName = getCodexCliModelDisplayName(model);
         if (codexCliName) return codexCliName;
@@ -89,6 +135,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
         if (model === 'llama-3.3-70b-versatile') return 'Groq Llama 3.3';
         if (model === 'gpt-5.4') return 'GPT 5.4';
         if (model === 'claude-sonnet-4-6') return 'Sonnet 4.6';
+        if (model.startsWith('yandex/')) return prettifyModelId(model.replace('yandex/', ''));
 
         // Check dynamic cloud models
         const cloud = cloudModels.find(m => m.id === model);
@@ -214,6 +261,39 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
                                         />
                                     ))
                                 )}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="border-t border-border-subtle p-2 bg-bg-input/30">
+                        <div className="flex items-start justify-between gap-3 px-1">
+                            <div className="min-w-0">
+                                <span className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary">Answer style</span>
+                                <span className="block text-[11px] font-medium text-text-primary truncate">{answerStyleLabel}</span>
+                            </div>
+                            <span className="text-[9px] text-emerald-500 font-medium shrink-0">Model</span>
+                        </div>
+                        <p className="px-1 pt-1 text-[9px] text-text-tertiary leading-snug">{answerStyleSummary}</p>
+                        {answerStylePacks.length > 0 && (
+                            <div className="grid grid-cols-2 gap-1 pt-2">
+                                {answerStylePacks.map(style => {
+                                    const selected = answerStyleSelectedId === style.id;
+                                    return (
+                                        <button
+                                            key={style.id}
+                                            type="button"
+                                            title={style.description}
+                                            disabled={answerStyleSavingId !== null}
+                                            onClick={() => handleAnswerStyleSelect(style.id)}
+                                            className={`min-w-0 px-2 py-1 rounded-md border text-[10px] font-medium transition-colors ${selected
+                                                ? 'border-accent-primary/40 bg-accent-primary/10 text-accent-primary'
+                                                : 'border-border-subtle bg-bg-item-surface text-text-secondary hover:text-text-primary hover:bg-bg-elevated'
+                                                }`}
+                                        >
+                                            <span className="block truncate">{style.shortLabel || style.label}</span>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

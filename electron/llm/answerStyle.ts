@@ -16,6 +16,10 @@ export type AnswerStyle =
   | 'one_liner'          // "in one line", "one sentence", "tl;dr"
   | 'short'              // "quickly", "briefly", "in short", "keep it short"
   | 'detailed'           // "in detail", "walk me through", "deep dive", "elaborate"
+  | 'strict'             // user-selected strict mode — concise, decisive, no filler
+  | 'expanded'           // user-selected expanded mode — fuller answer with tradeoffs/examples
+  | 'hint'               // user-selected hint mode — coaching cues, not a full script
+  | 'grounded'           // user-selected grounded mode — conservative about personal facts
   | 'bullets'            // "bullet points", "list", "as bullets"
   | 'code_only'          // "just the code", "code only", "only give code"
   | 'approach_first'     // "explain your approach", "how would you approach", "intuition first"
@@ -69,14 +73,14 @@ export function detectAnswerStyle(question: string): AnswerStyleResult {
   if (!q.trim()) return { style: 'default', targetSeconds: 0, directive: '', reason: 'empty' };
   for (const rule of STYLE_RULES) {
     if (rule.re.test(q)) {
-      return { style: rule.style, targetSeconds: rule.seconds, directive: directiveFor(rule.style, rule.seconds), reason: rule.reason };
+      return { style: rule.style, targetSeconds: rule.seconds, directive: getAnswerStyleDirective(rule.style, rule.seconds), reason: rule.reason };
     }
   }
   return { style: 'default', targetSeconds: 0, directive: '', reason: 'no_cue' };
 }
 
 /** The STYLE directive appended to the answer contract (form only — never grounding/voice). */
-function directiveFor(style: AnswerStyle, seconds: number): string {
+export function getAnswerStyleDirective(style: AnswerStyle, seconds: number = 0): string {
   switch (style) {
     case 'one_liner':
       return 'STYLE: Answer in ONE short sentence. No preamble, no list, no headers.';
@@ -84,6 +88,14 @@ function directiveFor(style: AnswerStyle, seconds: number): string {
       return `STYLE: Keep it SHORT and speakable — about ${seconds || 25} seconds (2-3 sentences). Lead with the answer; cut filler.`;
     case 'detailed':
       return `STYLE: Give a fuller, structured answer (about ${seconds || 75} seconds). Cover the key points in order, but stay speakable — no walls of text.`;
+    case 'strict':
+      return 'STYLE: Be STRICT and concise. Lead with the answer, use 2-4 short sentences or 3-5 tight bullets, cut filler, and do not invent facts or metrics.';
+    case 'expanded':
+      return 'STYLE: Give an EXPANDED answer. Include the reasoning, tradeoffs, and one concrete example where useful, but keep it readable and interview-ready.';
+    case 'hint':
+      return 'STYLE: HINT MODE. Do not write a fully scripted final answer. Give coaching cues, a compact answer structure, and 2-4 points the user should emphasize.';
+    case 'grounded':
+      return 'STYLE: Be EXTRA GROUNDED. Use only provided context for personal claims, companies, numbers, dates, and metrics. If context is missing, say that briefly and give a neutral framing.';
     case 'bullets':
       return 'STYLE: Answer as a short bulleted list (3-6 bullets), each one line. No long paragraphs.';
     case 'code_only':

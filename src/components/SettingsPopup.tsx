@@ -33,7 +33,8 @@ const SettingsPopup = () => {
                     groq: !!creds.hasGroqKey,
                     openai: !!creds.hasOpenaiKey,
                     claude: !!creds.hasClaudeKey,
-                    deepseek: !!creds.hasDeepseekKey
+                    deepseek: !!creds.hasDeepseekKey,
+                    yandex: !!(creds.hasYandexKey && creds.yandexFolderId)
                 });
             }
         } catch (e) {

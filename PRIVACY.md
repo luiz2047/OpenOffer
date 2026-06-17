@@ -12,12 +12,14 @@ Audio captures, screen captures, transcripts, notes, meeting history, settings, 
 
 Data leaves your device only when you configure a provider or enable a feature that requires one. Examples include:
 
-- AI providers such as OpenAI, Anthropic, Google Gemini, Groq, or a compatible local/self-hosted endpoint.
+- AI providers such as OpenAI, Anthropic, Google Gemini, Groq, DeepSeek, Yandex AI Studio, or a compatible local/self-hosted endpoint.
 - Speech-to-text providers such as GigaSTT, Local Whisper, OpenAI Whisper, Deepgram, ElevenLabs, Google, Azure, IBM, or Soniox.
 - Search providers such as Tavily when search is enabled.
 - GitHub release infrastructure for update checks.
 
 Each third-party provider has its own privacy policy and retention behavior. Review the provider terms before sending sensitive content.
+
+For Yandex AI Studio, OpenOffer sends `x-data-logging-enabled: false` by default on connection tests, generation, and streaming. Your text still leaves the device when you choose Yandex as a cloud provider.
 
 ## No OpenOffer Cloud Account
 

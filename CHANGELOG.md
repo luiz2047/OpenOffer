@@ -8,6 +8,25 @@
 
     - **LiteLLM AI Gateway**: Added LiteLLM as a built-in provider, giving access to 100+ LLM providers (AWS Bedrock, Google Vertex AI, Azure, Cohere, and more) through a single OpenAI-compatible proxy. Configure the proxy URL and optional virtual key under Settings → AI Providers → LiteLLM Proxy; models are auto-discovered from the proxy and listed with a `litellm/` prefix. Max output tokens default to **Auto** — each model's real output budget is read from the proxy's `/model/info` registry (fallback 8,192) — with a manual dropdown override (4K–1M). Routes through the same data-scope gating, rate-limiting, and abort-aware streaming as every other cloud provider.
 
+    ## [1.0.1] - 2026-06-17
+
+    ### Added
+
+    - **YandexGPT provider support**: Added Yandex AI Studio credentials, model discovery, response handling, and provider routing so OpenOffer can run interview assistance through YandexGPT models.
+    - **Prompt packs and answer styles**: Added model-aware prompt pack selection with Russian Yandex defaults plus universal answer styles for strict, detailed, and hint-style responses.
+    - **Yandex prompt evaluation tools**: Added dry-run and live smoke scripts, ML engineer mock interview fixtures, and setup docs for checking Russian prompt behavior before shipping prompt changes.
+    - **Fast local dev commands**: Added no-rebuild Electron launch scripts, including a screen-permission bypass helper for local macOS TCC troubleshooting.
+
+    ### Changed
+
+    - **AI provider settings UX**: Made the Yandex settings panel fit the app bounds and surfaced prompt/answer-style controls in the model selector.
+    - **Environment setup**: Added `.env.example` and documented Yandex AI Studio configuration for local testing.
+
+    ### Fixed
+
+    - **Prompt persistence**: Fixed answer-style and prompt-pack resolution across startup, model switching, and preferred model changes.
+    - **Local macOS packaging**: Re-sealed ad-hoc signed macOS apps after native module signing so local DMGs verify cleanly.
+
     ## [1.0.0] - 2026-06-15
 
     ### Added

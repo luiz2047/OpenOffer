@@ -23,7 +23,10 @@ import { CodingStreamGate } from './llm/codingStreamGate';
 import { isCodeVerificationEnabled } from './llm/codeVerification/verificationEnabled';
 import { DynamicActionEngine } from './services/dynamic-actions/DynamicActionEngine';
 import { DynamicAction } from './services/dynamic-actions/DynamicAction';
+import { SettingsManager } from './services/SettingsManager';
 import { ScreenContext } from './services/screen/ScreenContextService';
+import { getEnvAnswerStylePackId, getPlannerAnswerStyleForPackId, providerForModelId } from './llm/answerStylePacks';
+import type { AnswerStyle } from './llm/answerStyle';
 import { buildPreparedTranscriptContext as assemblePreparedTranscriptContext } from './utils/preparedTranscriptContext';
 import { PiLatencyTrace } from './services/telemetry/PiLatencyTracer';
 import { beginTrace, commitTrace } from './intelligence/IntelligenceTrace';
@@ -143,6 +146,18 @@ export class IntelligenceEngine extends EventEmitter {
     private whatToAnswerLLM: WhatToAnswerLLM | null = null;
     private codeHintLLM: CodeHintLLM | null = null;
     private brainstormLLM: BrainstormLLM | null = null;
+
+    private getAnswerStyleOverride(): AnswerStyle | undefined {
+        try {
+            const modelId = this.llmHelper.getCurrentModel();
+            const provider = providerForModelId(modelId);
+            const styleId = getEnvAnswerStylePackId()
+                || SettingsManager.getInstance().getAnswerStylePreference(provider, modelId);
+            return getPlannerAnswerStyleForPackId(styleId);
+        } catch {
+            return undefined;
+        }
+    }
 
     // Concurrency tracking
     private assistCancellationToken: AbortController | null = null;
@@ -1080,6 +1095,7 @@ export class IntelligenceEngine extends EventEmitter {
                 intentResult,
                 hasCandidateProfile: Boolean(candidateProfile),
                 activeMode: this.getActiveModeInfo(),
+                answerStyleOverride: this.getAnswerStyleOverride(),
             });
             trace.mark('answer_type_selected', {
                 answerType: answerPlan.answerType,
@@ -1915,6 +1931,7 @@ export class IntelligenceEngine extends EventEmitter {
                 source: 'manual_input',
                 speakerPerspective: 'user',
                 activeMode: this.getActiveModeInfo(),
+                answerStyleOverride: this.getAnswerStyleOverride(),
             });
             const context = isCodingAnswerType(answerPlan.answerType)
                 ? undefined

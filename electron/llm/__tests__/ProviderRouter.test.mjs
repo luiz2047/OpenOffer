@@ -26,6 +26,7 @@ test('routeLLMProviders returns deterministic text fallback order with availabil
       hasOpenAI: true,
       hasClaude: true,
       hasDeepseek: true,
+      hasYandex: true,
     },
     models: {
       groq: 'groq-text',
@@ -35,6 +36,7 @@ test('routeLLMProviders returns deterministic text fallback order with availabil
       openai: 'openai-text',
       claude: 'claude-text',
       deepseek: 'deepseek-v4-flash',
+      yandex: 'yandex/yandexgpt-5-lite',
     },
   });
 
@@ -46,12 +48,13 @@ test('routeLLMProviders returns deterministic text fallback order with availabil
     'openai',
     'claude',
     'deepseek',
+    'yandex',
   ]);
   assert.equal(attempts.every(attempt => attempt.status === 'available'), true);
   assert.deepEqual(attempts.map(attempt => attempt.provider), attempts.map(attempt => attempt.provider));
 });
 
-test('routeLLMProviders omits DeepSeek from multimodal fallback (text-only provider)', async () => {
+test('routeLLMProviders omits text-only providers from multimodal fallback', async () => {
   const attempts = await route({
     capability: 'chat',
     multimodal: true,
@@ -62,11 +65,14 @@ test('routeLLMProviders omits DeepSeek from multimodal fallback (text-only provi
       hasOpenAI: true,
       hasClaude: true,
       hasDeepseek: true,
+      hasYandex: true,
     },
   });
 
   assert.equal(attempts.find(a => a.provider === 'deepseek'), undefined,
     'DeepSeek must not appear in the multimodal/vision fallback chain');
+  assert.equal(attempts.find(a => a.provider === 'yandex'), undefined,
+    'Yandex must not appear in the multimodal/vision fallback chain');
 });
 
 test('routeLLMProviders marks DeepSeek missing_api_key when key absent', async () => {
@@ -80,6 +86,19 @@ test('routeLLMProviders marks DeepSeek missing_api_key when key absent', async (
   assert.ok(deepseek, 'DeepSeek must appear in text-only attempts list');
   assert.equal(deepseek.status, 'unavailable');
   assert.equal(deepseek.unavailableReason, 'missing_api_key');
+});
+
+test('routeLLMProviders marks Yandex missing_config when key or folder is absent', async () => {
+  const attempts = await route({
+    capability: 'chat',
+    multimodal: false,
+    availability: { hasYandex: false },
+  });
+
+  const yandex = attempts.find(a => a.provider === 'yandex');
+  assert.ok(yandex, 'Yandex must appear in text-only attempts list');
+  assert.equal(yandex.status, 'unavailable');
+  assert.equal(yandex.unavailableReason, 'missing_config');
 });
 
 test('routeLLMProviders returns multimodal fallback order', async () => {
@@ -118,12 +137,13 @@ test('routeLLMProviders marks missing providers unavailable with reasons', async
     },
   });
 
-  // 6 prior providers + deepseek
-  assert.equal(attempts.length, 7);
+  // 6 prior providers + DeepSeek + Yandex
+  assert.equal(attempts.length, 8);
   assert.equal(attempts.every(attempt => attempt.status === 'unavailable'), true);
   assert.equal(attempts.find(attempt => attempt.provider === 'codex').unavailableReason, 'missing_config');
   assert.equal(attempts.find(attempt => attempt.provider === 'openai').unavailableReason, 'missing_api_key');
   assert.equal(attempts.find(attempt => attempt.provider === 'deepseek').unavailableReason, 'missing_api_key');
+  assert.equal(attempts.find(attempt => attempt.provider === 'yandex').unavailableReason, 'missing_config');
 });
 
 test('routeLLMProviders reports disabled Groq distinctly from missing key', async () => {

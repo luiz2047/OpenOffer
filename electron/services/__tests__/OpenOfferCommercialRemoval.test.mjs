@@ -120,6 +120,7 @@ describe('OpenOffer commercial-path removal', () => {
         hasOpenAI: true,
         hasClaude: true,
         hasDeepseek: true,
+        hasYandex: true,
       },
     });
 
@@ -131,6 +132,7 @@ describe('OpenOffer commercial-path removal', () => {
       'openai',
       'claude',
       'deepseek',
+      'yandex',
     ]);
 
     const router = new routerModule.ProviderRouter();

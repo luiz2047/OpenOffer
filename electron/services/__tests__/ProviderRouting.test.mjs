@@ -34,6 +34,7 @@ describe('RateLimiter', () => {
     assert.ok(limiters.openai instanceof RateLimiter, 'openai rate limiter created');
     assert.ok(limiters.claude instanceof RateLimiter, 'claude rate limiter created');
     assert.ok(limiters.deepseek instanceof RateLimiter, 'deepseek rate limiter created');
+    assert.ok(limiters.yandex instanceof RateLimiter, 'yandex rate limiter created');
     assert.ok(limiters.litellm instanceof RateLimiter, 'litellm rate limiter created');
   });
 
@@ -269,6 +270,7 @@ describe('ProviderRouter', () => {
     assert.ok('groq' in health);
     assert.ok('openai' in health);
     assert.ok('claude' in health);
+    assert.ok('yandex' in health);
   });
 });
 

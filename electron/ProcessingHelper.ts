@@ -3,6 +3,8 @@
 import { AppState } from "./main"
 import { LLMHelper } from "./LLMHelper"
 import { CredentialsManager } from "./services/CredentialsManager"
+import { SettingsManager } from "./services/SettingsManager"
+import { coerceAnswerStylePackId, getEnvAnswerStylePackId, getEnvYandexPromptPackOverride } from "./llm/answerStylePacks"
 import { app } from "electron"
 // import dotenv from "dotenv" // Removed static import
 
@@ -38,13 +40,16 @@ export class ProcessingHelper {
       let openaiApiKey = process.env.OPENAI_API_KEY
       let claudeApiKey = process.env.CLAUDE_API_KEY
       let deepseekApiKey = process.env.DEEPSEEK_API_KEY
+      let yandexApiKey = process.env.YANDEX_API_KEY || process.env.YANDEXGPT_API_KEY
+      let yandexFolderId = process.env.YANDEX_FOLDER_ID || process.env.YANDEXGPT_FOLDER_ID
+      let answerStylePack = getEnvYandexPromptPackOverride()
 
       // Allow initializing without key (will be loaded in loadStoredCredentials or via Settings)
       if (!apiKey) {
         console.warn("[ProcessingHelper] GEMINI_API_KEY not found in env. Will try CredentialsManager after ready.")
       }
 
-      this.llmHelper = new LLMHelper(apiKey, false, undefined, undefined, groqApiKey, openaiApiKey, claudeApiKey, deepseekApiKey)
+      this.llmHelper = new LLMHelper(apiKey, false, undefined, undefined, groqApiKey, openaiApiKey, claudeApiKey, deepseekApiKey, yandexApiKey, yandexFolderId, undefined, true, answerStylePack)
     }
   }
 
@@ -60,6 +65,20 @@ export class ProcessingHelper {
     const openaiKey = credManager.getOpenaiApiKey();
     const claudeKey = credManager.getClaudeApiKey();
     const deepseekKey = credManager.getDeepseekApiKey();
+    const yandexKey = credManager.getYandexApiKey();
+    const yandexFolderId = credManager.getYandexFolderId();
+    const settingsManager = SettingsManager.getInstance();
+    const yandexPreferredModel = credManager.getYandexPreferredModel();
+    let yandexAnswerStylePackId = getEnvAnswerStylePackId()
+      || settingsManager.getAnswerStylePreference('yandex', yandexPreferredModel);
+    if (!yandexAnswerStylePackId) {
+      const migrated = coerceAnswerStylePackId(credManager.getYandexPromptPackId());
+      if (migrated) {
+        settingsManager.setAnswerStylePreference(undefined, 'yandex');
+        settingsManager.setAnswerStylePreference(migrated, 'yandex', yandexPreferredModel);
+        yandexAnswerStylePackId = migrated;
+      }
+    }
 
     if (geminiKey) {
       console.log("[ProcessingHelper] Loading stored Gemini API Key from CredentialsManager");
@@ -84,6 +103,17 @@ export class ProcessingHelper {
     if (deepseekKey) {
       console.log("[ProcessingHelper] Loading stored DeepSeek API Key from CredentialsManager");
       this.llmHelper.setDeepseekApiKey(deepseekKey);
+    }
+
+    if (yandexKey && yandexFolderId) {
+      console.log("[ProcessingHelper] Loading stored Yandex AI Studio config from CredentialsManager");
+      this.llmHelper.setYandexConfig(
+        yandexKey,
+        yandexFolderId,
+        yandexPreferredModel,
+        credManager.getYandexDisableDataLogging(),
+        yandexAnswerStylePackId
+      );
     }
 
     const litellmBaseURL = credManager.getLitellmBaseURL();

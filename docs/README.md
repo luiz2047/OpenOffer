@@ -6,6 +6,9 @@ work, meetings, and related desktop workflows.
 ## Current docs
 
 - Product and usage overview: `README.md`
+- Yandex AI Studio setup: `docs/YANDEX_AI_STUDIO_SETUP.md`
+- Yandex Russian prompt eval: `docs/testing/YANDEX_RUSSIAN_PROMPT_EVAL.md`
+- Yandex Russian prompt completion audit: `docs/testing/YANDEX_RUSSIAN_PROMPT_COMPLETION_AUDIT.md`
 - Contribution guide: `CONTRIBUTING.md`
 - Conduct: `CODE_OF_CONDUCT.md`
 - License attribution: `NOTICE.md`
