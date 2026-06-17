@@ -11,8 +11,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { X, Monitor, Mic, Lightbulb, Check, AlertCircle, ArrowRight, Lock } from 'lucide-react';
-import { NativelyLogoMark } from '../NativelyLogoMark';
-import nativelyIcon from '../../../assets/icon.png';
+import openOfferIcon from '../../../assets/icon.png';
 
 const STORAGE_KEY  = 'natively_perms_shown_v1';
 
@@ -545,7 +544,7 @@ export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }
                   flexShrink: 0,
                 }}>
                   <img
-                    src={nativelyIcon}
+                    src={openOfferIcon}
                     alt="OpenOffer Icon"
                     style={{
                       width: '42px',
@@ -702,7 +701,7 @@ export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }
                 {/* App Row 3: OpenOffer (Active) */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <img
-                    src={nativelyIcon}
+                    src={openOfferIcon}
                     alt="OpenOffer"
                     style={{
                       width: '22px',

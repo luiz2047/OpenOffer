@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { genMessageId } from '../utils/messageId';
 import MeetingChatOverlay from './MeetingChatOverlay';
 import EditableTextBlock from './EditableTextBlock';
-import NativelyLogo from './icon.png';
+import openOfferLogo from './icon.png';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import SyntaxHighlighter from 'react-syntax-highlighter/dist/esm/prism-light';
@@ -645,7 +645,7 @@ ${meeting.detailedSummary.keyPoints?.map(item => `- ${item}`).join('\n') || 'Non
                                         {interaction.answer && (
                                             <div className="flex items-start gap-4">
                                                 <div className="mt-1 w-6 h-6 rounded-full bg-bg-input flex items-center justify-center border border-border-subtle shrink-0">
-                                                    <img src={NativelyLogo} alt="AI" className="w-4 h-4 opacity-50 object-contain force-black-icon" />
+                                                    <img src={openOfferLogo} alt="AI" className="w-4 h-4 opacity-50 object-contain force-black-icon" />
                                                 </div>
                                                 <div>
                                                     <div className="text-[11px] text-text-tertiary mb-1.5 font-medium">{formatTime(interaction.timestamp)}</div>
