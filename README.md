@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/brand/openoffer-mark.png" alt="OpenOffer logo" width="96" />
+
 # OpenOffer
 
 Local-first, free, open-source assistant for interviews, career work, meetings, and work notes.

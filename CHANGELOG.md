@@ -8,6 +8,16 @@
 
     - **LiteLLM AI Gateway**: Added LiteLLM as a built-in provider, giving access to 100+ LLM providers (AWS Bedrock, Google Vertex AI, Azure, Cohere, and more) through a single OpenAI-compatible proxy. Configure the proxy URL and optional virtual key under Settings → AI Providers → LiteLLM Proxy; models are auto-discovered from the proxy and listed with a `litellm/` prefix. Max output tokens default to **Auto** — each model's real output budget is read from the proxy's `/model/info` registry (fallback 8,192) — with a manual dropdown override (4K–1M). Routes through the same data-scope gating, rate-limiting, and abort-aware streaming as every other cloud provider.
 
+    ## [1.0.2] - 2026-06-17
+
+    ### Added
+
+    - **OpenOffer brand asset pipeline**: Added a checked-in SVG source, generated PNG/ICO/ICNS assets, and a `brand:assets` script with regression coverage for key packaged icon dimensions.
+
+    ### Changed
+
+    - **OpenOffer logo rollout**: Replaced the remaining inherited Natively logo files used by the app, browser extension, public README, and packaged desktop builds with the approved OpenOffer mark.
+
     ## [1.0.1] - 2026-06-17
 
     ### Added

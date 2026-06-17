@@ -1,6 +1,6 @@
 {
   "name": "openoffer",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "main": "dist-electron/electron/main.js",
   "description": "OpenOffer is a local-first, open-source career assistant for interviews, meetings, and work notes.",
   "scripts": {
@@ -31,6 +31,7 @@
     "dist": "npm run app:build",
     "dist:signed": "npm run app:build:signed",
     "build:native": "node scripts/build-native.js",
+    "brand:assets": "node scripts/generate-brand-assets.mjs",
     "test": "node scripts/run-node-tests-with-native-abi.js",
     "test:modes": "npm run build:electron && node --test electron/services/__tests__/Mode*.test.mjs electron/services/__tests__/OpenOfferCommercialRemoval.test.mjs",
     "test:modes:no-build": "node --test electron/services/__tests__/Mode*.test.mjs electron/services/__tests__/OpenOfferCommercialRemoval.test.mjs",
