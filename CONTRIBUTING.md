@@ -60,7 +60,7 @@ Enhancement suggestions are tracked as GitHub issues. When you are creating an e
 
 ### Prerequisites
 
-- Node.js (v20+ recommended)
+- Node.js 22 LTS recommended. Node 20 may work, but Node 22 is the preferred baseline for current local development.
 - Git
 - Rust (required for native audio capture compilation)
 
@@ -69,8 +69,8 @@ Enhancement suggestions are tracked as GitHub issues. When you are creating an e
 1. Fork the repo and create your branch from `main`.
 2. Clone your fork locally: `git clone https://github.com/YOUR_USERNAME/openoffer.git`
 3. Install dependencies: `npm install`
-4. Set up your `.env` file (refer to the README for template).
-5. Start the development server: `npm start`
+4. If you need provider credentials, copy `.env.example` to `.env` and fill in local values.
+5. Start the development server: `npm run app:dev`
 
 If you've added code that should be tested, add tests.
 If you've changed APIs, update the documentation.
