@@ -202,6 +202,30 @@ describe('InterviewRepository', () => {
     }
     assert.equal(repo.list({ limit: 1000 }).length, 200);
   });
+
+  test('filters lists by status and time range, archives rows, and can delete linked meetings', () => {
+    const { db, repo } = createStack();
+    const now = 1_800_000_000_000;
+    const unscheduled = repo.create({ title: 'Unscheduled process', status: 'active' });
+    const screen = repo.create({ title: 'Recruiter screen', status: 'screening', startsAt: now + 60_000 });
+    const offer = repo.create({ title: 'Offer discussion', status: 'offer', startsAt: now + 7_200_000 });
+
+    assert.deepEqual(repo.list({ status: 'screening' }).map(item => item.id), [screen.id]);
+    assert.deepEqual(
+      repo.list({ status: ['screening', 'offer'], range: { start: now, end: now + 3_600_000 } }).map(item => item.id),
+      [screen.id],
+    );
+
+    assert.equal(repo.archive(screen.id), true);
+    assert.deepEqual(repo.list({ status: ['screening', 'offer'] }).map(item => item.id), [offer.id]);
+
+    db.prepare(`
+      INSERT INTO meetings (id, title, created_at, start_time, duration_ms, interview_event_id)
+      VALUES ('meeting-delete-1', 'Delete with interview', '2026-06-18T10:00:00.000Z', ?, 3600000, ?)
+    `).run(now, unscheduled.id);
+    assert.equal(repo.hardDelete(unscheduled.id, true), true);
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM meetings WHERE id = ?').get('meeting-delete-1').count, 0);
+  });
 });
 
 describe('InterviewService', () => {
@@ -260,6 +284,41 @@ describe('InterviewService', () => {
     assert.equal(wrapped.ok, false);
     assert.equal(wrapped.code, 'not_found');
     assert.equal(wrapped.retryable, false);
+  });
+
+  test('rejects invalid enum and numeric payloads before persistence', () => {
+    const { service } = createStack();
+    const detail = service.create('op-validation-create', { title: 'Validation interview' });
+
+    assert.throws(
+      () => service.create('op-invalid-status', { title: 'Bad status', status: 'done' }),
+      error => error instanceof InterviewDomainError && error.code === 'invalid_payload',
+    );
+    assert.throws(
+      () => service.create('op-invalid-priority', { title: 'Bad priority', priority: 'urgent' }),
+      error => error instanceof InterviewDomainError && error.code === 'invalid_payload',
+    );
+    assert.throws(
+      () => service.update(detail.id, { calendarProvider: 'icloud' }),
+      error => error instanceof InterviewDomainError && error.code === 'invalid_payload',
+    );
+    assert.throws(
+      () => service.saveRetro(detail.id, 'op-invalid-retro', { passProbability: 101 }),
+      error => error instanceof InterviewDomainError && error.code === 'invalid_payload',
+    );
+    assert.throws(
+      () => service.saveQuestions(detail.id, 'op-invalid-quality', [{ questionText: 'Q', quality: 6 }]),
+      error => error instanceof InterviewDomainError && error.code === 'invalid_payload',
+    );
+
+    const saved = service.saveQuestions(detail.id, 'op-valid-quality', [{ questionText: 'Q', quality: 5 }]);
+    assert.equal(saved[0].quality, 5);
+
+    service.archive(detail.id);
+    assert.throws(
+      () => service.saveDossier(detail.id, 'op-archived-dossier', { description: 'Should not save.' }),
+      error => error instanceof InterviewDomainError && error.code === 'interview_deleted_or_archived',
+    );
   });
 
   test('parses HR/vacancy paste safely and maps parser errors to IPC codes', async () => {

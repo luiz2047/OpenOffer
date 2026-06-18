@@ -285,10 +285,18 @@ function normalizeQuestions(questions: any): InterviewQuestionPayload[] {
     id: question?.id ? assertId(question.id, `questions[${index}].id`) : undefined,
     questionText: text(question?.questionText, `questions[${index}].questionText`, 1000, true) as string,
     category: text(question?.category, `questions[${index}].category`, 120),
-    quality: question?.quality ?? null,
+    quality: normalizeQuestionQuality(question?.quality, `questions[${index}].quality`),
     weakSpot: Boolean(question?.weakSpot),
     followUpNote: text(question?.followUpNote, `questions[${index}].followUpNote`, 20000),
   }));
+}
+
+function normalizeQuestionQuality(value: unknown, field: string): number | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value > 5) {
+    throw new InterviewDomainError('invalid_payload', `${field} must be an integer from 0 to 5.`, false, 'fix_input');
+  }
+  return value;
 }
 
 function normalizeSourceParseInput(input: unknown): string {

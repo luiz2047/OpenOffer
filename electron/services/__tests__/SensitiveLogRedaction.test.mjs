@@ -84,3 +84,18 @@ test('IPC and meeting summary logs avoid answer and LLM response snippets', () =
   assert.match(intent, /SLM classified`, \{ intent, confidence: topScore, textLength: text\.length \}/);
   assert.doesNotMatch(intent, /text\.substring\(/);
 });
+
+test('interview modules avoid raw prep, vacancy, salary, retro, and question logs', () => {
+  const files = [
+    'electron/services/interviews/InterviewRepository.ts',
+    'electron/services/interviews/InterviewService.ts',
+    'electron/services/interviews/parser.ts',
+    'src/features/interviews/InterviewCommandCenter.tsx',
+  ];
+
+  for (const file of files) {
+    const source = read(file);
+    assert.doesNotMatch(source, /console\.(log|warn|error|debug)[\s\S]{0,180}(rawSourceText|cheatsheet|salary|compensation|retro|questionText|vacancy)/i, file);
+    assert.doesNotMatch(source, /telemetryService\.track[\s\S]{0,240}(rawSourceText|cheatsheet|salary|compensation|retro|questionText|vacancy)/i, file);
+  }
+});

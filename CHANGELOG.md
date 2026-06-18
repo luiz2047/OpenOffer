@@ -4,9 +4,23 @@
 
     ## [Unreleased]
 
+    ## [1.1.0] - 2026-06-18
+
     ### What's New
 
+    - **Interview OS command center**: Reworked the startup launcher into a workbench for active job-search processes, with a left-side interview calendar, pipeline list, readiness scoring, vacancy dossier, prep brief, question bank, retro notes, and linked meeting recordings.
+    - **Calendar-backed interview scheduling**: Added interview creation and writeback paths for Google Calendar and macOS Calendar, plus local calendar status and meeting-link contracts.
     - **LiteLLM AI Gateway**: Added LiteLLM as a built-in provider, giving access to 100+ LLM providers (AWS Bedrock, Google Vertex AI, Azure, Cohere, and more) through a single OpenAI-compatible proxy. Configure the proxy URL and optional virtual key under Settings → AI Providers → LiteLLM Proxy; models are auto-discovered from the proxy and listed with a `litellm/` prefix. Max output tokens default to **Auto** — each model's real output budget is read from the proxy's `/model/info` registry (fallback 8,192) — with a manual dropdown override (4K–1M). Routes through the same data-scope gating, rate-limiting, and abort-aware streaming as every other cloud provider.
+
+    ### Changed
+
+    - **Public app surfaces**: Removed creator, donation, Buy Me a Coffee, and inherited personal-brand surfaces from startup, support, help, and about flows.
+    - **Interview data safety**: Hardened interview payload validation and expanded telemetry/log privacy canaries so prep notes, vacancy text, salary data, retro notes, and interview questions are not emitted as raw content.
+
+    ### Tests
+
+    - Added a Playwright E2E flow for manual interview creation, prep, questions, retro capture, and recording linking.
+    - Added service and contract coverage for interview repositories, IPC wiring, taxonomy, calendar writeback, macOS Calendar integration, and privacy redaction.
 
     ## [1.0.2] - 2026-06-17
 
