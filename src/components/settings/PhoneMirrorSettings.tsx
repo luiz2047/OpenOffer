@@ -2,6 +2,7 @@ import { Check, Copy, Lock, RefreshCw, ShieldAlert, Smartphone, Wifi } from 'luc
 import React, { useCallback, useEffect, useState } from 'react';
 import type { PhoneMirrorInfo } from '../../types/electron';
 import { isMac } from '../../utils/platformUtils';
+import { useTranslation } from 'react-i18next';
 
 const EMPTY_INFO: PhoneMirrorInfo = {
   running: false,
@@ -17,6 +18,7 @@ const EMPTY_INFO: PhoneMirrorInfo = {
 };
 
 export const PhoneMirrorSettings: React.FC = () => {
+  const { t } = useTranslation();
   const [info, setInfo] = useState<PhoneMirrorInfo>(EMPTY_INFO);
   const [busy, setBusy] = useState<null | 'enable' | 'disable' | 'lan' | 'rotate'>(null);
   const [error, setError] = useState<string | null>(null);
@@ -27,9 +29,9 @@ export const PhoneMirrorSettings: React.FC = () => {
       const next = await window.electronAPI.phoneMirrorGetInfo();
       if (next && typeof next === 'object') setInfo(next as PhoneMirrorInfo);
     } catch (e: any) {
-      setError(e?.message || 'Failed to load phone mirror status');
+      setError(e?.message || t('phoneMirror.failedToLoad'));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     refresh();
@@ -69,12 +71,12 @@ export const PhoneMirrorSettings: React.FC = () => {
           await refresh();
         }
       } catch (e: any) {
-        setError(e?.message || 'Action failed');
+        setError(e?.message || t('phoneMirror.actionFailed'));
       } finally {
         setBusy(null);
       }
     },
-    [refresh],
+    [refresh, t],
   );
 
   const onToggleEnable = useCallback(async () => {
@@ -116,15 +118,13 @@ export const PhoneMirrorSettings: React.FC = () => {
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="text-text-primary text-lg font-semibold tracking-tight">Phone Mirror</h3>
+            <h3 className="text-text-primary text-lg font-semibold tracking-tight">{t('phoneMirror.title')}</h3>
             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.08em] bg-amber-500/15 text-amber-400 border border-amber-500/30">
-              Beta
+              {t('common.beta')}
             </span>
           </div>
           <p className="text-text-secondary text-sm mt-1 leading-relaxed">
-            Stream live AI responses from your desktop to a phone browser on the same network.
-            Useful when you're sharing your screen and want the AI output kept off the shared
-            display.
+            {t('phoneMirror.description')}
           </p>
         </div>
       </header>
@@ -132,11 +132,11 @@ export const PhoneMirrorSettings: React.FC = () => {
       {/* Master toggle */}
       <div className="bg-bg-item-surface rounded-xl border border-border-subtle p-5 flex items-center justify-between gap-4">
         <div className="min-w-0">
-          <div className="text-text-primary font-medium text-sm">Enable Phone Mirror</div>
+          <div className="text-text-primary font-medium text-sm">{t('phoneMirror.enable')}</div>
           <div className="text-text-secondary text-xs mt-1">
             {info.running
-              ? `Running on port ${info.port} · ${info.clients} ${info.clients === 1 ? 'phone' : 'phones'} connected`
-              : 'Off — no listener, no exposure.'}
+              ? t('phoneMirror.runningStatus', { port: info.port, count: info.clients })
+              : t('phoneMirror.offStatus')}
           </div>
         </div>
         <button
@@ -160,12 +160,12 @@ export const PhoneMirrorSettings: React.FC = () => {
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="text-text-primary font-medium text-sm flex items-center gap-2">
-              <Wifi size={14} className="text-text-secondary" /> Allow LAN access
+              <Wifi size={14} className="text-text-secondary" /> {t('phoneMirror.lanAccess')}
             </div>
             <div className="text-text-secondary text-xs mt-1">
               {info.exposeOnLan
-                ? 'Phones on the same WiFi can connect with the pairing token.'
-                : 'Loopback only — only this computer can connect (use SSH tunnel for remote access).'}
+                ? t('phoneMirror.lanOnDescription')
+                : t('phoneMirror.lanOffDescription')}
             </div>
           </div>
           <button
@@ -185,8 +185,7 @@ export const PhoneMirrorSettings: React.FC = () => {
           <div className="mt-3 flex items-start gap-2 text-amber-400/90 text-xs leading-relaxed">
             <ShieldAlert size={14} className="mt-0.5 flex-shrink-0" />
             <span>
-              Anyone on this network with the pairing URL can read your AI responses. Use only on
-              trusted networks. Rotate the token below if you suspect the URL was shared.
+              {t('phoneMirror.lanWarning')}
             </span>
           </div>
         )}
@@ -197,13 +196,11 @@ export const PhoneMirrorSettings: React.FC = () => {
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-amber-300 text-xs leading-relaxed flex items-start gap-2">
           <ShieldAlert size={14} className="mt-0.5 flex-shrink-0" />
           <span>
-            LAN access is on, but no Wi-Fi or Ethernet IP was detected. Connect this{' '}
-            {isMac ? 'Mac' : 'PC'} to the same Wi-Fi as your phone (VPN tunnels and virtual
-            interfaces don't count). If you've connected, also confirm{' '}
+            {t('phoneMirror.lanMissing', { device: isMac ? 'Mac' : 'PC' })} {' '}
             {isMac ? (
-              <strong>System Settings → Network → Firewall</strong>
+              <strong>Системные настройки → Сеть → Брандмауэр</strong>
             ) : (
-              <strong>Windows Defender Firewall → Allowed apps</strong>
+              <strong>Брандмауэр Windows Defender → Разрешенные приложения</strong>
             )}{' '}
             is allowing incoming connections for this app.
           </span>
@@ -225,23 +222,23 @@ export const PhoneMirrorSettings: React.FC = () => {
               </div>
             ) : (
               <div className="flex-shrink-0 w-36 h-36 rounded-lg border border-dashed border-border-subtle grid place-items-center text-text-secondary text-xs">
-                generating QR…
+                {t('phoneMirror.generatingQr')}
               </div>
             )}
             <div className="flex-1 min-w-0 space-y-3">
               <div>
                 <div className="text-text-secondary text-xs uppercase tracking-wider mb-1.5">
-                  Scan with your phone
+                  {t('phoneMirror.scanWithPhone')}
                 </div>
                 <div className="text-text-primary text-sm font-medium">
                   {info.exposeOnLan
-                    ? 'Open the camera app and point at the code.'
-                    : 'LAN access is off. Turn it on, or open the URL on this computer.'}
+                    ? t('phoneMirror.openCamera')
+                    : t('phoneMirror.lanOffQr')}
                 </div>
               </div>
               <div>
                 <div className="text-text-secondary text-xs uppercase tracking-wider mb-1.5">
-                  Pairing URL
+                  {t('phoneMirror.pairingUrl')}
                 </div>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 min-w-0 truncate font-mono text-xs px-2.5 py-2 rounded-md bg-bg-main border border-border-subtle text-text-primary">
@@ -255,11 +252,11 @@ export const PhoneMirrorSettings: React.FC = () => {
                   >
                     {copied ? (
                       <>
-                        <Check size={13} /> Copied
+                        <Check size={13} /> {t('overlay.copied')}
                       </>
                     ) : (
                       <>
-                        <Copy size={13} /> Copy
+                        <Copy size={13} /> {t('overlay.copy')}
                       </>
                     )}
                   </button>
@@ -268,7 +265,7 @@ export const PhoneMirrorSettings: React.FC = () => {
               {info.exposeOnLan && info.lanUrls.length > 1 && (
                 <details className="text-xs">
                   <summary className="text-text-secondary cursor-pointer hover:text-text-primary">
-                    Other LAN addresses ({info.lanUrls.length - 1})
+                    {t('phoneMirror.otherLanAddresses', { count: info.lanUrls.length - 1 })}
                   </summary>
                   <ul className="mt-2 space-y-1 font-mono text-text-secondary">
                     {info.lanUrls.slice(1).map((u) => (
@@ -283,7 +280,7 @@ export const PhoneMirrorSettings: React.FC = () => {
           </div>
           <div className="flex items-center justify-between pt-3 border-t border-border-subtle">
             <div className="flex items-center gap-2 text-text-secondary text-xs">
-              <Lock size={12} /> Pairing token gates every connection.
+              <Lock size={12} /> {t('phoneMirror.tokenGates')}
             </div>
             <button
               type="button"
@@ -292,13 +289,13 @@ export const PhoneMirrorSettings: React.FC = () => {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-item-active/60 transition-colors disabled:opacity-50"
             >
               <RefreshCw size={12} className={busy === 'rotate' ? 'animate-spin' : ''} />
-              Rotate token
+              {t('phoneMirror.rotateToken')}
             </button>
           </div>
         </div>
       ) : (
         <div className="bg-bg-item-surface/50 rounded-xl border border-dashed border-border-subtle p-6 text-center text-text-secondary text-sm">
-          Turn on Phone Mirror to generate a pairing URL and QR code.
+          {t('phoneMirror.turnOn')}
         </div>
       )}
 
@@ -309,9 +306,7 @@ export const PhoneMirrorSettings: React.FC = () => {
       )}
 
       <div className="text-text-secondary text-xs leading-relaxed">
-        Phone Mirror runs entirely on your local network. No traffic leaves your machine — the
-        bridge serves an HTML page and a WebSocket directly to your phone, gated by a per-session
-        pairing token.
+        {t('phoneMirror.privacy')}
       </div>
     </div>
   );

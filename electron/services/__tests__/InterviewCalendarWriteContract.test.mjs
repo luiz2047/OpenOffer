@@ -38,6 +38,7 @@ test('manual interview creation can push an event to Google or Mac calendar', ()
   const types = read('src/types/electron.d.ts');
   const api = read('src/features/interviews/api.ts');
   const ui = read('src/features/interviews/InterviewCommandCenter.tsx');
+  const resources = read('src/i18n/resources.ts');
 
   assert.ok(findSafeHandle(ipc, 'interviews:create-calendar-event') >= 0);
   assert.match(ipc, /CalendarManager'\)\.CalendarManager\.getInstance\(\)\.createEvent/);
@@ -45,7 +46,9 @@ test('manual interview creation can push an event to Google or Mac calendar', ()
   assert.match(preload, /interviewsCreateCalendarEvent: \(interviewId: string, provider: ['"]google['"] \| ['"]macos['"]\)/);
   assert.match(types, /interviewsCreateCalendarEvent: \(interviewId: string, provider: ['"]google['"] \| ['"]macos['"]\)/);
   assert.match(api, /createCalendarEvent\(interviewId: string, provider: ['"]google['"] \| ['"]macos['"]\)/);
-  assert.match(ui, /Create in Google Calendar/);
-  assert.match(ui, /Create in Mac Calendar/);
+  assert.match(ui, /interviews\.detail\.createInGoogleCalendar/);
+  assert.match(ui, /interviews\.detail\.createInMacCalendar/);
+  assert.match(resources, /Создать в Google Calendar/);
+  assert.match(resources, /Создать в календаре Mac/);
   assert.match(ui, /interviewApi\.createCalendarEvent\(created\.id, createCalendarProvider\)/);
 });

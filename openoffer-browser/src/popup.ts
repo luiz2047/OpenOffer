@@ -36,21 +36,21 @@ function setMsg(text: string, kind: 'ok' | 'err' | 'warn' | ''): void {
 function describe(outcome: DomPostOutcome): { text: string; kind: 'ok' | 'err' | 'warn' } {
   switch (outcome.kind) {
     case 'success':
-      return { text: 'Sent to OpenOffer.', kind: 'ok' };
+      return { text: 'Отправлено в OpenOffer.', kind: 'ok' };
     case 'unauthorized':
-      return { text: 'Pairing expired (token rotated). Re-pair below.', kind: 'warn' };
+      return { text: 'Подключение истекло: token обновлен. Подключитесь заново ниже.', kind: 'warn' };
     case 'no-session':
-      return { text: 'Start a OpenOffer session, then capture again.', kind: 'warn' };
+      return { text: 'Запустите сессию OpenOffer и повторите захват.', kind: 'warn' };
     case 'refused':
-      return { text: 'Open OpenOffer and enable Phone Mirror.', kind: 'err' };
+      return { text: 'Откройте OpenOffer и включите зеркало телефона.', kind: 'err' };
     case 'rate-limited':
-      return { text: 'Too many requests — wait a moment and retry.', kind: 'warn' };
+      return { text: 'Слишком много запросов — подождите и повторите.', kind: 'warn' };
     case 'too-large':
-      return { text: 'Page too large to send.', kind: 'err' };
+      return { text: 'Страница слишком большая для отправки.', kind: 'err' };
     case 'bad-request':
-      return { text: 'Desktop rejected the request.', kind: 'err' };
+      return { text: 'Desktop-приложение отклонило запрос.', kind: 'err' };
     case 'http-error':
-      return { text: `Unexpected response (${outcome.status}).`, kind: 'err' };
+      return { text: `Неожиданный ответ (${outcome.status}).`, kind: 'err' };
     case 'error':
       return { text: outcome.message, kind: 'err' };
   }
@@ -66,9 +66,9 @@ async function refreshStatus(): Promise<void> {
   if (outcome.kind === 'unpaired' || outcome.kind === 'unauthorized') {
     setDot(outcome.kind === 'unauthorized' ? 'amber' : 'grey');
     statusText.textContent =
-      outcome.kind === 'unauthorized' ? 'Pairing expired — re-pair' : 'Not paired';
+      outcome.kind === 'unauthorized' ? 'Подключение истекло — подключитесь заново' : 'Не подключено';
     showPaired(false);
-    if (outcome.kind === 'unauthorized') setMsg('Token rotated on desktop. Re-pair below.', 'warn');
+    if (outcome.kind === 'unauthorized') setMsg('Token обновлен на desktop. Подключитесь заново ниже.', 'warn');
     return;
   }
   if (outcome.kind === 'success') {
@@ -82,26 +82,26 @@ async function refreshStatus(): Promise<void> {
       wsOpen = !!r?.open;
     } catch { /* ignore */ }
     setDot('green');
-    statusText.textContent = wsOpen ? 'Connected — capture ready' : 'Connected (connecting capture…)';
+    statusText.textContent = wsOpen ? 'Подключено — захват готов' : 'Подключено (готовим захват…)';
     return;
   }
   // Paired but desktop unreachable (refused / error / rate-limited).
   setDot('red');
   statusText.textContent =
-    outcome.kind === 'refused' ? 'Desktop offline — enable Phone Mirror' : 'Desktop unreachable';
+    outcome.kind === 'refused' ? 'Desktop offline — включите зеркало телефона' : 'Desktop недоступен';
   showPaired(true);
 }
 
 function describePair(outcome: PairFetchOutcome): { text: string; kind: 'ok' | 'err' | 'warn' } {
   switch (outcome.kind) {
     case 'paired':
-      return { text: 'Connected.', kind: 'ok' };
+      return { text: 'Подключено.', kind: 'ok' };
     case 'not-armed':
-      return { text: 'Click "Connect browser extension" in OpenOffer settings first.', kind: 'warn' };
+      return { text: 'Сначала нажмите "Connect browser extension" в настройках OpenOffer.', kind: 'warn' };
     case 'forbidden':
-      return { text: 'Pairing refused by desktop.', kind: 'err' };
+      return { text: 'Desktop-приложение отказало в подключении.', kind: 'err' };
     case 'refused':
-      return { text: 'Open OpenOffer and enable Phone Mirror.', kind: 'err' };
+      return { text: 'Откройте OpenOffer и включите зеркало телефона.', kind: 'err' };
     case 'error':
       return { text: outcome.message, kind: 'err' };
   }
@@ -109,11 +109,11 @@ function describePair(outcome: PairFetchOutcome): { text: string; kind: 'ok' | '
 
 connectBtn.addEventListener('click', async () => {
   connectBtn.disabled = true;
-  setMsg('Connecting…', '');
+  setMsg('Подключение…', '');
   const outcome = await send<PairFetchOutcome>({ type: 'autopair' });
   connectBtn.disabled = false;
   if (outcome.kind === 'paired') {
-    setMsg('Connected.', 'ok');
+    setMsg('Подключено.', 'ok');
     await refreshStatus();
   } else {
     const d = describePair(outcome);
@@ -125,12 +125,12 @@ pairBtn.addEventListener('click', async () => {
   const value = pairInput.value.trim();
   if (!value) return;
   pairBtn.disabled = true;
-  setMsg('Pairing…', '');
+  setMsg('Подключение…', '');
   const outcome = await send<DomPostOutcome>({ type: 'pair', value });
   pairBtn.disabled = false;
   if (outcome.kind === 'success') {
     pairInput.value = '';
-    setMsg('Paired.', 'ok');
+    setMsg('Подключено.', 'ok');
     await refreshStatus();
   } else {
     const d = describe(outcome);
@@ -140,18 +140,18 @@ pairBtn.addEventListener('click', async () => {
 
 captureBtn.addEventListener('click', async () => {
   captureBtn.disabled = true;
-  setMsg('Capturing…', '');
+  setMsg('Захват…', '');
   const report = await send<CaptureReport>({ type: 'capture' });
   captureBtn.disabled = false;
   const d = describe(report.outcome);
-  const suffix = report.outcome.kind === 'success' && report.chars ? ` (${report.chars} chars)` : '';
+  const suffix = report.outcome.kind === 'success' && report.chars ? ` (${report.chars} симв.)` : '';
   setMsg(d.text + suffix, d.kind);
   if (report.outcome.kind === 'unauthorized') await refreshStatus();
 });
 
 unpairBtn.addEventListener('click', async () => {
   await send({ type: 'unpair' });
-  setMsg('Unpaired.', '');
+  setMsg('Отключено.', '');
   await refreshStatus();
 });
 

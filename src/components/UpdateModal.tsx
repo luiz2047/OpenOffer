@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { isMac } from '../utils/platformUtils';
+import { useTranslation } from 'react-i18next';
 
 interface ReleaseNoteSection {
     title: string;
@@ -29,6 +30,7 @@ interface UpdateModalProps {
 }
 
 const CopyBlock = ({ command }: { command: string }) => {
+    const { t } = useTranslation();
     const [copied, setCopied] = React.useState(false);
     const handleCopy = () => {
         navigator.clipboard.writeText(command);
@@ -43,12 +45,12 @@ const CopyBlock = ({ command }: { command: string }) => {
             <button
                 onClick={handleCopy}
                 className="h-6 px-2.5 rounded-md bg-white/5 hover:bg-white/10 active:bg-white/15 flex items-center justify-center transition-colors border border-white/5 flex-shrink-0"
-                title="Copy to clipboard"
+                title={t('update.copyToClipboard')}
             >
                 {copied ? (
-                    <span className="text-[10px] font-semibold text-green-400">Copied</span>
+                    <span className="text-[10px] font-semibold text-green-400">{t('overlay.copied')}</span>
                 ) : (
-                    <span className="text-[10px] font-medium text-white/50 group-hover:text-white/80">Copy</span>
+                    <span className="text-[10px] font-medium text-white/50 group-hover:text-white/80">{t('overlay.copy')}</span>
                 )}
             </button>
         </div>
@@ -66,6 +68,7 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
     errorMessage,
     instructionsArch
 }) => {
+    const { t } = useTranslation();
     // Helper to format version string
     const formatVersion = (v: string) => {
         if (!v) return 'Unknown';
@@ -162,7 +165,7 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                             <div className="p-8 flex flex-col items-center justify-center h-full text-center">
                                 <div className="space-y-2 mb-6">
                                     <h2 className="text-[17px] font-semibold text-white tracking-tight">
-                                        Update Failed
+                                        {t('update.failedTitle')}
                                     </h2>
                                     {errorMessage && (
                                         <p className="text-[13px] text-red-400 font-medium">
@@ -170,44 +173,44 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                         </p>
                                     )}
                                     <p className="text-[13px] text-white/40">
-                                        Check your internet connection or download the update manually from GitHub.
+                                        {t('update.failedDescription')}
                                     </p>
                                 </div>
                                 <button
                                     onClick={onDismiss}
                                     className="px-5 py-[6px] bg-white/10 hover:bg-white/20 text-white text-[13px] font-medium rounded-lg transition-colors"
                                 >
-                                    Close
+                                    {t('common.close')}
                                 </button>
                             </div>
                         ) : status === 'instructions' ? (
                             <div className="p-8 flex flex-col h-full relative text-left w-full max-w-full">
                                 <div className="space-y-1.5 mb-5 text-center mt-2">
                                     <h2 className="text-[17px] font-semibold text-white tracking-tight">
-                                        Manual Update Required
+                                        {t('update.manualRequired')}
                                     </h2>
                                     <p className="text-[13px] text-white/40 font-medium leading-relaxed">
-                                        The download has started in your browser. Follow these steps to install the update:
+                                        {t('update.manualDescription')}
                                     </p>
                                 </div>
                                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 mb-4 space-y-2 w-full">
                                     {isMac ? (
                                         <>
                                             <div className="space-y-1 w-full">
-                                                <p className="text-[12px] font-medium text-white/80">1. Clear quarantine on the downloaded file:</p>
+                                                <p className="text-[12px] font-medium text-white/80">{t('update.clearQuarantineDownloaded')}</p>
                                                 <CopyBlock command={`xattr -cr ~/Downloads/OpenOffer-${displayVersion.replace('v', '')}-${instructionsArch || 'arm64'}.dmg`} />
                                             </div>
                                             <div className="space-y-1 mt-1 pl-0.5">
-                                                <p className="text-[12px] font-medium text-white/80">2. Open the file and install OpenOffer.</p>
+                                                <p className="text-[12px] font-medium text-white/80">{t('update.openAndInstall')}</p>
                                             </div>
                                             <div className="space-y-1 mt-3 w-full">
-                                                <p className="text-[12px] font-medium text-white/80">3. Clear quarantine on the installed app:</p>
+                                                <p className="text-[12px] font-medium text-white/80">{t('update.clearQuarantineInstalled')}</p>
                                                 <CopyBlock command="xattr -cr /Applications/OpenOffer.app" />
                                             </div>
                                         </>
                                     ) : (
                                         <div className="space-y-1 w-full">
-                                            <p className="text-[12px] font-medium text-white/80">Run the downloaded installer (.exe) and follow the prompts. OpenOffer will restart when finished.</p>
+                                            <p className="text-[12px] font-medium text-white/80">{t('update.windowsInstaller')}</p>
                                         </div>
                                     )}
                                 </div>
@@ -216,7 +219,7 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                         onClick={onDismiss}
                                         className="px-6 py-[6px] bg-white/10 hover:bg-white/20 text-white text-[13px] font-medium rounded-lg transition-colors w-[200px]"
                                     >
-                                        Done
+                                        {t('update.done')}
                                     </button>
                                 </div>
                             </div>
@@ -226,10 +229,10 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                 {/* 1. Header Text */}
                                 <div className="space-y-1.5 mb-8">
                                     <h2 className="text-[17px] font-semibold text-white tracking-tight">
-                                        Downloading Update...
+                                        {t('update.downloadingTitle')}
                                     </h2>
                                     <p className="text-[13px] text-white/40 font-medium">
-                                        {downloadProgress < 100 ? 'Please wait while we prepare the update.' : 'Finalizing package...'}
+                                        {downloadProgress < 100 ? t('update.preparing') : t('update.finalizing')}
                                     </p>
                                 </div>
 
@@ -249,10 +252,10 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                         </div>
                                         <div className="space-y-0.5">
                                             <p className="text-[12px] font-medium text-white/80 leading-tight">
-                                                If macOS says "App is damaged"
+                                                {t('update.macDamagedTitle')}
                                             </p>
                                             <p className="text-[11px] text-white/40 leading-snug">
-                                                Move app to Applications folder, then run:
+                                                {t('update.macDamagedDescription')}
                                             </p>
                                         </div>
                                     </div>
@@ -265,12 +268,12 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                         <button
                                             onClick={handleCopyCommand}
                                             className="h-6 px-2.5 rounded-md bg-white/5 hover:bg-white/10 active:bg-white/15 flex items-center justify-center transition-colors border border-white/5"
-                                            title="Copy to clipboard"
+                                            title={t('update.copyToClipboard')}
                                         >
                                             {copied ? (
-                                                <span className="text-[10px] font-semibold text-green-400">Copied</span>
+                                                <span className="text-[10px] font-semibold text-green-400">{t('overlay.copied')}</span>
                                             ) : (
-                                                <span className="text-[10px] font-medium text-white/50 group-hover:text-white/80">Copy</span>
+                                                <span className="text-[10px] font-medium text-white/50 group-hover:text-white/80">{t('overlay.copy')}</span>
                                             )}
                                         </button>
                                     </div>
@@ -288,7 +291,7 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                         />
                                     </div>
                                     <p className="text-[11px] font-medium text-white/30 tabular-nums">
-                                        {Math.round(downloadProgress)}% Complete
+                                        {t('update.complete', { progress: Math.round(downloadProgress) })}
                                     </p>
                                 </div>
 
@@ -296,7 +299,7 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                     onClick={onDismiss}
                                     className="text-[13px] font-medium text-white/30 hover:text-white/60 transition-colors mt-auto mb-1"
                                 >
-                                    Hide
+                                    {t('common.hide')}
                                 </button>
                             </div>
                         ) : (
@@ -304,10 +307,10 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                 {/* Header Group */}
                                 <div className="flex flex-col gap-0.5 text-center relative flex-shrink-0 pt-1">
                                     <h2 className="text-[19px] font-semibold text-white tracking-tight">
-                                        Update Available
+                                        {t('update.availableTitle')}
                                     </h2>
                                     <p className="text-[13px] text-white/50 font-medium tracking-wide">
-                                        Version {displayVersion} is ready to install.
+                                        {t('update.availableDescription', { version: displayVersion })}
                                     </p>
                                 </div>
 
@@ -321,7 +324,7 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                 >
                                     {showFallback ? (
                                         <p className="text-[13px] text-white/60 text-center leading-relaxed mt-8">
-                                            Includes performance improvements and bug fixes.
+                                            {t('update.improvements')}
                                         </p>
                                     ) : (
                                         <div className="space-y-5 px-1">
@@ -359,7 +362,7 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                         onClick={onDismiss}
                                         className="text-[13px] font-medium text-white/40 hover:text-white/70 transition-colors"
                                     >
-                                        Not Now
+                                        {t('update.notNow')}
                                     </button>
 
                                     {/* Primary Action - Right Aligned, System Blue */}
@@ -368,14 +371,14 @@ const UpdateModal: React.FC<UpdateModalProps> = ({
                                             onClick={() => window.electronAPI.restartAndInstall()}
                                             className="px-5 py-[6px] bg-[#007AFF] hover:bg-[#0062CC] text-white text-[13px] font-medium rounded-lg shadow-sm transition-colors"
                                         >
-                                            Restart & Install
+                                            {t('update.restartAndInstall')}
                                         </button>
                                     ) : (
                                         <button
                                             onClick={handleUpdateClick}
                                             className="px-5 py-[6px] bg-[#007AFF] hover:bg-[#0062CC] text-white text-[13px] font-medium rounded-lg shadow-sm transition-colors"
                                         >
-                                            Update Now
+                                            {t('update.updateNow')}
                                         </button>
                                     )}
                                 </div>

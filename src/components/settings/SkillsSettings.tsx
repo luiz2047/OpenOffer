@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { CheckCircle, FolderOpen, RefreshCw, Sparkles } from 'lucide-react';
 import type { SkillSummary } from '../../types/electron';
+import { useTranslation } from 'react-i18next';
 
 export const SkillsSettings: React.FC = () => {
+    const { t } = useTranslation();
     const [skills, setSkills] = useState<SkillSummary[]>([]);
     const [skillsPath, setSkillsPath] = useState<string>('');
     const [loading, setLoading] = useState(false);
@@ -12,7 +14,7 @@ export const SkillsSettings: React.FC = () => {
         setLoading(true);
         try {
             if (typeof window.electronAPI?.skillsRefresh !== 'function') {
-                setStatus('Skills IPC bridge not detected on window.electronAPI — preload may be missing.');
+                setStatus(t('skills.ipcMissing'));
                 setSkills([]);
                 return;
             }
@@ -20,11 +22,11 @@ export const SkillsSettings: React.FC = () => {
             setSkills(Array.isArray(list) ? list : []);
             setStatus(null);
         } catch (error: any) {
-            setStatus(error?.message || 'Could not load skills.');
+            setStatus(error?.message || t('skills.loadFailed'));
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [t]);
 
     useEffect(() => {
         loadSkills();
@@ -33,14 +35,14 @@ export const SkillsSettings: React.FC = () => {
     const openFolder = async () => {
         try {
             if (typeof window.electronAPI?.skillsOpenFolder !== 'function') {
-                setStatus('Skills IPC bridge not detected on window.electronAPI — preload may be missing.');
+                setStatus(t('skills.ipcMissing'));
                 return;
             }
             const result = await window.electronAPI.skillsOpenFolder();
             if (result?.path) setSkillsPath(result.path);
             if (!result?.success && result?.error) setStatus(result.error);
         } catch (error: any) {
-            setStatus(error?.message || 'Could not open skills folder.');
+            setStatus(error?.message || t('skills.openFailed'));
         }
     };
 
@@ -48,9 +50,9 @@ export const SkillsSettings: React.FC = () => {
         <div className="space-y-5 animated fadeIn select-text pb-4">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <h3 className="text-lg font-bold text-text-primary mb-1">Skills</h3>
+                    <h3 className="text-lg font-bold text-text-primary mb-1">{t('skills.title')}</h3>
                     <p className="text-xs text-text-secondary">
-                        Local SKILL.md instructions that can be invoked from the overlay dropdown or by typing $skill-name or /skill-name.
+                        {t('skills.description')}
                     </p>
                 </div>
                 <button
@@ -59,7 +61,7 @@ export const SkillsSettings: React.FC = () => {
                     className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-border-subtle bg-bg-subtle/30 hover:bg-bg-subtle transition-all duration-200 text-xs font-medium text-text-secondary hover:text-text-primary active:scale-95 mt-1 disabled:opacity-60"
                 >
                     <RefreshCw size={13} strokeWidth={2.5} className={loading ? 'animate-spin' : ''} />
-                    Refresh
+                    {t('common.refresh')}
                 </button>
             </div>
 
@@ -68,10 +70,10 @@ export const SkillsSettings: React.FC = () => {
                     <div className="min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                             <FolderOpen size={15} className="text-text-secondary" />
-                            <h4 className="text-sm font-semibold text-text-primary">Skills Folder</h4>
+                            <h4 className="text-sm font-semibold text-text-primary">{t('skills.folderTitle')}</h4>
                         </div>
                         <p className="text-xs text-text-secondary">
-                            Add a folder containing a SKILL.md file here. Scripts and assets are ignored in this v1.
+                            {t('skills.folderDescription')}
                         </p>
                         {skillsPath && (
                             <p className="mt-2 text-[11px] text-text-tertiary font-mono truncate">{skillsPath}</p>
@@ -81,7 +83,7 @@ export const SkillsSettings: React.FC = () => {
                         onClick={openFolder}
                         className="px-4 py-2 rounded-lg bg-bg-input hover:bg-bg-elevated border border-border-subtle text-xs font-medium text-text-primary transition-colors shrink-0"
                     >
-                        Open Folder
+                        {t('skills.openFolder')}
                     </button>
                 </div>
             </div>
@@ -112,7 +114,7 @@ export const SkillsSettings: React.FC = () => {
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0 text-[11px] text-text-tertiary">
                                 <CheckCircle size={13} className="text-green-500" />
-                                {skill.source === 'builtin' ? 'Built-in' : 'Local'}
+                                {skill.source === 'builtin' ? t('skills.builtin') : t('skills.local')}
                             </div>
                         </div>
                     </div>
@@ -121,8 +123,8 @@ export const SkillsSettings: React.FC = () => {
                 {!loading && skills.length === 0 && (
                     <div className="bg-bg-card rounded-xl border border-border-subtle p-6 text-center">
                         <Sparkles size={20} className="mx-auto mb-2 text-text-tertiary" />
-                        <p className="text-sm font-medium text-text-primary">No skills found</p>
-                        <p className="text-xs text-text-secondary mt-1">Open the skills folder and add a folder with SKILL.md.</p>
+                        <p className="text-sm font-medium text-text-primary">{t('skills.noneFound')}</p>
+                        <p className="text-xs text-text-secondary mt-1">{t('skills.noneDescription')}</p>
                     </div>
                 )}
             </div>

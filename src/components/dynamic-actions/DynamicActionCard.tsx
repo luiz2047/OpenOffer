@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { X, Zap, ChevronRight } from 'lucide-react'
 import type { DynamicActionPayload } from '@/types/electron'
+import { useTranslation } from 'react-i18next'
 
 interface Props {
   action: DynamicActionPayload
@@ -16,6 +17,7 @@ interface Props {
 // callback which is responsible for kicking off the answer stream so the
 // card itself stays presentation-only.
 export const DynamicActionCard: React.FC<Props> = ({ action, isPrimary, onAccept, onDismiss }) => {
+  const { t } = useTranslation()
   const [busy, setBusy] = useState(false)
   const evidence = action.evidenceRefs?.[0]
   const evidenceText = evidence?.text?.trim() ?? ''
@@ -82,8 +84,8 @@ export const DynamicActionCard: React.FC<Props> = ({ action, isPrimary, onAccept
             onDismiss(action.id)
           }}
           className="ml-0.5 p-1 rounded-full text-white/30 hover:text-white/70 hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100"
-          title="Dismiss"
-          aria-label={`Dismiss ${action.label}`}
+          title={t('common.dismiss')}
+          aria-label={t('dynamicActions.dismiss', { label: action.label })}
         >
           <X className="w-3 h-3" />
         </button>

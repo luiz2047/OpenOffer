@@ -81,6 +81,13 @@ const DETAIL_TABS = ['Vacancy', 'Prep', 'Retro', 'Questions'] as const;
 type DetailTab = typeof DETAIL_TABS[number];
 type DraftStatus = 'synced' | 'dirty' | 'saved' | 'failed';
 
+const DETAIL_TAB_I18N_KEY: Record<DetailTab, string> = {
+  Vacancy: 'interviews.detailTabs.vacancy',
+  Prep: 'interviews.detailTabs.prep',
+  Retro: 'interviews.detailTabs.retro',
+  Questions: 'interviews.detailTabs.questions',
+};
+
 const DRAFT_PREFIX = 'openoffer:interviews:draft';
 
 function draftKey(interviewId: string, kind: 'dossier' | 'prep' | 'retro'): string {
@@ -890,7 +897,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                     onClick={() => setDetailTab(tab)}
                     className={`min-h-11 flex-1 px-3 text-[12px] font-semibold transition ${detailTab === tab ? 'border-b-2 border-cyan-300 text-white' : 'border-b-2 border-transparent text-text-secondary hover:text-white'}`}
                   >
-                    {tab}
+                    {t(DETAIL_TAB_I18N_KEY[tab])}
                   </button>
                 ))}
               </div>
@@ -898,58 +905,58 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               {detailTab === 'Vacancy' && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <InfoTile icon={<BriefcaseBusiness size={16} />} label="Company" value={detail.company || 'Unfilled'} />
-                    <InfoTile icon={<UserRound size={16} />} label="Role" value={detail.roleTitle || 'Unfilled'} />
-                    <InfoTile icon={<CircleDot size={16} />} label="Stage" value={detail.stage || 'Unfilled'} />
-                    <InfoTile icon={<Clock3 size={16} />} label="Schedule" value={formatDateTime(detail.startsAt)} />
+                    <InfoTile icon={<BriefcaseBusiness size={16} />} label={t('interviews.detail.company')} value={detail.company || t('interviews.detail.unfilled')} />
+                    <InfoTile icon={<UserRound size={16} />} label={t('interviews.detail.role')} value={detail.roleTitle || t('interviews.detail.unfilled')} />
+                    <InfoTile icon={<CircleDot size={16} />} label={t('interviews.detail.stage')} value={detail.stage || t('interviews.detail.unfilled')} />
+                    <InfoTile icon={<Clock3 size={16} />} label={t('interviews.detail.schedule')} value={formatDateTime(detail.startsAt)} />
                   </div>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <button type="button"
                       className="flex min-h-14 items-center justify-between rounded-md bg-white/[0.025] p-3 text-left transition hover:bg-white/[0.055] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60"
                       onClick={() => detail.vacancyUrl && window.electronAPI?.openExternal?.(detail.vacancyUrl)}
                     >
-                      <span className="text-[13px] text-text-secondary">Vacancy URL</span>
+                      <span className="text-[13px] text-text-secondary">{t('interviews.detail.vacancyUrl')}</span>
                       <ArrowUpRight size={15} className="text-text-tertiary" />
                     </button>
                     <button type="button"
                       className="flex min-h-14 items-center justify-between rounded-md bg-white/[0.025] p-3 text-left transition hover:bg-white/[0.055] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60"
                       onClick={() => detail.meetingUrl && window.electronAPI?.openExternal?.(detail.meetingUrl)}
                     >
-                      <span className="text-[13px] text-text-secondary">Meeting URL</span>
+                      <span className="text-[13px] text-text-secondary">{t('interviews.detail.meetingUrl')}</span>
                       <LinkIcon size={15} className="text-text-tertiary" />
                     </button>
                   </div>
                   <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
-                    <div className={labelClass}>Raw vacancy / HR context</div>
+                    <div className={labelClass}>{t('interviews.detail.rawVacancyContext')}</div>
                     <div className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-text-secondary">
-                      {detail.rawSourceText || 'No source text yet.'}
+                      {detail.rawSourceText || t('interviews.detail.noSourceText')}
                     </div>
                   </div>
                   <EditorPanel
-                    title="Vacancy dossier"
-                    action="Save dossier"
+                    title={t('interviews.detail.vacancyDossier')}
+                    action={t('interviews.detail.saveDossier')}
                     busy={busy}
                     status={draftStatus.dossier}
                     onSave={saveDossier}
                     fields={[
-                      { key: 'description', label: 'Description', value: dossierDraft.description, rows: 6 },
-                      { key: 'requirements', label: 'Requirements', value: dossierDraft.requirements, rows: 5 },
-                      { key: 'compensationText', label: 'Compensation', value: dossierDraft.compensationText, rows: 2 },
-                      { key: 'fitHypothesis', label: 'Fit hypothesis', value: dossierDraft.fitHypothesis, rows: 4 },
-                      { key: 'risks', label: 'Risks', value: dossierDraft.risks, rows: 4 },
-                      { key: 'questionsToAsk', label: 'Questions to ask', value: dossierDraft.questionsToAsk, rows: 4 },
+                      { key: 'description', label: t('interviews.detail.description'), value: dossierDraft.description, rows: 6 },
+                      { key: 'requirements', label: t('interviews.detail.requirements'), value: dossierDraft.requirements, rows: 5 },
+                      { key: 'compensationText', label: t('interviews.detail.compensation'), value: dossierDraft.compensationText, rows: 2 },
+                      { key: 'fitHypothesis', label: t('interviews.detail.fitHypothesis'), value: dossierDraft.fitHypothesis, rows: 4 },
+                      { key: 'risks', label: t('interviews.detail.risks'), value: dossierDraft.risks, rows: 4 },
+                      { key: 'questionsToAsk', label: t('interviews.detail.questionsToAsk'), value: dossierDraft.questionsToAsk, rows: 4 },
                     ]}
                     onChange={(key, value) => updateDraft('dossier', setDossierDraft, key, value)}
                   />
                   <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
-                    <div className={labelClass}>Attach recording</div>
+                    <div className={labelClass}>{t('interviews.detail.attachRecording')}</div>
                     <div className="mt-3 flex gap-2">
                       <select value={attachMeetingId} onChange={event => setAttachMeetingId(event.target.value)} className={inputClass}>
-                        <option value="">Select meeting</option>
+                        <option value="">{t('interviews.detail.selectMeeting')}</option>
                         {meetings.map(meeting => <option key={meeting.id} value={meeting.id}>{meeting.title}</option>)}
                       </select>
                       <button type="button" onClick={attachMeeting} disabled={!attachMeetingId || busy} className={secondaryButtonClass}>
-                        Link
+                        {t('interviews.detail.link')}
                       </button>
                     </div>
                   </div>
@@ -958,19 +965,19 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
               {detailTab === 'Prep' && (
                 <EditorPanel
-                  title="Preparation"
-                  action="Save prep"
+                  title={t('interviews.detail.preparation')}
+                  action={t('interviews.detail.savePrep')}
                   busy={busy}
                   status={draftStatus.prep}
                   onSave={savePrep}
                   fields={[
-                    { key: 'oneLineGoal', label: 'One-line goal', value: prepDraft.oneLineGoal, rows: 2 },
-                    { key: 'pitch30s', label: '30s pitch', value: prepDraft.pitch30s, rows: 3 },
-                    { key: 'pitch2m', label: '2m pitch', value: prepDraft.pitch2m, rows: 4 },
-                    { key: 'expectedTopics', label: 'Expected topics', value: prepDraft.expectedTopics, rows: 4 },
-                    { key: 'cheatsheet', label: 'Cheat sheet', value: prepDraft.cheatsheet, rows: 8 },
-                    { key: 'riskHandling', label: 'Risk handling', value: prepDraft.riskHandling, rows: 4 },
-                    { key: 'lastChecklist', label: 'Last checklist', value: prepDraft.lastChecklist, rows: 4 },
+                    { key: 'oneLineGoal', label: t('interviews.detail.oneLineGoal'), value: prepDraft.oneLineGoal, rows: 2 },
+                    { key: 'pitch30s', label: t('interviews.detail.pitch30s'), value: prepDraft.pitch30s, rows: 3 },
+                    { key: 'pitch2m', label: t('interviews.detail.pitch2m'), value: prepDraft.pitch2m, rows: 4 },
+                    { key: 'expectedTopics', label: t('interviews.detail.expectedTopics'), value: prepDraft.expectedTopics, rows: 4 },
+                    { key: 'cheatsheet', label: t('interviews.detail.cheatSheet'), value: prepDraft.cheatsheet, rows: 8 },
+                    { key: 'riskHandling', label: t('interviews.detail.riskHandling'), value: prepDraft.riskHandling, rows: 4 },
+                    { key: 'lastChecklist', label: t('interviews.detail.lastChecklist'), value: prepDraft.lastChecklist, rows: 4 },
                   ]}
                   onChange={(key, value) => updateDraft('prep', setPrepDraft, key, value)}
                 />
@@ -980,28 +987,28 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 <div className="space-y-4">
                   {retroPrompt?.due && (
                     <div className="rounded-md border border-amber-400/20 bg-amber-500/10 p-4">
-                      <div className="text-[13px] font-semibold text-amber-100">Retro is due</div>
-                      <div className="mt-1 text-[12px] text-amber-100/75">Capture what changed before the interview context decays.</div>
+                      <div className="text-[13px] font-semibold text-amber-100">{t('interviews.detail.retroDue')}</div>
+                      <div className="mt-1 text-[12px] text-amber-100/75">{t('interviews.detail.retroDueDescription')}</div>
                       <div className="mt-3 flex gap-2">
-                        <button type="button" onClick={() => setDetailTab('Retro')} className="min-h-11 rounded-md bg-amber-300 px-3 text-[12px] font-semibold text-black">Write</button>
-                        <button type="button" onClick={() => updateRetroPrompt('snooze')} className="min-h-11 rounded-md border border-amber-300/25 px-3 text-[12px] font-semibold text-amber-100">Snooze</button>
-                        <button type="button" onClick={() => updateRetroPrompt('dismiss')} className="min-h-11 rounded-md border border-white/[0.08] px-3 text-[12px] font-semibold text-text-secondary">Dismiss</button>
+                        <button type="button" onClick={() => setDetailTab('Retro')} className="min-h-11 rounded-md bg-amber-300 px-3 text-[12px] font-semibold text-black">{t('interviews.detail.write')}</button>
+                        <button type="button" onClick={() => updateRetroPrompt('snooze')} className="min-h-11 rounded-md border border-amber-300/25 px-3 text-[12px] font-semibold text-amber-100">{t('interviews.detail.snooze')}</button>
+                        <button type="button" onClick={() => updateRetroPrompt('dismiss')} className="min-h-11 rounded-md border border-white/[0.08] px-3 text-[12px] font-semibold text-text-secondary">{t('common.dismiss')}</button>
                       </div>
                     </div>
                   )}
                   <EditorPanel
-                    title="Retro"
-                    action="Save retro"
+                    title={t('interviews.detail.retro')}
+                    action={t('interviews.detail.saveRetro')}
                     busy={busy}
                     status={draftStatus.retro}
                     onSave={saveRetro}
                     fields={[
-                      { key: 'passProbability', label: 'Pass probability', value: retroDraft.passProbability, rows: 1 },
-                      { key: 'mainSignal', label: 'Main signal', value: retroDraft.mainSignal, rows: 4 },
-                      { key: 'strongMoments', label: 'Strong moments', value: retroDraft.strongMoments, rows: 4 },
-                      { key: 'weakMoments', label: 'Weak moments', value: retroDraft.weakMoments, rows: 4 },
-                      { key: 'newFacts', label: 'New facts', value: retroDraft.newFacts, rows: 4 },
-                      { key: 'followUpActions', label: 'Follow-up actions', value: retroDraft.followUpActions, rows: 4 },
+                      { key: 'passProbability', label: t('interviews.detail.passProbability'), value: retroDraft.passProbability, rows: 1 },
+                      { key: 'mainSignal', label: t('interviews.detail.mainSignal'), value: retroDraft.mainSignal, rows: 4 },
+                      { key: 'strongMoments', label: t('interviews.detail.strongMoments'), value: retroDraft.strongMoments, rows: 4 },
+                      { key: 'weakMoments', label: t('interviews.detail.weakMoments'), value: retroDraft.weakMoments, rows: 4 },
+                      { key: 'newFacts', label: t('interviews.detail.newFacts'), value: retroDraft.newFacts, rows: 4 },
+                      { key: 'followUpActions', label: t('interviews.detail.followUpActions'), value: retroDraft.followUpActions, rows: 4 },
                     ]}
                     onChange={(key, value) => updateDraft('retro', setRetroDraft, key, value)}
                   />
@@ -1012,9 +1019,9 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 <div className="space-y-4">
                   <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
                     <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_150px_auto]">
-                      <input value={questionText} onChange={event => setQuestionText(event.target.value)} className={inputClass} placeholder="Question" />
-                      <input value={questionCategory} onChange={event => setQuestionCategory(event.target.value)} className={inputClass} placeholder="Category" />
-                      <button type="button" onClick={addQuestion} className={primaryButtonClass}>Add</button>
+                      <input value={questionText} onChange={event => setQuestionText(event.target.value)} className={inputClass} placeholder={t('interviews.detail.question')} />
+                      <input value={questionCategory} onChange={event => setQuestionCategory(event.target.value)} className={inputClass} placeholder={t('interviews.detail.category')} />
+                      <button type="button" onClick={addQuestion} className={primaryButtonClass}>{t('interviews.detail.add')}</button>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -1022,7 +1029,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       <div key={`${question.id ?? 'draft'}-${index}`} className="flex items-start justify-between gap-3 rounded-md bg-white/[0.025] p-3">
                         <div>
                           <div className="text-[13px] font-medium">{question.questionText}</div>
-                          <div className="mt-1 text-[11px] text-text-tertiary">{question.category || 'uncategorized'}</div>
+                          <div className="mt-1 text-[11px] text-text-tertiary">{question.category || t('interviews.detail.uncategorized')}</div>
                         </div>
                         <button type="button" className={iconButtonClass} onClick={() => setQuestionDrafts(prev => prev.filter((_, i) => i !== index))}>
                           <Trash2 size={14} />
@@ -1030,7 +1037,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       </div>
                     ))}
                   </div>
-                  <button type="button" onClick={saveQuestions} disabled={busy} className={primaryButtonClass}>Save questions</button>
+                  <button type="button" onClick={saveQuestions} disabled={busy} className={primaryButtonClass}>{t('interviews.detail.saveQuestions')}</button>
                 </div>
               )}
             </div>
@@ -1038,21 +1045,21 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
             <aside className="min-h-0 overflow-y-auto border-t border-white/[0.07] bg-[#0e1012] p-4 custom-scrollbar lg:border-l lg:border-t-0">
               <div className={`rounded-md px-3 py-3 ring-1 ring-current/15 ${readinessTone(readiness?.level)}`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-[12px] font-semibold">Readiness</span>
+                  <span className="text-[12px] font-semibold">{t('interviews.detail.readiness')}</span>
                   <span className="text-[18px] font-bold tabular-nums">{readiness?.score ?? 0}</span>
                 </div>
                 <div className="mt-1 text-[11px] text-current opacity-80">{readiness?.nextAction ?? readiness?.level ?? 'not_started'}</div>
               </div>
-              <SideMetric icon={<ListChecks size={15} />} label="Checklist" value={`${detail.prep?.lastChecklist?.length ?? 0} items`} />
-              <SideMetric icon={<MessageSquareText size={15} />} label="Questions" value={`${detail.questions?.length ?? 0} saved`} />
-              <SideMetric icon={<FileText size={15} />} label="Retros" value={`${detail.retros?.length ?? 0} notes`} />
+              <SideMetric icon={<ListChecks size={15} />} label={t('interviews.detail.checklist')} value={`${detail.prep?.lastChecklist?.length ?? 0}`} />
+              <SideMetric icon={<MessageSquareText size={15} />} label={t('interviews.detail.questions')} value={`${detail.questions?.length ?? 0}`} />
+              <SideMetric icon={<FileText size={15} />} label={t('interviews.detail.retros')} value={`${detail.retros?.length ?? 0}`} />
               <div className="mt-4 rounded-md bg-white/[0.025] p-3">
-                <div className={labelClass}>Linked recordings</div>
+                <div className={labelClass}>{t('interviews.detail.linkedRecordings')}</div>
                 <div className="mt-3 space-y-2">
                   {(detail.linkedMeetings ?? []).map(meeting => (
                     <div key={meeting.id} className="rounded bg-black/20 px-2 py-1.5 text-[12px] text-text-secondary">{meeting.title}</div>
                   ))}
-                  {(detail.linkedMeetings ?? []).length === 0 && <div className="text-[12px] text-text-tertiary">None</div>}
+                  {(detail.linkedMeetings ?? []).length === 0 && <div className="text-[12px] text-text-tertiary">{t('interviews.detail.none')}</div>}
                 </div>
               </div>
             </aside>
@@ -1074,46 +1081,46 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
           <div className="max-h-[calc(100vh-24px)] w-[min(760px,calc(100vw-24px))] overflow-y-auto rounded-md bg-[#111417] p-5 shadow-2xl ring-1 ring-white/[0.1]">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <div className="text-[16px] font-semibold">New interview</div>
-                <div className="text-[12px] text-text-tertiary">Manual intake</div>
+                <div className="text-[16px] font-semibold">{t('interviews.newInterview')}</div>
+                <div className="text-[12px] text-text-tertiary">{t('interviews.detail.manualIntake')}</div>
               </div>
               <button type="button" className={iconButtonClass} onClick={() => {
                 setShowCreate(false);
                 setCreateCalendarProvider('none');
                 setSourceParsePreview(null);
                 setParseWarnings([]);
-              }} aria-label="Close">
+              }} aria-label={t('common.close')}>
                 <X size={15} />
               </button>
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Field label="Title"><input className={inputClass} value={createForm.title} onChange={event => setCreateForm(prev => ({ ...prev, title: event.target.value }))} /></Field>
-              <Field label="Company"><input className={inputClass} value={createForm.company ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, company: event.target.value }))} /></Field>
-              <Field label="Role"><input className={inputClass} value={createForm.roleTitle ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, roleTitle: event.target.value }))} /></Field>
-              <Field label="Stage"><input className={inputClass} value={createForm.stage ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, stage: event.target.value }))} /></Field>
-              <Field label="Status">
+              <Field label={t('interviews.detail.title')}><input className={inputClass} value={createForm.title} onChange={event => setCreateForm(prev => ({ ...prev, title: event.target.value }))} /></Field>
+              <Field label={t('interviews.detail.company')}><input className={inputClass} value={createForm.company ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, company: event.target.value }))} /></Field>
+              <Field label={t('interviews.detail.role')}><input className={inputClass} value={createForm.roleTitle ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, roleTitle: event.target.value }))} /></Field>
+              <Field label={t('interviews.detail.stage')}><input className={inputClass} value={createForm.stage ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, stage: event.target.value }))} /></Field>
+              <Field label={t('interviews.detail.status')}>
                 <select className={inputClass} value={createForm.status} onChange={event => setCreateForm(prev => ({ ...prev, status: event.target.value as InterviewStatus }))}>
-                  {STATUS_OPTIONS.map(status => <option key={status} value={status}>{status}</option>)}
+                  {STATUS_OPTIONS.map(status => <option key={status} value={status}>{t(`interviews.status.${status}`)}</option>)}
                 </select>
               </Field>
-              <Field label="Priority">
+              <Field label={t('interviews.detail.priority')}>
                 <select className={inputClass} value={createForm.priority} onChange={event => setCreateForm(prev => ({ ...prev, priority: event.target.value as InterviewPriority }))}>
                   {PRIORITY_OPTIONS.map(priority => <option key={priority} value={priority}>{priority}</option>)}
                 </select>
               </Field>
-              <Field label="Starts"><input className={inputClass} type="datetime-local" value={toLocalInputValue(createForm.startsAt)} onChange={event => setCreateForm(prev => ({ ...prev, startsAt: fromLocalInputValue(event.target.value) }))} /></Field>
-              <Field label="Ends"><input className={inputClass} type="datetime-local" value={toLocalInputValue(createForm.endsAt)} onChange={event => setCreateForm(prev => ({ ...prev, endsAt: fromLocalInputValue(event.target.value) }))} /></Field>
-              <Field label="Vacancy URL"><input className={inputClass} value={createForm.vacancyUrl ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, vacancyUrl: event.target.value }))} /></Field>
-              <Field label="Meeting URL"><input className={inputClass} value={createForm.meetingUrl ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, meetingUrl: event.target.value }))} /></Field>
-              <Field label="Calendar sync">
+              <Field label={t('interviews.detail.starts')}><input className={inputClass} type="datetime-local" value={toLocalInputValue(createForm.startsAt)} onChange={event => setCreateForm(prev => ({ ...prev, startsAt: fromLocalInputValue(event.target.value) }))} /></Field>
+              <Field label={t('interviews.detail.ends')}><input className={inputClass} type="datetime-local" value={toLocalInputValue(createForm.endsAt)} onChange={event => setCreateForm(prev => ({ ...prev, endsAt: fromLocalInputValue(event.target.value) }))} /></Field>
+              <Field label={t('interviews.detail.vacancyUrl')}><input className={inputClass} value={createForm.vacancyUrl ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, vacancyUrl: event.target.value }))} /></Field>
+              <Field label={t('interviews.detail.meetingUrl')}><input className={inputClass} value={createForm.meetingUrl ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, meetingUrl: event.target.value }))} /></Field>
+              <Field label={t('interviews.detail.calendarSync')}>
                 <select className={inputClass} value={createCalendarProvider} onChange={event => setCreateCalendarProvider(event.target.value as 'none' | 'google' | 'macos')}>
-                  <option value="none">Do not add</option>
-                  <option value="google">Create in Google Calendar</option>
-                  <option value="macos">Create in Mac Calendar</option>
+                  <option value="none">{t('interviews.detail.doNotAdd')}</option>
+                  <option value="google">{t('interviews.detail.createInGoogleCalendar')}</option>
+                  <option value="macos">{t('interviews.detail.createInMacCalendar')}</option>
                 </select>
               </Field>
               <div className="md:col-span-2">
-                <Field label="Source text">
+                <Field label={t('interviews.detail.sourceText')}>
                   <textarea
                     className={`${inputClass} min-h-[130px] resize-none`}
                     value={createForm.rawSourceText ?? ''}
@@ -1126,7 +1133,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 </Field>
                 <div className="mt-2 flex items-center justify-between gap-3">
                   <div className="min-w-0 truncate text-[11px] text-text-tertiary">
-                    {sourceParsePreview ? `${sourceParsePreview.fieldCount} fields detected` : 'Unparsed source'}
+                    {sourceParsePreview ? t('interviews.detail.fieldsDetected', { count: sourceParsePreview.fieldCount }) : t('interviews.detail.unparsedSource')}
                     {parseWarnings.length > 0 ? ` · ${parseWarnings.join(', ')}` : ''}
                   </div>
                   <button type="button"
@@ -1135,7 +1142,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                     className={secondaryButtonClass}
                   >
                     <FileText size={14} />
-                    Parse
+                    {t('interviews.detail.parse')}
                   </button>
                 </div>
               </div>
@@ -1146,9 +1153,9 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 setCreateCalendarProvider('none');
                 setSourceParsePreview(null);
                 setParseWarnings([]);
-              }} className={secondaryButtonClass}>Cancel</button>
+              }} className={secondaryButtonClass}>{t('common.cancel')}</button>
               <button type="button" onClick={createInterview} disabled={busy || !createForm.title.trim()} className={primaryButtonClass}>
-                Create
+                {t('interviews.detail.create')}
               </button>
             </div>
           </div>
@@ -1193,34 +1200,45 @@ const EditorPanel: React.FC<{
   fields: Array<{ key: string; label: string; value: string; rows: number }>;
   onChange: (key: string, value: string) => void;
   onSave: () => void;
-}> = ({ title, action, busy, status = 'synced', fields, onChange, onSave }) => (
-  <div className="space-y-4">
-    <div className="flex items-center justify-between">
-      <div>
-        <div className="text-[15px] font-semibold">{title}</div>
-        <div className="mt-0.5 text-[11px] text-text-tertiary">
-          {status === 'dirty' ? 'Draft changed' : status === 'saved' ? 'Draft saved locally' : status === 'failed' ? 'Draft not saved locally' : 'Synced'}
+}> = ({ title, action, busy, status = 'synced', fields, onChange, onSave }) => {
+  const { t } = useTranslation();
+  const statusText = status === 'dirty'
+    ? t('interviews.detail.draftChanged')
+    : status === 'saved'
+      ? t('interviews.detail.draftSavedLocally')
+      : status === 'failed'
+        ? t('interviews.detail.draftNotSavedLocally')
+        : t('interviews.detail.synced');
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-[15px] font-semibold">{title}</div>
+          <div className="mt-0.5 text-[11px] text-text-tertiary">
+            {statusText}
+          </div>
         </div>
+        <button type="button" onClick={onSave} disabled={busy} className={primaryButtonClass}>
+          {action}
+        </button>
       </div>
-      <button type="button" onClick={onSave} disabled={busy} className={primaryButtonClass}>
-        {action}
-      </button>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {fields.map(field => (
+          <div key={field.key} className={field.rows > 4 ? 'md:col-span-2' : undefined}>
+            <Field label={field.label}>
+              <textarea
+                className={`${inputClass} resize-none`}
+                rows={field.rows}
+                value={field.value}
+                onChange={event => onChange(field.key, event.target.value)}
+              />
+            </Field>
+          </div>
+        ))}
+      </div>
     </div>
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-      {fields.map(field => (
-        <div key={field.key} className={field.rows > 4 ? 'md:col-span-2' : undefined}>
-          <Field label={field.label}>
-            <textarea
-              className={`${inputClass} resize-none`}
-              rows={field.rows}
-              value={field.value}
-              onChange={event => onChange(field.key, event.target.value)}
-            />
-          </Field>
-        </div>
-      ))}
-    </div>
-  </div>
-);
+  );
+};
 
 export default InterviewCommandCenter;

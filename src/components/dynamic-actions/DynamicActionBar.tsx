@@ -2,6 +2,7 @@ import type { DynamicActionPayload } from '@/types/electron';
 import { AnimatePresence } from 'framer-motion';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DynamicActionCard } from './DynamicActionCard';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   // Called when the user accepts (or hits Tab on the primary). Parent should
@@ -23,6 +24,7 @@ export const DynamicActionBar: React.FC<Props> = ({
   maxVisible = 3,
   staleAfterMs = 60_000,
 }) => {
+  const { t } = useTranslation();
   const [actions, setActions] = useState<DynamicActionPayload[]>([]);
   const actionsRef = useRef(actions);
   actionsRef.current = actions;
@@ -117,7 +119,7 @@ export const DynamicActionBar: React.FC<Props> = ({
     <div
       className="flex flex-col gap-1.5 px-3 pt-1 pb-1 w-full"
       data-testid="dynamic-action-bar"
-      aria-label="Suggested actions"
+      aria-label={t('dynamicActions.suggestedActions')}
     >
       <AnimatePresence initial={false}>
         {visible.map((a, i) => (

@@ -507,7 +507,7 @@ const MessageRow = React.memo(
           >
             {msg.role === 'interviewer' && (
               <div className="flex items-center gap-1.5 mb-1 text-[10px] font-medium uppercase tracking-wider overlay-text-muted">
-                Interviewer
+                Интервьюер
                 {msg.isStreaming && (
                   <span className="w-1 h-1 bg-green-500 rounded-full animate-pulse" />
                 )}
@@ -518,14 +518,14 @@ const MessageRow = React.memo(
                 className={`flex items-center gap-1 text-[10px] opacity-70 mb-1 border-b pb-1 ${isLightTheme ? 'border-black/10' : 'border-white/10'}`}
               >
                 <Image className="w-2.5 h-2.5" />
-                <span>Screenshot attached</span>
+                <span>Скриншот прикреплен</span>
               </div>
             )}
             {/* Correction header: this message fixes an earlier wrong answer. */}
             {msg.role === 'system' && msg.isCorrection && (
               <div className="flex items-center gap-1.5 mb-1.5 text-[11px] font-medium text-amber-500">
                 <span aria-hidden>↻</span>
-                <span>Corrected answer{msg.correctionNote ? ` — ${msg.correctionNote}` : ''}</span>
+                <span>Исправленный ответ{msg.correctionNote ? ` — ${msg.correctionNote}` : ''}</span>
               </div>
             )}
             {renderMessageText(msg)}
@@ -5666,7 +5666,7 @@ Provide only the answer, nothing else.`;
                     <button type="button"
                       onClick={() => setStealthHotkeyConflict(null)}
                       className="px-1.5 py-1 rounded-md hover:bg-white/10 transition-colors text-[11px] overlay-text-muted"
-                      aria-label="Dismiss"
+                      aria-label="Закрыть"
                       data-stealth-ignore="true"
                     >
                       ×
@@ -5698,7 +5698,7 @@ Provide only the answer, nothing else.`;
                     <button type="button"
                       onClick={() => setStealthPermissionMissing(false)}
                       className="px-1.5 py-1 rounded-md hover:bg-white/10 transition-colors text-[11px] overlay-text-muted"
-                      aria-label="Dismiss"
+                      aria-label="Закрыть"
                       data-stealth-ignore="true"
                     >
                       ×

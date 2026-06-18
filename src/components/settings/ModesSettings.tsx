@@ -10,6 +10,7 @@ import {
   Upload,
   X,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 type ModeTemplateType =
   | 'general'
@@ -67,7 +68,15 @@ function templateLabel(type: string): string {
   return templates.find(t => t.type === type)?.label ?? type;
 }
 
+function templateI18nKey(type: string): string {
+  if (type === 'looking-for-work') return 'lookingForWork';
+  if (type === 'technical-interview') return 'technicalInterview';
+  if (type === 'team-meet') return 'teamMeet';
+  return type;
+}
+
 const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
+  const { t } = useTranslation();
   const api = window.electronAPI;
   const [modes, setModes] = useState<Mode[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -87,7 +96,7 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
 
   const loadModes = useCallback(async () => {
     if (!api?.modesGetAll) {
-      setError('Modes API is unavailable in this window.');
+      setError(t('modesManager.apiUnavailable'));
       setLoading(false);
       return;
     }
@@ -106,11 +115,11 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
         return activeMode?.id ?? normalized[0]?.id ?? null;
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load modes.');
+      setError(err instanceof Error ? err.message : t('modesManager.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [api]);
+  }, [api, t]);
 
   const loadModeDetails = useCallback(async (mode: Mode | null) => {
     if (!mode) {
@@ -155,12 +164,12 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
     setSaving(true);
     setError(null);
     try {
-      const result = await create({ name: templateLabel(templateType), templateType });
-      if (!result.success) throw new Error(result.error ?? 'Could not create mode.');
+      const result = await create({ name: t(`modesManager.templatesData.${templateI18nKey(templateType)}.label`), templateType });
+      if (!result.success) throw new Error(result.error ?? t('modesManager.createFailed'));
       await loadModes();
       if (result.mode?.id) setSelectedId(result.mode.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create mode.');
+      setError(err instanceof Error ? err.message : t('modesManager.createFailed'));
     } finally {
       setSaving(false);
     }
@@ -182,10 +191,10 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
         templateType: templateDraft,
         customContext: contextDraft,
       });
-      if (!result.success) throw new Error(result.error ?? 'Could not save mode.');
+      if (!result.success) throw new Error(result.error ?? t('modesManager.saveFailed'));
       await loadModes();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save mode.');
+      setError(err instanceof Error ? err.message : t('modesManager.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -202,11 +211,11 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
     setError(null);
     try {
       const result = await setActiveMode(mode.id);
-      if (!result.success) throw new Error(result.error ?? 'Could not activate mode.');
+      if (!result.success) throw new Error(result.error ?? t('modesManager.activateFailed'));
       setModes(current => current.map(item => ({ ...item, isActive: item.id === mode.id })));
       setSelectedId(mode.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not activate mode.');
+      setError(err instanceof Error ? err.message : t('modesManager.activateFailed'));
     } finally {
       setSaving(false);
     }
@@ -226,11 +235,11 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
     setError(null);
     try {
       const result = await remove(selectedMode.id);
-      if (!result.success) throw new Error(result.error ?? 'Could not delete mode.');
+      if (!result.success) throw new Error(result.error ?? t('modesManager.deleteFailed'));
       setSelectedId(null);
       await loadModes();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not delete mode.');
+      setError(err instanceof Error ? err.message : t('modesManager.deleteFailed'));
     } finally {
       setSaving(false);
     }
@@ -249,10 +258,10 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
     try {
       const result = await upload(selectedMode.id);
       if (result.cancelled) return;
-      if (!result.success) throw new Error(result.error ?? 'Could not add reference file.');
+      if (!result.success) throw new Error(result.error ?? t('modesManager.addReferenceFailed'));
       await Promise.all([loadModes(), loadModeDetails(selectedMode)]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not add reference file.');
+      setError(err instanceof Error ? err.message : t('modesManager.addReferenceFailed'));
     } finally {
       setSaving(false);
     }
@@ -269,10 +278,10 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
     setError(null);
     try {
       const result = await remove(file.id);
-      if (!result.success) throw new Error(result.error ?? 'Could not remove reference file.');
+      if (!result.success) throw new Error(result.error ?? t('modesManager.removeReferenceFailed'));
       if (selectedMode) await Promise.all([loadModes(), loadModeDetails(selectedMode)]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not remove reference file.');
+      setError(err instanceof Error ? err.message : t('modesManager.removeReferenceFailed'));
     } finally {
       setSaving(false);
     }
@@ -290,10 +299,10 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
     setError(null);
     try {
       const result = await addSection(selectedMode.id, 'New section', 'Describe what OpenOffer should capture here.');
-      if (!result.success) throw new Error(result.error ?? 'Could not add note section.');
+      if (!result.success) throw new Error(result.error ?? t('modesManager.addSectionFailed'));
       await loadModeDetails(selectedMode);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not add note section.');
+      setError(err instanceof Error ? err.message : t('modesManager.addSectionFailed'));
     } finally {
       setSaving(false);
     }
@@ -307,8 +316,8 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
             <LayoutGrid size={17} />
           </div>
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold leading-tight">Modes Manager</h2>
-            <p className="text-[11px] text-text-secondary leading-tight">Public, local-first personas and meeting templates.</p>
+            <h2 className="text-sm font-semibold leading-tight">{t('modesManager.title')}</h2>
+            <p className="text-[11px] text-text-secondary leading-tight">{t('modesManager.description')}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -316,7 +325,7 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
             type="button"
             onClick={() => void loadModes()}
             className="h-8 w-8 rounded-lg border border-border-subtle text-text-secondary hover:text-text-primary hover:bg-bg-item-hover flex items-center justify-center"
-            title="Refresh modes"
+            title={t('modesManager.refreshModes')}
           >
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -325,7 +334,7 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
               type="button"
               onClick={onClose}
               className="h-8 w-8 rounded-lg border border-border-subtle text-text-secondary hover:text-text-primary hover:bg-bg-item-hover flex items-center justify-center"
-              title="Close"
+              title={t('common.close')}
             >
               <X size={16} />
             </button>
@@ -342,22 +351,22 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
       <div className="min-h-0 flex-1 grid grid-cols-[260px_1fr]">
         <aside className="border-r border-border-subtle p-4 overflow-y-auto">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] uppercase text-text-tertiary font-semibold">Modes</span>
+            <span className="text-[11px] uppercase text-text-tertiary font-semibold">{t('modesManager.modes')}</span>
             <button
               type="button"
               onClick={() => void createMode('looking-for-work')}
               disabled={saving}
               className="h-7 w-7 rounded-lg bg-accent-primary text-white flex items-center justify-center disabled:opacity-50"
-              title="Create mode"
+              title={t('modesManager.createMode')}
             >
               <Plus size={15} />
             </button>
           </div>
 
           <div className="space-y-1.5">
-            {loading && <div className="text-xs text-text-secondary px-2 py-3">Loading modes...</div>}
+            {loading && <div className="text-xs text-text-secondary px-2 py-3">{t('modesManager.loading')}</div>}
             {!loading && modes.length === 0 && (
-              <div className="text-xs text-text-secondary px-2 py-3">No modes yet.</div>
+              <div className="text-xs text-text-secondary px-2 py-3">{t('modesManager.none')}</div>
             )}
             {modes.map(mode => (
               <button
@@ -375,14 +384,14 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
                   {mode.isActive && <CheckCircle size={13} className="text-accent-primary shrink-0" />}
                 </div>
                 <div className="mt-0.5 text-[11px] text-text-secondary truncate">
-                  {templateLabel(mode.templateType)} · {mode.referenceFileCount ?? 0} refs
+                  {t(`modesManager.templatesData.${templateI18nKey(mode.templateType)}.label`)} · {t('modesManager.refs', { count: mode.referenceFileCount ?? 0 })}
                 </div>
               </button>
             ))}
           </div>
 
           <div className="mt-5">
-            <div className="text-[11px] uppercase text-text-tertiary font-semibold mb-2">Templates</div>
+            <div className="text-[11px] uppercase text-text-tertiary font-semibold mb-2">{t('modesManager.templates')}</div>
             <div className="space-y-1.5">
               {templates.filter(t => t.type !== 'general').map(template => (
                 <button
@@ -392,8 +401,8 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
                   disabled={saving}
                   className="w-full text-left rounded-lg border border-border-subtle px-3 py-2 hover:bg-bg-item-hover disabled:opacity-50"
                 >
-                  <div className="text-xs font-medium">{template.label}</div>
-                  <div className="text-[11px] text-text-secondary line-clamp-2">{template.description}</div>
+                  <div className="text-xs font-medium">{t(`modesManager.templatesData.${templateI18nKey(template.type)}.label`)}</div>
+                  <div className="text-[11px] text-text-secondary line-clamp-2">{t(`modesManager.templatesData.${templateI18nKey(template.type)}.description`)}</div>
                 </button>
               ))}
             </div>
@@ -403,7 +412,7 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
         <main className="min-w-0 overflow-y-auto p-5">
           {!selectedMode ? (
             <div className="h-full flex items-center justify-center text-sm text-text-secondary">
-              Select or create a mode.
+              {t('modesManager.selectOrCreate')}
             </div>
           ) : (
             <div className="max-w-3xl mx-auto space-y-5">
@@ -411,7 +420,7 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1 grid gap-3">
                     <label className="grid gap-1">
-                      <span className="text-[11px] font-semibold text-text-tertiary uppercase">Name</span>
+                      <span className="text-[11px] font-semibold text-text-tertiary uppercase">{t('modesManager.name')}</span>
                       <input
                         value={nameDraft}
                         onChange={event => setNameDraft(event.target.value)}
@@ -419,14 +428,14 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
                       />
                     </label>
                     <label className="grid gap-1">
-                      <span className="text-[11px] font-semibold text-text-tertiary uppercase">Template</span>
+                      <span className="text-[11px] font-semibold text-text-tertiary uppercase">{t('modesManager.template')}</span>
                       <select
                         value={templateDraft}
                         onChange={event => setTemplateDraft(event.target.value as ModeTemplateType)}
                         className="h-9 rounded-lg bg-bg-elevated border border-border-subtle px-3 text-sm outline-none focus:border-accent-primary"
                       >
                         {templates.map(template => (
-                          <option key={template.type} value={template.type}>{template.label}</option>
+                          <option key={template.type} value={template.type}>{t(`modesManager.templatesData.${templateI18nKey(template.type)}.label`)}</option>
                         ))}
                       </select>
                     </label>
@@ -438,7 +447,7 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
                       disabled={saving || selectedMode.isActive}
                       className="h-9 px-3 rounded-lg border border-border-subtle text-xs font-medium hover:bg-bg-item-hover disabled:opacity-50 flex items-center gap-2"
                     >
-                      <CheckCircle size={14} /> {selectedMode.isActive ? 'Active' : 'Set active'}
+                      <CheckCircle size={14} /> {selectedMode.isActive ? t('modesManager.active') : t('modesManager.setActive')}
                     </button>
                     <button
                       type="button"
@@ -446,14 +455,14 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
                       disabled={saving}
                       className="h-9 px-3 rounded-lg bg-accent-primary text-white text-xs font-medium disabled:opacity-50 flex items-center gap-2"
                     >
-                      <Save size={14} /> Save
+                      <Save size={14} /> {t('common.save')}
                     </button>
                     <button
                       type="button"
                       onClick={() => void deleteSelected()}
                       disabled={saving || selectedMode.templateType === 'general'}
                       className="h-9 w-9 rounded-lg border border-border-subtle text-text-secondary hover:text-red-300 hover:bg-red-500/10 disabled:opacity-40 flex items-center justify-center"
-                      title="Delete mode"
+                      title={t('modesManager.deleteMode')}
                     >
                       <Trash2 size={15} />
                     </button>
@@ -463,23 +472,23 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
 
               <section className="rounded-lg border border-border-subtle bg-bg-surface p-4">
                 <div className="mb-2">
-                  <h3 className="text-sm font-semibold">Real-time instructions</h3>
-                  <p className="text-xs text-text-secondary">Pinned local context for this mode. Reference files stay separate for retrieval.</p>
+                  <h3 className="text-sm font-semibold">{t('modesManager.realtimeInstructions')}</h3>
+                  <p className="text-xs text-text-secondary">{t('modesManager.realtimeDescription')}</p>
                 </div>
                 <textarea
                   value={contextDraft}
                   onChange={event => setContextDraft(event.target.value)}
                   rows={7}
                   className="w-full resize-none rounded-lg bg-bg-elevated border border-border-subtle p-3 text-sm leading-5 outline-none focus:border-accent-primary"
-                  placeholder="Example: Keep answers concise, prefer Russian explanations, and ask clarifying questions when requirements are ambiguous."
+                  placeholder={t('modesManager.realtimePlaceholder')}
                 />
               </section>
 
               <section className="rounded-lg border border-border-subtle bg-bg-surface p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h3 className="text-sm font-semibold">Reference files</h3>
-                    <p className="text-xs text-text-secondary">Local documents used by this mode.</p>
+                    <h3 className="text-sm font-semibold">{t('modesManager.referenceFiles')}</h3>
+                    <p className="text-xs text-text-secondary">{t('modesManager.referenceDescription')}</p>
                   </div>
                   <button
                     type="button"
@@ -487,11 +496,11 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
                     disabled={saving}
                     className="h-8 px-3 rounded-lg border border-border-subtle text-xs font-medium hover:bg-bg-item-hover disabled:opacity-50 flex items-center gap-2"
                   >
-                    <Upload size={14} /> Add file
+                    <Upload size={14} /> {t('modesManager.addFile')}
                   </button>
                 </div>
                 <div className="space-y-2">
-                  {files.length === 0 && <div className="text-xs text-text-secondary">No reference files added.</div>}
+                  {files.length === 0 && <div className="text-xs text-text-secondary">{t('modesManager.noReferenceFiles')}</div>}
                   {files.map(file => (
                     <div key={file.id} className="flex items-center justify-between gap-3 rounded-lg border border-border-subtle bg-bg-elevated px-3 py-2">
                       <div className="flex items-center gap-2 min-w-0">
@@ -503,7 +512,7 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
                         onClick={() => void deleteReference(file)}
                         disabled={saving}
                         className="h-7 w-7 rounded-md text-text-secondary hover:text-red-300 hover:bg-red-500/10 disabled:opacity-50 flex items-center justify-center"
-                        title="Remove file"
+                        title={t('modesManager.removeFile')}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -515,8 +524,8 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
               <section className="rounded-lg border border-border-subtle bg-bg-surface p-4">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <h3 className="text-sm font-semibold">Note template</h3>
-                    <p className="text-xs text-text-secondary">Sections OpenOffer should fill after a meeting.</p>
+                    <h3 className="text-sm font-semibold">{t('modesManager.noteTemplate')}</h3>
+                    <p className="text-xs text-text-secondary">{t('modesManager.noteTemplateDescription')}</p>
                   </div>
                   <button
                     type="button"
@@ -524,11 +533,11 @@ const ModesSettings: React.FC<ModesSettingsProps> = ({ onClose }) => {
                     disabled={saving}
                     className="h-8 px-3 rounded-lg border border-border-subtle text-xs font-medium hover:bg-bg-item-hover disabled:opacity-50 flex items-center gap-2"
                   >
-                    <Plus size={14} /> Section
+                    <Plus size={14} /> {t('modesManager.section')}
                   </button>
                 </div>
                 <div className="grid gap-2">
-                  {sections.length === 0 && <div className="text-xs text-text-secondary">No note sections configured.</div>}
+                  {sections.length === 0 && <div className="text-xs text-text-secondary">{t('modesManager.noSections')}</div>}
                   {sections.map(section => (
                     <div key={section.id} className="rounded-lg border border-border-subtle bg-bg-elevated px-3 py-2">
                       <div className="text-sm font-medium">{section.title}</div>

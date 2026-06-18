@@ -114,10 +114,10 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
                     }
                 }
             } else {
-                setFetchError(result?.error || 'Failed to fetch models');
+                setFetchError(result?.error || 'Не удалось загрузить модели');
             }
         } catch (e: any) {
-            setFetchError(e.message || 'Failed to fetch models');
+            setFetchError(e.message || 'Не удалось загрузить модели');
         } finally {
             setIsFetching(false);
         }
@@ -133,7 +133,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
                 onPreferredModelChange(modelId);
             }
         } catch (e) {
-            console.error('Failed to save preferred model:', e);
+            console.error('Не удалось сохранить выбранную модель:', e);
         }
     };
 
@@ -143,8 +143,8 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
         <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle">
             <div className="mb-2 flex items-center justify-between">
                 <label className="flex items-center text-xs font-medium text-text-primary uppercase tracking-wide">
-                    {providerName} API Key
-                    {hasStoredKey && <span className="ml-2 text-green-500 normal-case">✓ Saved</span>}
+                    {providerName} API-ключ
+                    {hasStoredKey && <span className="ml-2 text-green-500 normal-case">✓ Сохранен</span>}
                 </label>
                 <button
                     onClick={() => {
@@ -152,9 +152,9 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
                         window.electronAPI?.openExternal(keyUrl);
                     }}
                     className="text-xs text-text-tertiary hover:text-text-primary flex items-center gap-1 transition-colors"
-                    title={`Get ${providerName} API Key`}
+                    title={`Получить API-ключ ${providerName}`}
                 >
-                    <span className="text-[10px] uppercase tracking-wide">Get Key</span>
+                    <span className="text-[10px] uppercase tracking-wide">Получить ключ</span>
                     <ExternalLink size={12} />
                 </button>
             </div>
@@ -174,20 +174,20 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
                         : 'bg-bg-input hover:bg-bg-secondary border border-border-subtle text-text-primary disabled:opacity-50'
                         }`}
                 >
-                    {savingStatus ? 'Saving...' : savedStatus ? 'Saved!' : 'Save'}
+                    {savingStatus ? 'Сохранение...' : savedStatus ? 'Сохранено!' : 'Сохранить'}
                 </button>
                 {hasStoredKey && (
                     <button
                         onClick={onRemoveKey}
                         className="px-2.5 py-2.5 rounded-lg text-xs font-medium text-text-tertiary hover:text-red-500 hover:bg-red-500/10 transition-all"
-                        title="Remove API Key"
+                        title="Удалить API-ключ"
                     >
                         <Trash2 size={16} strokeWidth={1.5} />
                     </button>
                 )}
             </div>
 
-            {/* Action Row: Test Connection + Conditional Dropdown + Fetch Models */}
+            {/* Строка действий: проверка подключения, селект модели и загрузка моделей */}
             <div className="flex items-center justify-between mb-3 w-full">
                 <button
                     onClick={onTestConnection}
@@ -196,12 +196,12 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
                         testStatus === 'error' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
                             'bg-bg-input hover:bg-bg-elevated text-text-primary'
                         }`}
-                    title={testError || "Test Connection"}
+                    title={testError || "Проверить подключение"}
                 >
-                    {testStatus === 'testing' ? <><Loader2 size={12} className="animate-spin" /> Testing...</> :
-                        testStatus === 'success' ? <><CheckCircle size={12} /> Connected</> :
-                            testStatus === 'error' ? <><AlertCircle size={12} /> Error</> :
-                                <>{/* No Icon */} Test Connection</>}
+                    {testStatus === 'testing' ? <><Loader2 size={12} className="animate-spin" /> Проверка...</> :
+                        testStatus === 'success' ? <><CheckCircle size={12} /> Подключено</> :
+                            testStatus === 'error' ? <><AlertCircle size={12} /> Ошибка</> :
+                                <>{/* No Icon */} Проверить подключение</>}
                 </button>
 
                 {/* Inline Model Dropdown */}
@@ -212,7 +212,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
                             className={`w-full bg-bg-input border border-border-subtle rounded-md px-3 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent-primary flex items-center justify-between transition-colors ${fetchedModels.length > 0 ? 'hover:bg-bg-elevated' : 'opacity-80 cursor-default'}`}
                             type="button"
                         >
-                            <span className="truncate pr-2">{selectedOption ? selectedOption.label : (preferredModel || 'Select model')}</span>
+                            <span className="truncate pr-2">{selectedOption ? selectedOption.label : (preferredModel || 'Выберите модель')}</span>
                             <ChevronDown size={14} className={`text-text-secondary transition-transform ${isDropdownOpen ? 'rotate-180' : ''} ${fetchedModels.length === 0 ? 'opacity-50' : ''}`} />
                         </button>
 
@@ -248,9 +248,9 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
                             }`}
                     >
                         {isFetching ? (
-                            <><Loader2 size={12} className="animate-spin" /> Fetching...</>
+                            <><Loader2 size={12} className="animate-spin" /> Загрузка...</>
                         ) : (
-                            <><RefreshCw size={12} /> Fetch Models</>
+                            <><RefreshCw size={12} /> Загрузить модели</>
                         )}
                     </button>
                 ) : (
@@ -261,7 +261,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
 
             {/* Error from test or fetch */}
             {testError && <p className="text-[10px] text-red-400 mt-1.5 mb-2">{testError}</p>}
-            {fetchError && <p className="text-[10px] text-red-400 mt-1.5 mb-2">Model fetch error: {fetchError}</p>}
+            {fetchError && <p className="text-[10px] text-red-400 mt-1.5 mb-2">Ошибка загрузки моделей: {fetchError}</p>}
 
 
         </div>

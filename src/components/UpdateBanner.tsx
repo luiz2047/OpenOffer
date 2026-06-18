@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import UpdateModal from './UpdateModal';
+import { useTranslation } from 'react-i18next';
 
 type UpdateInfo = {
     version?: string;
@@ -17,6 +18,7 @@ type ParsedReleaseNotes = {
 const LATEST_RELEASE_URL = 'https://github.com/luiz2047/openoffer/releases/latest';
 
 const UpdateBanner: React.FC = () => {
+    const { t } = useTranslation();
     const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
     const [parsedNotes, setParsedNotes] = useState<ParsedReleaseNotes | null>(null);
     const [isVisible, setIsVisible] = useState(false);
@@ -90,7 +92,7 @@ const UpdateBanner: React.FC = () => {
             } else {
                 console.warn('[UpdateBanner] update-downloaded received with no version');
                 setStatus('error');
-                setErrorMessage('Update downloaded but version is unknown. Please download from GitHub releases.');
+                setErrorMessage(t('update.unknownDownloaded'));
             }
         });
 

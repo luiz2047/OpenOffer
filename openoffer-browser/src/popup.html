@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>OpenOffer Page Context</title>
+    <title>OpenOffer Контекст страницы</title>
     <style>
       :root {
         color-scheme: dark;
@@ -258,35 +258,35 @@
       <img class="logo" src="icons/icon_128x128.png" alt="" width="30" height="30" />
       <div class="brand-text">
         <span class="wordmark">OpenOffer</span>
-        <span class="product">Page Context</span>
+        <span class="product">Контекст страницы</span>
       </div>
     </header>
 
     <div class="status-row">
       <span id="dot" class="dot"></span>
-      <span id="statusText" class="status-text">Checking…</span>
+      <span id="statusText" class="status-text">Проверка…</span>
     </div>
 
     <!-- Pairing (shown when unpaired or re-pair needed) -->
     <div id="pairCard" class="card hidden">
-      <button id="connectBtn" class="primary">Connect to OpenOffer</button>
+      <button id="connectBtn" class="primary">Подключить к OpenOffer</button>
       <div class="hint">
-        In OpenOffer → Settings → Phone Mirror → Browser Extension, click
-        <strong>Connect browser extension</strong>, then press this within 60s.
+        В OpenOffer → Настройки → Зеркало телефона → Расширение браузера нажмите
+        <strong>Подключить расширение браузера</strong>, затем нажмите эту кнопку в течение 60 секунд.
       </div>
       <details class="mt">
-        <summary>Pair manually instead</summary>
-        <label for="pairInput">Pairing string (port:token)</label>
+        <summary>Подключить вручную</summary>
+        <label for="pairInput">Строка подключения (port:token)</label>
         <input id="pairInput" type="text" placeholder="4123:AbC123…" autocomplete="off" spellcheck="false" />
-        <button id="pairBtn" class="ghost mt">Pair</button>
+        <button id="pairBtn" class="ghost mt">Подключить</button>
       </details>
     </div>
 
     <!-- Capture (shown when paired) -->
     <div id="captureCard" class="card hidden">
-      <button id="captureBtn" class="primary">Capture this page</button>
-      <button id="unpairBtn" class="ghost mt">Unpair</button>
-      <div class="hint">Hotkey: <kbd>Ctrl/⌘+Shift+Y</kbd>. Capture pushes once per press.</div>
+      <button id="captureBtn" class="primary">Захватить страницу</button>
+      <button id="unpairBtn" class="ghost mt">Отключить</button>
+      <div class="hint">Горячая клавиша: <kbd>Ctrl/⌘+Shift+Y</kbd>. Захват отправляется один раз за нажатие.</div>
     </div>
 
     <div id="msg" class="msg"></div>
