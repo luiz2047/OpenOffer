@@ -156,6 +156,8 @@ test.describe('OpenOffer E2E smoke', () => {
           },
         }),
         interviewsGetRetroPrompt: async () => ({ ok: true, data: { interviewEventId: 'interview_mock', due: false, reason: 'not_ended', state: null } }),
+        interviewsGetRetroEvaluation: async () => ({ ok: true, data: null }),
+        interviewsGenerateRetroEvaluation: async () => ({ ok: true, data: { id: 'retro_eval_mock', interviewEventId: 'interview_mock', meetingId: 'meeting_mock', status: 'ready', modelId: 'test-model', summary: 'Mock evaluation', signals: [], risks: [], followups: [], confidence: 0.5, isActive: true, createdAt: '2026-06-18T00:00:00.000Z', updatedAt: '2026-06-18T00:00:00.000Z' } }),
         interviewsUpdateRetroPrompt: async () => ({ ok: true, data: { interviewEventId: 'interview_mock', due: false, reason: 'dismissed', state: null } }),
         vacancyDossierSave: async () => ({ ok: true, data: { id: 'dossier_mock', interviewEventId: 'interview_mock', requirements: [], risks: [], questionsToAsk: [], createdAt: '2026-06-18T00:00:00.000Z', updatedAt: '2026-06-18T00:00:00.000Z' } }),
         prepBriefSave: async () => ({ ok: true, data: { id: 'prep_mock', interviewEventId: 'interview_mock', expectedTopics: [], riskHandling: [], lastChecklist: [], updatedAt: '2026-06-18T00:00:00.000Z' } }),
@@ -298,11 +300,11 @@ test.describe('OpenOffer E2E smoke', () => {
     await openSettings(page);
 
     await page.getByRole('button', { name: /audio/i }).click();
-    await expect(page.getByText('Speech Provider', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/Speech Provider|Провайдер распознавания речи/).first()).toBeVisible();
 
-    await page.locator('button:has-text("Select Provider"), button:has-text("GigaSTT"), button:has-text("Local Whisper")').first().click();
+    await page.locator('button:has-text("Select Provider"), button:has-text("Выберите провайдера"), button:has-text("GigaSTT"), button:has-text("Local Whisper")').first().click();
     await expect(page.getByText('GigaSTT').first()).toBeVisible();
     await expect(page.getByText('Local Whisper').first()).toBeVisible();
-    await expect(page.getByText(/Local Russian-first STT server/i).first()).toBeVisible();
+    await expect(page.getByText(/Local Russian-first STT server|Локальный STT-сервер/i).first()).toBeVisible();
   });
 });

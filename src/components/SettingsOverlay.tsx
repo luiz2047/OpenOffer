@@ -439,9 +439,9 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [showVerboseToast, setShowVerboseToast] = useState(false);
     const verboseToastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const applyInterfaceTranslationsSnapshot = (snapshot: InterfaceTranslationsSnapshot) => {
-        setInterfaceLocales(snapshot.locales);
-        setInterfaceTranslationsPath(snapshot.translationsPath);
+    const applyInterfaceTranslationsSnapshot = (snapshot?: InterfaceTranslationsSnapshot | null) => {
+        setInterfaceLocales(Array.isArray(snapshot?.locales) ? snapshot.locales : []);
+        setInterfaceTranslationsPath(typeof snapshot?.translationsPath === 'string' ? snapshot.translationsPath : '');
     };
 
     // Close dropdown when clicking outside
@@ -457,9 +457,18 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             window.electronAPI?.getVerboseLogging?.().then(setVerboseLogging).catch(() => { });
             window.electronAPI?.getMeetingRetention?.().then(setMeetingRetention).catch(() => { });
             window.electronAPI?.getInterfaceTranslations?.()
-                .then(applyInterfaceTranslationsSnapshot)
+                .then((snapshot) => {
+                    if (snapshot) {
+                        applyInterfaceTranslationsSnapshot(snapshot);
+                    } else {
+                        return window.electronAPI?.getInterfaceLocales?.()
+                            .then((locales) => setInterfaceLocales(Array.isArray(locales) ? locales : []));
+                    }
+                })
                 .catch(() => {
-                    window.electronAPI?.getInterfaceLocales?.().then(setInterfaceLocales).catch(() => { });
+                    window.electronAPI?.getInterfaceLocales?.()
+                        .then((locales) => setInterfaceLocales(Array.isArray(locales) ? locales : []))
+                        .catch(() => { });
                 });
             window.electronAPI?.getInterfaceLanguage?.()
                 .then((state) => setInterfaceLanguage(state.preference))
