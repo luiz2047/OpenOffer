@@ -20,6 +20,32 @@ import type {
   VacancyDossierPayload,
 } from './interviews'
 
+export type InterfaceLanguagePreference = 'system' | (string & {})
+
+export interface InterfaceLanguageState {
+  preference: InterfaceLanguagePreference
+  resolvedLanguage: string
+  systemLanguage: string
+}
+
+export interface InterfaceLocaleOption {
+  code: string
+  label: string
+  nativeLabel: string
+  description: string
+  source: 'builtin' | 'custom'
+  coverage: number
+  valid: boolean
+  errors: string[]
+  warnings: string[]
+}
+
+export interface InterfaceTranslationsSnapshot {
+  translationsPath: string
+  locales: InterfaceLocaleOption[]
+  resources: Record<string, Record<string, unknown>>
+}
+
 // Phase 3 — DynamicActionPayload mirrors electron/services/dynamic-actions/DynamicAction.ts.
 // Kept as a structural interface (not a class import) to preserve the strict main↔renderer
 // type boundary — the renderer never imports from electron/* directly.
@@ -60,6 +86,20 @@ export interface ElectronAPI {
     height: number
   }) => Promise<void>
   onToggleExpand: (callback: () => void) => () => void
+  getInterfaceLocales: () => Promise<InterfaceLocaleOption[]>
+  getInterfaceTranslations: () => Promise<InterfaceTranslationsSnapshot>
+  refreshInterfaceTranslations: () => Promise<InterfaceTranslationsSnapshot>
+  openInterfaceTranslationsFolder: () => Promise<{ success: boolean; path: string; error?: string }>
+  getInterfaceLanguage: () => Promise<InterfaceLanguageState>
+  setInterfaceLanguage: (
+    preference: InterfaceLanguagePreference
+  ) => Promise<{ success: boolean; state?: InterfaceLanguageState; error?: string }>
+  onInterfaceLanguageChanged: (
+    callback: (state: InterfaceLanguageState) => void
+  ) => () => void
+  onInterfaceTranslationsChanged: (
+    callback: (snapshot: InterfaceTranslationsSnapshot) => void
+  ) => () => void
   getRecognitionLanguages: () => Promise<Record<string, any>>
   getScreenshots: () => Promise<Array<{ path: string; preview: string }>>
   deleteScreenshot: (

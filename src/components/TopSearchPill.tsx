@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, Sparkles, FileText } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, LazyMotion, domAnimation, m } from 'framer-motion';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
+import { useTranslation } from 'react-i18next';
 
 // ============================================
 // Types
@@ -94,6 +95,7 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
     onOpenMeeting,
     onExpansionChange
 }) => {
+    const { t } = useTranslation();
     const isLight = useResolvedTheme() === 'light';
     const [state, setState] = useState<PillState>('idle');
     const [query, setQuery] = useState('');
@@ -231,12 +233,13 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
     const showResults = state === 'results' && query.trim();
 
     return (
+        <LazyMotion features={domAnimation}>
         <>
             {/* Backdrop blur overlay */}
             {createPortal(
                 <AnimatePresence>
                     {isExpanded && (
-                        <motion.div
+                        <m.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
@@ -255,7 +258,7 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                 className="absolute left-1/2 -translate-x-1/2 top-[7px] no-drag z-40"
             >
                 <div className="relative">
-                    <motion.div
+                    <m.div
                         initial={false}
                         animate={{
                             width: isExpanded ? 480 : 340,
@@ -300,14 +303,14 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                                         focus:outline-none
                                         ${state === 'idle' ? 'cursor-default' : 'cursor-text'}
                                     `}
-                                        placeholder="Search or ask anything..."
+                                        placeholder={t('search.placeholder')}
                                     />
                                 </div>
 
                                 {/* Results Panel */}
                                 <AnimatePresence>
                                     {showResults && (
-                                        <motion.div
+                                        <m.div
                                             initial={{ height: 0, opacity: 0 }}
                                             animate={{ height: 'auto', opacity: 1 }}
                                             exit={{ height: 0, opacity: 0 }}
@@ -328,7 +331,7 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                                                         </div>
 
                                                         {/* AI Query Option */}
-                                                        <motion.button
+                                                        <m.button type="button"
                                                             initial={{ opacity: 0, scale: 0.95 }}
                                                             animate={{ opacity: 1, scale: 1 }}
                                                             transition={{ duration: 0.2 }}
@@ -349,10 +352,10 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                                                             <span className="text-[13px] text-text-primary truncate">
                                                                 {query}
                                                             </span>
-                                                        </motion.button>
+                                                        </m.button>
 
                                                         {/* Literal Search Option */}
-                                                        <motion.button
+                                                        <m.button type="button"
                                                             initial={{ opacity: 0, scale: 0.95 }}
                                                             animate={{ opacity: 1, scale: 1 }}
                                                             transition={{ duration: 0.2 }}
@@ -373,7 +376,7 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                                                             <span className="text-[13px] text-text-secondary">
                                                                 Search for <span className="text-text-primary">"{query}"</span>
                                                             </span>
-                                                        </motion.button>
+                                                        </m.button>
                                                     </div>
 
                                                     {/* Sessions Section */}
@@ -385,7 +388,7 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
 
                                                             <AnimatePresence initial={false} mode="popLayout">
                                                                 {sessionResults.map((result, index) => (
-                                                                    <motion.button
+                                                                    <m.button type="button"
                                                                         layout="position"
                                                                         key={result.id}
                                                                         initial={{ opacity: 0, height: 0 }}
@@ -416,22 +419,23 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                                                                                 </div>
                                                                             )}
                                                                         </div>
-                                                                    </motion.button>
+                                                                    </m.button>
                                                                 ))}
                                                             </AnimatePresence>
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
-                                        </motion.div>
+                                        </m.div>
                                     )}
                                 </AnimatePresence>
                             </div>
                         </div>
-                    </motion.div>
+                    </m.div>
                 </div >
             </div >
         </>
+        </LazyMotion>
     );
 };
 

@@ -109,14 +109,14 @@ describe('UX3: audio warning banner deep-links to the correct macOS System Setti
     );
   });
 
-  it('banner JSX renders both "Open Mic Settings" and "Open Screen Settings" labels', () => {
+  it('banner JSX renders both mic and screen settings labels', () => {
     assert.ok(
-      source.includes("'Open Mic Settings'") || source.includes('"Open Mic Settings"'),
-      'BUG: "Open Mic Settings" label is missing — the channel-aware label switch was reverted (UX3).',
+      source.includes("t('overlay.openMicSettings')") || source.includes('t("overlay.openMicSettings")'),
+      'BUG: overlay.openMicSettings label is missing — the channel-aware label switch was reverted (UX3).',
     );
     assert.ok(
-      source.includes("'Open Screen Settings'") || source.includes('"Open Screen Settings"'),
-      'BUG: "Open Screen Settings" label is missing — the channel-aware label switch was reverted (UX3).',
+      source.includes("t('overlay.openScreenSettings')") || source.includes('t("overlay.openScreenSettings")'),
+      'BUG: overlay.openScreenSettings label is missing — the channel-aware label switch was reverted (UX3).',
     );
   });
 

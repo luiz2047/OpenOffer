@@ -1,4 +1,5 @@
 import { ChevronUp, ChevronDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import icon from "../icon.png";
 import type { OverlayAppearance } from "../../lib/overlayAppearance";
 
@@ -17,6 +18,7 @@ export default function TopPill({
     appearance,
     onLogoClick,
 }: TopPillProps) {
+    const { t } = useTranslation();
     return (
         <div className="flex justify-center select-none z-50">
             <div
@@ -82,7 +84,7 @@ export default function TopPill({
                             <ChevronDown className="w-3.5 h-3.5" />
                         )}
                     </span>
-                    <span className="tracking-wide opacity-80 group-hover:opacity-100">{expanded ? "Hide" : "Show"}</span>
+                    <span className="tracking-wide opacity-80 group-hover:opacity-100">{expanded ? t('common.hide') : t('common.show')}</span>
                 </button>
 
                 {/* STOP / QUIT BUTTON */}

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import packageJson from '../../package.json';
 import {
     X, Mic, Speaker, Monitor, Keyboard, User, LifeBuoy, LogOut, Upload,
     ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
     Camera, RotateCcw, Eye, Layout, MessageSquare, Crop,
-    ChevronDown, ChevronUp, Check, BadgeCheck, Power, Palette, Calendar, Ghost, Sun, Moon, RefreshCw, Info, Globe, FlaskConical, Terminal, Settings, Activity, ExternalLink, Trash2,
+    ChevronDown, ChevronUp, Check, BadgeCheck, Power, Palette, Calendar, Ghost, Sun, Moon, RefreshCw, Info, Globe, Languages, FlaskConical, Terminal, Settings, Activity, ExternalLink, Trash2,
     Sparkles, Pencil, Briefcase, Building2, Search, MapPin, CheckCircle, HelpCircle, Zap, SlidersHorizontal, PointerOff,
     Star, AlertCircle, Gift, Smartphone, Cpu, Shield
 } from 'lucide-react';
@@ -31,6 +32,7 @@ import { getMeetingInterfaceTheme, setMeetingInterfaceTheme, type MeetingInterfa
 import { KeyRecorder } from './ui/KeyRecorder';
 import icon from './icon.png';
 import { sanitizeSttProvider } from '../lib/legacyStateMigration';
+import type { InterfaceLanguagePreference, InterfaceLocaleOption, InterfaceTranslationsSnapshot } from '../i18n';
 
 // ---------------------------------------------------------------------------
 // StarRating — renders filled/empty stars for culture ratings
@@ -41,6 +43,7 @@ import { sanitizeSttProvider } from '../lib/legacyStateMigration';
 // ---------------------------------------------------------------------------
 const MockupOpenOfferInterface = ({ opacity }: { opacity: number }) => {
     const resolvedTheme = useResolvedTheme();
+    const { t } = useTranslation();
     const appearance = useMemo(
         () => getOverlayAppearance(opacity, resolvedTheme),
         [opacity, resolvedTheme]
@@ -66,7 +69,7 @@ const MockupOpenOfferInterface = ({ opacity }: { opacity: number }) => {
                             </div>
                             <div className="flex items-center gap-2 px-4 py-1.5 rounded-full text-[12px] font-medium border overlay-chip-surface overlay-text-interactive" style={appearance.chipStyle}>
                                 <ChevronUp className="w-3.5 h-3.5 opacity-70" />
-                                <span className="opacity-80 tracking-wide">Hide</span>
+                                <span className="opacity-80 tracking-wide">{t('common.hide')}</span>
                             </div>
                             <div className="w-8 h-8 rounded-full flex items-center justify-center overlay-icon-surface overlay-text-primary" style={appearance.iconStyle}>
                                 <div className="w-3.5 h-3.5 rounded-[3px] bg-red-400 opacity-80" />
@@ -98,19 +101,19 @@ const MockupOpenOfferInterface = ({ opacity }: { opacity: number }) => {
                         {/* Quick Actions */}
                         <div className="flex flex-nowrap justify-center items-center gap-1.5 px-4 pb-3 pt-3">
                             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border shrink-0 overlay-chip-surface overlay-text-interactive" style={appearance.chipStyle}>
-                                <Pencil className="w-3 h-3 opacity-70" /> What to answer?
+                                <Pencil className="w-3 h-3 opacity-70" /> {t('overlay.whatToAnswer')}
                             </div>
                             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border shrink-0 overlay-chip-surface overlay-text-interactive" style={appearance.chipStyle}>
-                                <MessageSquare className="w-3 h-3 opacity-70" /> Clarify
+                                <MessageSquare className="w-3 h-3 opacity-70" /> {t('overlay.clarify')}
                             </div>
                             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border shrink-0 overlay-chip-surface overlay-text-interactive" style={appearance.chipStyle}>
-                                <RefreshCw className="w-3 h-3 opacity-70" /> Recap
+                                <RefreshCw className="w-3 h-3 opacity-70" /> {t('overlay.recap')}
                             </div>
                             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border shrink-0 overlay-chip-surface overlay-text-interactive" style={appearance.chipStyle}>
-                                <HelpCircle className="w-3 h-3 opacity-70" /> Follow Up Question
+                                <HelpCircle className="w-3 h-3 opacity-70" /> {t('overlay.followUpQuestion')}
                             </div>
                             <div className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium min-w-[74px] shrink-0 border overlay-chip-surface overlay-text-interactive" style={appearance.chipStyle}>
-                                <Zap className="w-3 h-3 opacity-70" /> Answer
+                                <Zap className="w-3 h-3 opacity-70" /> {t('overlay.answer')}
                             </div>
                         </div>
 
@@ -118,7 +121,7 @@ const MockupOpenOfferInterface = ({ opacity }: { opacity: number }) => {
                         <div className="px-3">
                             <div className="relative group">
                                 <div className="w-full border rounded-xl pl-3 pr-10 py-2.5 h-[38px] flex items-center overlay-input-surface" style={appearance.inputStyle}>
-                                    <span className="text-[13px] overlay-text-muted">Ask anything on screen or conversation</span>
+                                    <span className="text-[13px] overlay-text-muted">{t('overlay.inputPlaceholderPrefix')}</span>
                                 </div>
                             </div>
 
@@ -177,7 +180,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, icon, value, options
             )}
 
             <div className="relative">
-                <button
+                <button type="button"
                     onClick={() => setIsOpen(!isOpen)}
                     className="w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2.5 text-sm text-text-primary flex items-center justify-between hover:bg-bg-elevated transition-colors"
                 >
@@ -189,7 +192,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, icon, value, options
                     <div className="absolute top-full left-0 w-full mt-1 bg-bg-elevated border border-border-subtle rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto animated fadeIn">
                         <div className="p-1 space-y-0.5">
                             {options.map((device) => (
-                                <button
+                                <button type="button"
                                     key={device.deviceId}
                                     onClick={() => {
                                         onChange(device.deviceId);
@@ -275,7 +278,7 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChang
 
     return (
         <div ref={containerRef} className="relative z-20 font-sans">
-            <button
+            <button type="button"
                 onClick={() => setIsOpen(!isOpen)}
                 className={`w-full group bg-bg-input border border-border-subtle hover:border-border-muted shadow-sm rounded-xl p-2.5 pr-3.5 flex items-center justify-between transition-all duration-200 outline-none focus:ring-2 focus:ring-accent-primary/20 ${isOpen ? 'ring-2 ring-accent-primary/20 border-accent-primary/50' : 'hover:shadow-md'}`}
             >
@@ -313,7 +316,7 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChang
                             {options.map(option => {
                                 const isSelected = value === option.id;
                                 return (
-                                    <button
+                                    <button type="button"
                                         key={option.id}
                                         onClick={() => { onChange(option.id); setIsOpen(false); }}
                                         className={`w-full rounded-[10px] p-2 flex items-center gap-3 transition-all duration-200 group relative ${isSelected ? (isLight ? 'bg-bg-item-active shadow-inner' : 'bg-white/10 shadow-inner') : (isLight ? 'hover:bg-bg-item-surface' : 'hover:bg-white/5')}`}
@@ -395,6 +398,7 @@ type SttRuntimeStatus = {
 };
 
 const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, initialTab = 'general' }) => {
+    const { t } = useTranslation();
     const isLight = useResolvedTheme() === 'light';
     const [activeTab, setActiveTab] = useState(initialTab);
 
@@ -414,9 +418,16 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [openOnLogin, setOpenOnLogin] = useState(false);
     const [themeMode, setThemeMode] = useState<'system' | 'light' | 'dark'>('system');
     const [isThemeDropdownOpen, setIsThemeDropdownOpen] = useState(false);
+    const [interfaceLanguage, setInterfaceLanguage] = useState<InterfaceLanguagePreference>('system');
+    const [interfaceLocales, setInterfaceLocales] = useState<InterfaceLocaleOption[]>([]);
+    const [interfaceTranslationsPath, setInterfaceTranslationsPath] = useState('');
+    const [isRefreshingInterfaceTranslations, setIsRefreshingInterfaceTranslations] = useState(false);
+    const [isInterfaceLanguageDropdownOpen, setIsInterfaceLanguageDropdownOpen] = useState(false);
+    const [interfaceLanguageError, setInterfaceLanguageError] = useState<string | null>(null);
     const [isAiLangDropdownOpen, setIsAiLangDropdownOpen] = useState(false);
     const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'uptodate' | 'error'>('idle');
     const themeDropdownRef = React.useRef<HTMLDivElement>(null);
+    const interfaceLanguageDropdownRef = React.useRef<HTMLDivElement>(null);
     const aiLangDropdownRef = React.useRef<HTMLDivElement>(null);
     const [meetingInterfaceTheme, setMeetingInterfaceThemeState] = useState<MeetingInterfaceTheme>(getMeetingInterfaceTheme);
     const [isInterfaceThemeDropdownOpen, setIsInterfaceThemeDropdownOpen] = useState(false);
@@ -427,6 +438,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [meetingRetention, setMeetingRetention] = useState<'forever' | '7d' | '30d' | 'never'>('forever');
     const [showVerboseToast, setShowVerboseToast] = useState(false);
     const verboseToastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const applyInterfaceTranslationsSnapshot = (snapshot: InterfaceTranslationsSnapshot) => {
+        setInterfaceLocales(snapshot.locales);
+        setInterfaceTranslationsPath(snapshot.translationsPath);
+    };
 
     // Close dropdown when clicking outside
     // Sync with global state changes
@@ -440,6 +456,14 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             window.electronAPI?.getDisguise?.().then(setDisguiseMode).catch(() => { });
             window.electronAPI?.getVerboseLogging?.().then(setVerboseLogging).catch(() => { });
             window.electronAPI?.getMeetingRetention?.().then(setMeetingRetention).catch(() => { });
+            window.electronAPI?.getInterfaceTranslations?.()
+                .then(applyInterfaceTranslationsSnapshot)
+                .catch(() => {
+                    window.electronAPI?.getInterfaceLocales?.().then(setInterfaceLocales).catch(() => { });
+                });
+            window.electronAPI?.getInterfaceLanguage?.()
+                .then((state) => setInterfaceLanguage(state.preference))
+                .catch(() => { });
         }
     }, [isOpen]);
 
@@ -465,6 +489,23 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     useEffect(() => {
         if (window.electronAPI?.onMeetingRetentionChanged) {
             const unsubscribe = window.electronAPI.onMeetingRetentionChanged(setMeetingRetention);
+            return () => unsubscribe();
+        }
+    }, []);
+
+    useEffect(() => {
+        if (window.electronAPI?.onInterfaceLanguageChanged) {
+            const unsubscribe = window.electronAPI.onInterfaceLanguageChanged((state) => {
+                setInterfaceLanguage(state.preference);
+                setInterfaceLanguageError(null);
+            });
+            return () => unsubscribe();
+        }
+    }, []);
+
+    useEffect(() => {
+        if (window.electronAPI?.onInterfaceTranslationsChanged) {
+            const unsubscribe = window.electronAPI.onInterfaceTranslationsChanged(applyInterfaceTranslationsSnapshot);
             return () => unsubscribe();
         }
     }, []);
@@ -501,6 +542,9 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             if (themeDropdownRef.current && !themeDropdownRef.current.contains(event.target as Node)) {
                 setIsThemeDropdownOpen(false);
             }
+            if (interfaceLanguageDropdownRef.current && !interfaceLanguageDropdownRef.current.contains(event.target as Node)) {
+                setIsInterfaceLanguageDropdownOpen(false);
+            }
             if (aiLangDropdownRef.current && !aiLangDropdownRef.current.contains(event.target as Node)) {
                 setIsAiLangDropdownOpen(false);
             }
@@ -509,14 +553,14 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             }
         };
 
-        if (isThemeDropdownOpen || isAiLangDropdownOpen || isInterfaceThemeDropdownOpen) {
+        if (isThemeDropdownOpen || isInterfaceLanguageDropdownOpen || isAiLangDropdownOpen || isInterfaceThemeDropdownOpen) {
             document.addEventListener('mousedown', handleClickOutside);
         }
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [isThemeDropdownOpen, isAiLangDropdownOpen, isInterfaceThemeDropdownOpen]);
+    }, [isThemeDropdownOpen, isInterfaceLanguageDropdownOpen, isAiLangDropdownOpen, isInterfaceThemeDropdownOpen]);
 
     const [showTranscript, setShowTranscript] = useState(() => {
         const stored = localStorage.getItem('natively_interviewer_transcript');
@@ -534,7 +578,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [availableLanguages, setAvailableLanguages] = useState<Record<string, any>>({});
     const [autoDetectedLanguage, setAutoDetectedLanguage] = useState<string | null>(null);
 
-    // AI Response Language
+    // AI answer locale
     const [aiResponseLanguage, setAiResponseLanguage] = useState('English');
     const [availableAiLanguages, setAvailableAiLanguages] = useState<any[]>([]);
 
@@ -855,6 +899,59 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             await window.electronAPI.setThemeMode(mode);
         }
     };
+
+    const handleInterfaceLanguageChange = async (preference: InterfaceLanguagePreference) => {
+        const previous = interfaceLanguage;
+        setInterfaceLanguage(preference);
+        setInterfaceLanguageError(null);
+        try {
+            const result = await window.electronAPI?.setInterfaceLanguage?.(preference);
+            if (!result?.success) {
+                setInterfaceLanguage(previous);
+                setInterfaceLanguageError(result?.error || t('settings.general.interfaceLanguageSetError'));
+                return;
+            }
+            if (result.state) {
+                setInterfaceLanguage(result.state.preference);
+            }
+        } catch (error) {
+            setInterfaceLanguage(previous);
+            setInterfaceLanguageError(error instanceof Error ? error.message : t('settings.general.interfaceLanguageSetError'));
+        }
+    };
+
+    const handleRefreshInterfaceTranslations = async () => {
+        setIsRefreshingInterfaceTranslations(true);
+        setInterfaceLanguageError(null);
+        try {
+            const snapshot = await window.electronAPI?.refreshInterfaceTranslations?.();
+            if (snapshot) applyInterfaceTranslationsSnapshot(snapshot);
+        } catch (error) {
+            setInterfaceLanguageError(error instanceof Error ? error.message : t('settings.general.translationPacksRefreshError'));
+        } finally {
+            setIsRefreshingInterfaceTranslations(false);
+        }
+    };
+
+    const handleOpenInterfaceTranslationsFolder = async () => {
+        setInterfaceLanguageError(null);
+        try {
+            const result = await window.electronAPI?.openInterfaceTranslationsFolder?.();
+            if (!result?.success) {
+                setInterfaceLanguageError(result?.error || t('settings.general.translationPacksOpenError'));
+            }
+            if (result?.path) setInterfaceTranslationsPath(result.path);
+        } catch (error) {
+            setInterfaceLanguageError(error instanceof Error ? error.message : t('settings.general.translationPacksOpenError'));
+        }
+    };
+
+    const selectableInterfaceLocales = (interfaceLocales.length > 0 ? interfaceLocales : [
+        { code: 'system', nativeLabel: t('common.system'), label: t('common.system'), description: '', source: 'builtin' as const, coverage: 100, valid: true, errors: [], warnings: [] },
+        { code: 'en', nativeLabel: 'English', label: 'English', description: '', source: 'builtin' as const, coverage: 100, valid: true, errors: [], warnings: [] },
+        { code: 'ru', nativeLabel: 'Русский', label: 'Russian', description: '', source: 'builtin' as const, coverage: 100, valid: true, errors: [], warnings: [] },
+    ]).filter((option) => option.valid !== false);
+    const customInterfaceLocales = interfaceLocales.filter((option) => option.source === 'custom');
 
     // Audio Settings
     const [inputDevices, setInputDevices] = useState<MediaDeviceInfo[]>([]);
@@ -1460,84 +1557,84 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                         {/* Sidebar */}
                         <div className="w-64 bg-bg-sidebar flex flex-col border-r border-border-subtle">
                             <div className="p-6">
-                                <h2 className="font-semibold text-gray-400 text-xs uppercase tracking-wider mb-2">Settings</h2>
+                                <h2 className="font-semibold text-gray-400 text-xs uppercase tracking-wider mb-2">{t('settings.sidebar.title')}</h2>
                                 <nav className="space-y-1">
-                                    <button
+                                    <button type="button"
                                         onClick={() => setActiveTab('general')}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'general' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Monitor size={16} /> General
+                                        <Monitor size={16} /> {t('settings.sidebar.general')}
                                     </button>
-                                    <button
+                                    <button type="button"
                                         onClick={() => setActiveTab('ai-providers')}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'ai-providers' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <FlaskConical size={16} /> AI Providers
+                                        <FlaskConical size={16} /> {t('settings.sidebar.aiProviders')}
                                     </button>
-                                    <button
+                                    <button type="button"
                                         onClick={() => setActiveTab('skills')}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'skills' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Sparkles size={16} className={activeTab === 'skills' ? 'text-accent-primary' : 'text-text-secondary'} /> Skills
+                                        <Sparkles size={16} className={activeTab === 'skills' ? 'text-accent-primary' : 'text-text-secondary'} /> {t('settings.sidebar.skills')}
                                     </button>
-                                    <button
+                                    <button type="button"
                                         onClick={() => setActiveTab('calendar')}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'calendar' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Calendar size={16} /> Calendar
+                                        <Calendar size={16} /> {t('settings.sidebar.calendar')}
                                     </button>
-                                    <button
+                                    <button type="button"
                                         onClick={() => setActiveTab('audio')}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'audio' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Mic size={16} /> Audio
+                                        <Mic size={16} /> {t('settings.sidebar.audio')}
                                     </button>
-                                    <button
+                                    <button type="button"
                                         onClick={() => setActiveTab('keybinds')}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'keybinds' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Keyboard size={16} /> Keybinds
+                                        <Keyboard size={16} /> {t('settings.sidebar.keybinds')}
                                     </button>
 
-                                    <button
+                                    <button type="button"
                                         onClick={() => setActiveTab('phone-mirror')}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'phone-mirror' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Smartphone size={16} /> Phone Mirror
+                                        <Smartphone size={16} /> {t('settings.sidebar.phoneMirror')}
                                     </button>
 
-                                    <button
+                                    <button type="button"
                                         onClick={() => setActiveTab('intelligence')}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'intelligence' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Cpu size={16} className={activeTab === 'intelligence' ? 'text-accent-primary' : ''} /> Intelligence
+                                        <Cpu size={16} className={activeTab === 'intelligence' ? 'text-accent-primary' : ''} /> {t('settings.sidebar.intelligence')}
                                     </button>
 
-                                    <button
+                                    <button type="button"
                                         onClick={() => setActiveTab('help')}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-[13px] font-medium transition-colors flex items-center gap-3 ${activeTab === 'help' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <HelpCircle size={16} /> Setup & Help
+                                        <HelpCircle size={16} /> {t('settings.sidebar.setupHelp')}
                                     </button>
 
-                                    <button
+                                    <button type="button"
                                         onClick={() => setActiveTab('about')}
                                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'about' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Info size={16} /> About
+                                        <Info size={16} /> {t('settings.sidebar.about')}
                                     </button>
                                 </nav>
                             </div>
 
                             <div className="mt-auto p-6 border-t border-border-subtle">
-                                <button
+                                <button type="button"
                                     onClick={() => window.electronAPI.quitApp()}
                                     className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-3"
                                 >
-                                    <LogOut size={16} /> Quit OpenOffer
+                                    <LogOut size={16} /> {t('settings.sidebar.quit')}
                                 </button>
-                                <button onClick={onClose} className="group mt-2 w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50 transition-colors flex items-center gap-3">
-                                    <X size={18} className="group-hover:text-red-500 transition-colors" /> Close
+                                <button type="button" onClick={onClose} className="group mt-2 w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50 transition-colors flex items-center gap-3">
+                                    <X size={18} className="group-hover:text-red-500 transition-colors" /> {t('common.close')}
                                 </button>
                             </div>
                         </div>
@@ -1614,8 +1711,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                         </div>
 
                                         <div>
-                                            <h3 className="text-lg font-bold text-text-primary mb-1">General settings</h3>
-                                            <p className="text-xs text-text-secondary mb-2">Customize how OpenOffer works for you</p>
+                                            <h3 className="text-lg font-bold text-text-primary mb-1">{t('settings.general.title')}</h3>
+                                            <p className="text-xs text-text-secondary mb-2">{t('settings.general.subtitle')}</p>
 
                                             <div className={`rounded-xl border ${isLight ? 'bg-bg-card border-border-subtle divide-y divide-border-subtle' : 'bg-transparent border-transparent divide-y divide-border-subtle/20'}`}>
                                             <div className="space-y-0">
@@ -1632,8 +1729,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             <Power size={20} />
                                                         </div>
                                                         <div>
-                                                            <h3 className="text-sm font-bold text-text-primary">Open OpenOffer when you log in</h3>
-                                                            <p className="text-xs text-text-secondary mt-0.5">OpenOffer will open automatically when you log in to your computer</p>
+                                                            <h3 className="text-sm font-bold text-text-primary">{t('settings.general.openAtLoginTitle')}</h3>
+                                                            <p className="text-xs text-text-secondary mt-0.5">{t('settings.general.openAtLoginDescription')}</p>
                                                         </div>
                                                     </div>
                                                     <div
@@ -1649,7 +1746,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 </div>
 
                                                 {/* Meeting Retention */}
-                                                <div className="flex items-start justify-between px-4 py-3 gap-4">
+                                                <div className="flex flex-wrap items-start justify-between px-4 py-3 gap-4">
                                                     <div className="flex items-start gap-4">
                                                         <div className={`w-10 h-10 bg-bg-item-surface rounded-lg border flex items-center justify-center shrink-0 transition-all duration-200 ${
                                                             meetingRetention === 'never'
@@ -1661,8 +1758,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             <Shield size={20} />
                                                         </div>
                                                         <div className="flex-1">
-                                                            <h3 className="text-sm font-bold text-text-primary">Do not save meetings</h3>
-                                                            <p className="text-xs text-text-secondary mt-0.5 leading-normal">When enabled, live assistance works but transcripts, summaries, and history are discarded when the meeting ends</p>
+                                                            <h3 className="text-sm font-bold text-text-primary">{t('settings.general.doNotSaveMeetingsTitle')}</h3>
+                                                            <p className="text-xs text-text-secondary mt-0.5 leading-normal">{t('settings.general.doNotSaveMeetingsDescription')}</p>
                                                         </div>
                                                     </div>
                                                     <div
@@ -1674,7 +1771,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer shrink-0 mt-2 ${meetingRetention === 'never' ? 'bg-emerald-500' : 'bg-bg-toggle-switch border border-border-muted'}`}
                                                         role="switch"
                                                         aria-checked={meetingRetention === 'never'}
-                                                        aria-label="Do not save meetings"
+                                                        aria-label={t('settings.general.doNotSaveMeetingsTitle')}
                                                     >
                                                         <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${meetingRetention === 'never' ? 'translate-x-5' : 'translate-x-0'}`} />
                                                     </div>
@@ -1730,7 +1827,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                         Logs: <span className="font-mono text-amber-300">~/Documents/openoffer_debug.log</span>
                                                                     </p>
                                                                 </div>
-                                                                <button
+                                                                <button type="button"
                                                                     onClick={() => window.electronAPI?.openLogFile?.()}
                                                                     className="shrink-0 text-[11px] font-medium text-amber-400 hover:text-amber-300 transition-colors px-2 py-0.5 rounded-md bg-amber-500/15 hover:bg-amber-500/25"
                                                                 >
@@ -1809,6 +1906,116 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 </div>
 
 
+                                                {/* Interface Language */}
+                                                <div className="flex items-center justify-between px-4 py-3 gap-4">
+                                                    <div className="flex items-center gap-4 min-w-0">
+                                                        <div className={`w-10 h-10 bg-bg-item-surface rounded-lg border flex items-center justify-center shrink-0 transition-all duration-200 ${
+                                                            interfaceLanguage !== 'system'
+                                                                ? isLight
+                                                                    ? 'border-cyan-500/30 text-cyan-600 bg-cyan-50/50'
+                                                                    : 'border-cyan-500/40 text-cyan-400 bg-cyan-500/5'
+                                                                : 'border-border-subtle text-text-tertiary'
+                                                        }`}>
+                                                            <Globe size={20} />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <h3 className="text-sm font-bold text-text-primary">{t('settings.general.interfaceLanguageTitle')}</h3>
+                                                            <p className="text-xs text-text-secondary mt-0.5 leading-normal max-w-[460px]">{t('settings.general.interfaceLanguageDescription')}</p>
+                                                            {interfaceLanguageError && (
+                                                                <p className="text-[11px] text-red-400 mt-1">{interfaceLanguageError}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="relative shrink-0" ref={interfaceLanguageDropdownRef}>
+                                                        <button type="button"
+                                                            onClick={() => setIsInterfaceLanguageDropdownOpen(!isInterfaceLanguageDropdownOpen)}
+                                                            className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 min-w-[130px] justify-between"
+                                                        >
+                                                            <span className="text-ellipsis overflow-hidden whitespace-nowrap">
+                                                                {interfaceLanguage === 'system'
+                                                                    ? t('common.system')
+                                                                    : interfaceLocales.find((locale) => locale.code === interfaceLanguage)?.nativeLabel ?? interfaceLanguage}
+                                                            </span>
+                                                            <ChevronDown size={12} className={`shrink-0 transition-transform ${isInterfaceLanguageDropdownOpen ? 'rotate-180' : ''}`} />
+                                                        </button>
+
+                                                        {isInterfaceLanguageDropdownOpen && (
+                                                            <div className="absolute right-0 top-full mt-1 min-w-full w-max bg-bg-elevated border border-border-subtle rounded-lg shadow-xl overflow-hidden z-20 p-1 animated fadeIn select-none">
+                                                                {selectableInterfaceLocales.map((option, index) => (
+                                                                    <button type="button"
+                                                                        key={`${option.source}:${option.code}:${index}`}
+                                                                        onClick={() => {
+                                                                            void handleInterfaceLanguageChange(option.code);
+                                                                            setIsInterfaceLanguageDropdownOpen(false);
+                                                                        }}
+                                                                        className={`w-full text-left px-2 py-1.5 rounded-md text-xs flex items-center gap-2 transition-colors ${interfaceLanguage === option.code ? 'text-text-primary bg-bg-item-active/50' : 'text-text-secondary hover:bg-bg-input hover:text-text-primary'}`}
+                                                                    >
+                                                                        <span className="font-medium">{option.code === 'system' ? t('common.system') : option.nativeLabel}</span>
+                                                                        {option.source === 'custom' && (
+                                                                            <span className="ml-auto text-[10px] text-text-tertiary">{option.coverage ?? 0}%</span>
+                                                                        )}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Translation Packs */}
+                                                <div className="flex items-start justify-between px-4 py-3 gap-4">
+                                                    <div className="flex items-start gap-4 min-w-0">
+                                                        <div className="w-10 h-10 bg-bg-item-surface rounded-lg border border-border-subtle text-text-tertiary flex items-center justify-center shrink-0">
+                                                            <Languages size={20} />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <h3 className="text-sm font-bold text-text-primary">{t('settings.general.translationPacksTitle')}</h3>
+                                                            <p className="text-xs text-text-secondary mt-0.5 leading-normal max-w-[520px]">{t('settings.general.translationPacksDescription')}</p>
+                                                            {interfaceTranslationsPath && (
+                                                                <p className="text-[11px] text-text-tertiary mt-1 truncate max-w-[520px]">{interfaceTranslationsPath}</p>
+                                                            )}
+                                                            <div className="mt-2 space-y-1">
+                                                                {customInterfaceLocales.length === 0 && (
+                                                                    <p className="text-[11px] text-text-tertiary">{t('settings.general.translationPacksNone')}</p>
+                                                                )}
+                                                                {customInterfaceLocales.map((locale, index) => (
+                                                                    <div key={`${locale.code}:${index}`} className="text-[11px] text-text-secondary flex flex-wrap items-center gap-x-2 gap-y-1">
+                                                                        <span className="font-medium text-text-primary">{locale.nativeLabel || locale.code}</span>
+                                                                        <span>{locale.valid ? t('settings.general.translationPackValid') : t('settings.general.translationPackInvalid')}</span>
+                                                                        {locale.valid && (
+                                                                            <span>{t('settings.general.translationPackCoverage', { coverage: locale.coverage ?? 0 })}</span>
+                                                                        )}
+                                                                        {(locale.errors?.length ?? 0) > 0 && (
+                                                                            <span className="text-red-400">{locale.errors?.[0]}</span>
+                                                                        )}
+                                                                        {(locale.warnings?.length ?? 0) > 0 && (
+                                                                            <span className="text-yellow-400">{locale.warnings?.[0]}</span>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                                        <button type="button"
+                                                            onClick={() => void handleOpenInterfaceTranslationsFolder()}
+                                                            className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+                                                        >
+                                                            <ExternalLink size={12} />
+                                                            {t('settings.general.translationPacksOpenFolder')}
+                                                        </button>
+                                                        <button type="button"
+                                                            onClick={() => void handleRefreshInterfaceTranslations()}
+                                                            disabled={isRefreshingInterfaceTranslations}
+                                                            className="bg-bg-component hover:bg-bg-elevated disabled:opacity-60 border border-border-subtle text-text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+                                                        >
+                                                            <RefreshCw size={12} className={isRefreshingInterfaceTranslations ? 'animate-spin' : ''} />
+                                                            {isRefreshingInterfaceTranslations ? t('common.checking') : t('common.refresh')}
+                                                        </button>
+                                                    </div>
+                                                </div>
+
                                                 {/* Theme */}
                                                 <div className="flex items-center justify-between px-4 py-3">
                                                     <div className="flex items-center gap-4">
@@ -1822,13 +2029,13 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             <Palette size={20} />
                                                         </div>
                                                         <div>
-                                                            <h3 className="text-sm font-bold text-text-primary">Theme</h3>
-                                                            <p className="text-xs text-text-secondary mt-0.5">Customize how OpenOffer looks on your device</p>
+                                                            <h3 className="text-sm font-bold text-text-primary">{t('settings.general.themeTitle')}</h3>
+                                                            <p className="text-xs text-text-secondary mt-0.5">{t('settings.general.themeDescription')}</p>
                                                         </div>
                                                     </div>
 
                                                     <div className="relative" ref={themeDropdownRef}>
-                                                        <button
+                                                        <button type="button"
                                                             onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
                                                             className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 min-w-[110px] justify-between"
                                                         >
@@ -1838,7 +2045,13 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                     {themeMode === 'light' && <Sun size={14} />}
                                                                     {themeMode === 'dark' && <Moon size={14} />}
                                                                 </span>
-                                                                <span className="capitalize text-ellipsis overflow-hidden whitespace-nowrap">{themeMode}</span>
+                                                                <span className="text-ellipsis overflow-hidden whitespace-nowrap">
+                                                                    {themeMode === 'system'
+                                                                        ? t('settings.general.themeSystem')
+                                                                        : themeMode === 'light'
+                                                                            ? t('settings.general.themeLight')
+                                                                            : t('settings.general.themeDark')}
+                                                                </span>
                                                             </div>
                                                             <ChevronDown size={12} className={`shrink-0 transition-transform ${isThemeDropdownOpen ? 'rotate-180' : ''}`} />
                                                         </button>
@@ -1847,11 +2060,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         {isThemeDropdownOpen && (
                                                             <div className="absolute right-0 top-full mt-1 min-w-full w-max bg-bg-elevated border border-border-subtle rounded-lg shadow-xl overflow-hidden z-20 p-1 animated fadeIn select-none">
                                                                 {[
-                                                                    { mode: 'system', label: 'System', icon: <Monitor size={14} /> },
-                                                                    { mode: 'light', label: 'Light', icon: <Sun size={14} /> },
-                                                                    { mode: 'dark', label: 'Dark', icon: <Moon size={14} /> }
+                                                                    { mode: 'system', label: t('settings.general.themeSystem'), icon: <Monitor size={14} /> },
+                                                                    { mode: 'light', label: t('settings.general.themeLight'), icon: <Sun size={14} /> },
+                                                                    { mode: 'dark', label: t('settings.general.themeDark'), icon: <Moon size={14} /> }
                                                                 ].map((option) => (
-                                                                    <button
+                                                                    <button type="button"
                                                                         key={option.mode}
                                                                         onClick={() => {
                                                                             handleSetTheme(option.mode as any);
@@ -1881,7 +2094,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             <Layout size={20} />
                                                         </div>
                                                         <div>
-                                                            <h3 className="text-sm font-bold text-text-primary">Meeting Interface Style</h3>
+                                                            <h3 className="text-sm font-bold text-text-primary">{t('settings.general.meetingInterfaceStyleTitle')}</h3>
                                                             <p className="text-xs text-text-secondary mt-0.5">
                                                                 {meetingInterfaceTheme === 'liquid-glass'
                                                                     ? 'Liquid glass — Apple-inspired transparent overlay'
@@ -1893,16 +2106,16 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     </div>
 
                                                     <div className="relative" ref={interfaceThemeDropdownRef}>
-                                                        <button
+                                                        <button type="button"
                                                             onClick={() => setIsInterfaceThemeDropdownOpen(!isInterfaceThemeDropdownOpen)}
                                                             className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 min-w-[110px] justify-between"
                                                         >
                                                             <span className="text-ellipsis overflow-hidden whitespace-nowrap">
                                                                 {meetingInterfaceTheme === 'liquid-glass'
-                                                                    ? 'Liquid Glass'
+                                                                    ? t('settings.general.meetingInterfaceLiquid')
                                                                     : meetingInterfaceTheme === 'modern'
-                                                                        ? 'Modern'
-                                                                        : 'Default'}
+                                                                        ? t('settings.general.meetingInterfaceModern')
+                                                                        : t('settings.general.meetingInterfaceDefault')}
                                                             </span>
                                                             <ChevronDown size={12} className={`shrink-0 transition-transform ${isInterfaceThemeDropdownOpen ? 'rotate-180' : ''}`} />
                                                         </button>
@@ -1910,11 +2123,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         {isInterfaceThemeDropdownOpen && (
                                                             <div className="absolute right-0 top-full mt-1 w-full bg-bg-elevated border border-border-subtle rounded-lg shadow-xl overflow-hidden z-20 p-1 animated fadeIn select-none">
                                                                 {([
-                                                                    { mode: 'default' as MeetingInterfaceTheme, label: 'Default' },
-                                                                    { mode: 'liquid-glass' as MeetingInterfaceTheme, label: 'Liquid Glass' },
-                                                                    { mode: 'modern' as MeetingInterfaceTheme, label: 'Modern' },
+                                                                    { mode: 'default' as MeetingInterfaceTheme, label: t('settings.general.meetingInterfaceDefault') },
+                                                                    { mode: 'liquid-glass' as MeetingInterfaceTheme, label: t('settings.general.meetingInterfaceLiquid') },
+                                                                    { mode: 'modern' as MeetingInterfaceTheme, label: t('settings.general.meetingInterfaceModern') },
                                                                 ] as const).map((option) => (
-                                                                    <button
+                                                                    <button type="button"
                                                                         key={option.mode}
                                                                         onClick={() => {
                                                                             setMeetingInterfaceTheme(option.mode);
@@ -1931,7 +2144,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     </div>
                                                 </div>
 
-                                                    {/* AI Response Language */}
+                                                    {/* AI answer locale */}
                                                 <div className="flex items-center justify-between px-4 py-3">
                                                     <div className="flex items-center gap-4">
                                                         <div className={`w-10 h-10 bg-bg-item-surface rounded-lg border flex items-center justify-center shrink-0 transition-all duration-200 ${
@@ -1944,18 +2157,18 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             <Globe size={20} />
                                                         </div>
                                                         <div>
-                                                            <h3 className="text-sm font-bold text-text-primary">AI Response Language</h3>
+                                                            <h3 className="text-sm font-bold text-text-primary">{t('settings.general.aiResponseLanguageTitle')}</h3>
                                                             <p className="text-xs text-text-secondary mt-0.5">
                                                                 {aiResponseLanguage === 'auto'
-                                                                    ? 'Mirrors user\'s language automatically'
-                                                                    : 'Language for AI suggestions and notes'
+                                                                    ? t('settings.general.aiResponseLanguageAutoDescription')
+                                                                    : t('settings.general.aiResponseLanguageDescription')
                                                                 }
                                                             </p>
                                                         </div>
                                                     </div>
 
                                                     <div className="relative" ref={aiLangDropdownRef}>
-                                                        <button
+                                                        <button type="button"
                                                             onClick={() => setIsAiLangDropdownOpen(!isAiLangDropdownOpen)}
                                                             className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 min-w-[110px] justify-between"
                                                         >
@@ -1969,7 +2182,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         {isAiLangDropdownOpen && (
                                                             <div className="absolute right-0 top-full mt-1 min-w-full w-max bg-bg-elevated border border-border-subtle rounded-lg shadow-xl overflow-hidden z-20 p-1 animated fadeIn select-none max-h-60 overflow-y-auto custom-scrollbar">
                                                                 {availableAiLanguages.map((option) => (
-                                                                    <button
+                                                                    <button type="button"
                                                                         key={option.code}
                                                                         onClick={() => {
                                                                             handleAiLanguageChange(option.code);
@@ -1996,13 +2209,13 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             <BadgeCheck size={20} />
                                                         </div>
                                                         <div>
-                                                            <h3 className="text-sm font-bold text-text-primary">Version</h3>
+                                                            <h3 className="text-sm font-bold text-text-primary">{t('settings.general.versionTitle')}</h3>
                                                             <p className="text-xs text-text-secondary mt-0.5">
-                                                                You are currently using OpenOffer version {packageJson.version}
+                                                                {t('settings.general.versionDescription', { version: packageJson.version })}
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    <button
+                                                    <button type="button"
                                                         onClick={async () => {
                                                             if (updateStatus === 'available') {
                                                                 try {
@@ -2032,27 +2245,27 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         {updateStatus === 'checking' ? (
                                                             <>
                                                                 <RefreshCw size={14} className="animate-spin" />
-                                                                Checking
+                                                                {t('common.checking')}
                                                             </>
                                                         ) : updateStatus === 'available' ? (
                                                             <>
                                                                 <ArrowDown size={14} />
-                                                                Update
+                                                                {t('common.update')}
                                                             </>
                                                         ) : updateStatus === 'uptodate' ? (
                                                             <>
                                                                 <Check size={14} />
-                                                                Up to date
+                                                                {t('common.upToDate')}
                                                             </>
                                                         ) : updateStatus === 'error' ? (
                                                             <>
                                                                 <X size={14} />
-                                                                Error
+                                                                {t('common.error')}
                                                             </>
                                                         ) : (
                                                             <>
                                                                 <RefreshCw size={14} />
-                                                                Check
+                                                                {t('common.check')}
                                                             </>
                                                         )}
                                                     </button>
@@ -2061,7 +2274,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             </div>
 
                                                 {/* ------------------------------------------------------------------ */}
-                                                {/* Interface Opacity (Stealth Mode)                                   */}
+                                                {/* Overlay opacity control                                      */}
                                                 {/* ------------------------------------------------------------------ */}
                                                 <div
                                                     id="opacity-slider-card"
@@ -2071,7 +2284,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     <div className="flex items-center justify-between mb-3">
                                                         <label className="flex items-center gap-2 text-xs font-medium text-text-secondary uppercase tracking-wide">
                                                             <Eye size={13} className="text-text-secondary" />
-                                                            Interface Opacity
+                                                            {t('settings.general.interfaceOpacityTitle')}
                                                         </label>
                                                         {/*
                                                          * Render previewOverlayOpacity (live drag value), NOT
@@ -2110,13 +2323,13 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     />
 
                                                     <div className="flex justify-between mt-1.5">
-                                                        <span className="text-[10px] text-text-tertiary">More Stealth</span>
-                                                        <span className="text-[10px] text-text-tertiary">Fully Visible</span>
+                                                        <span className="text-[10px] text-text-tertiary">{t('settings.general.moreStealth')}</span>
+                                                        <span className="text-[10px] text-text-tertiary">{t('settings.general.fullyVisible')}</span>
                                                     </div>
 
                                                     <p className="text-xs text-text-tertiary mt-2">
-                                                        Controls the visibility of the in-meeting overlay.{' '}
-                                                        <span className="text-text-secondary">Hold the slider to preview.</span>
+                                                        {t('settings.general.interfaceOpacityDescription')}{' '}
+                                                        <span className="text-text-secondary">{t('settings.general.holdToPreview')}</span>
                                                     </p>
                                                 </div>
 
@@ -2124,17 +2337,17 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
                                     </div>
 
-                                    {/* Process Disguise */}
-                                    {/* Process Disguise */}
+                                    {/* Disguise settings */}
+                                    {/* Disguise settings */}
                                     <div className={`${isLight ? 'bg-bg-card' : 'bg-bg-item-surface'} rounded-xl p-5 border border-border-subtle`}>
                                         <div className="flex flex-col gap-1 mb-3">
                                             <div className="flex items-center gap-2">
-                                                <h3 className="text-lg font-bold text-text-primary">Process Disguise</h3>
+                                                <h3 className="text-lg font-bold text-text-primary">{t('settings.general.processDisguiseTitle')}</h3>
                                             </div>
                                             <p className="text-xs text-text-secondary">
-                                                Disguise OpenOffer as another application to prevent detection during screen sharing.
+                                                {t('settings.general.processDisguiseDescription')}
                                                 <span className="block mt-1 text-text-tertiary">
-                                                    Select a disguise to be automatically applied when Undetectable mode is on.
+                                                    {t('settings.general.processDisguiseHint')}
                                                 </span>
                                             </p>
                                         </div>
@@ -2142,16 +2355,16 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                         <div className={`grid grid-cols-2 gap-3 ${isUndetectable ? 'opacity-50 pointer-events-none' : ''}`}>
                                             {isUndetectable && (
                                                 <p className="col-span-2 text-xs text-yellow-500/80 -mt-1 mb-1">
-                                                    ⚠️ Disable Undetectable mode first to change disguise.
+                                                    ⚠️ {t('settings.general.disableUndetectableFirst')}
                                                 </p>
                                             )}
                                             {[
-                                                { id: 'none', label: 'None (Default)', icon: <Layout size={14} /> },
-                                                { id: 'terminal', label: 'Terminal', icon: <Terminal size={14} /> },
-                                                { id: 'settings', label: 'System Settings', icon: <Settings size={14} /> },
-                                                { id: 'activity', label: 'Activity Monitor', icon: <Activity size={14} /> }
+                                                { id: 'none', label: t('settings.general.disguiseNone'), icon: <Layout size={14} /> },
+                                                { id: 'terminal', label: t('settings.general.disguiseTerminal'), icon: <Terminal size={14} /> },
+                                                { id: 'settings', label: t('settings.general.disguiseSystemSettings'), icon: <Settings size={14} /> },
+                                                { id: 'activity', label: t('settings.general.disguiseActivityMonitor'), icon: <Activity size={14} /> }
                                             ].map((option) => (
-                                                <button
+                                                <button type="button"
                                                     key={option.id}
                                                     disabled={isUndetectable}
                                                     onClick={() => {
@@ -2194,7 +2407,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             <h3 className="text-lg font-bold text-text-primary mb-1">Keyboard shortcuts</h3>
                                             <p className="text-xs text-text-secondary">OpenOffer works with these easy to remember commands.</p>
                                         </div>
-                                        <button
+                                        <button type="button"
                                             onClick={resetShortcuts}
                                             className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-border-subtle bg-bg-subtle/30 hover:bg-bg-subtle hover:border-green-500/30 transition-all duration-200 text-xs font-medium text-text-secondary hover:text-green-500 active:scale-95 mt-1"
                                         >
@@ -2383,7 +2596,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    <button
+                                                    <button type="button"
                                                         onClick={refreshSttRuntimeStatus}
                                                         disabled={sttRuntimeLoading}
                                                         className="w-8 h-8 rounded-lg bg-bg-input hover:bg-bg-elevated border border-border-subtle text-text-secondary hover:text-text-primary transition-colors flex items-center justify-center disabled:opacity-50"
@@ -2454,7 +2667,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             { id: 'whisper-large-v3-turbo', label: 'V3 Turbo', desc: 'Fastest' },
                                                             { id: 'whisper-large-v3', label: 'V3', desc: 'Most Accurate' },
                                                         ].map((m) => (
-                                                            <button
+                                                            <button type="button"
                                                                 key={m.id}
                                                                 onClick={async () => {
                                                                     setGroqSttModel(m.id);
@@ -2489,7 +2702,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                 ? <span className="text-text-primary">{googleServiceAccountPath.split('/').pop()}</span>
                                                                 : <span className="text-text-tertiary italic">No file selected</span>}
                                                         </div>
-                                                        <button
+                                                        <button type="button"
                                                             onClick={async () => {
                                                                 // @ts-ignore
                                                                 const result = await window.electronAPI?.selectServiceAccount?.();
@@ -2557,7 +2770,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             }
                                                             className="flex-1 bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
                                                         />
-                                                        <button
+                                                        <button type="button"
                                                             onClick={() => {
                                                                 const keyMap: Record<string, string> = {
                                                                     groq: sttGroqKey, openai: sttOpenaiKey, deepgram: sttDeepgramKey,
@@ -2592,7 +2805,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                 soniox: hasStoredSonioxKey,
                                                             };
                                                             return hasKeyMap[sttProvider] ? (
-                                                                <button
+                                                                <button type="button"
                                                                     onClick={() => handleRemoveSttKey(sttProvider as any)}
                                                                     className="px-2.5 py-2.5 rounded-lg text-xs font-medium text-text-tertiary hover:text-red-500 hover:bg-red-500/10 transition-all"
                                                                     title="Remove API Key"
@@ -2615,7 +2828,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                     placeholder="e.g. eastus"
                                                                     className="flex-1 bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
                                                                 />
-                                                                <button
+                                                                <button type="button"
                                                                     onClick={async () => {
                                                                         if (!sttAzureRegion.trim()) return;
                                                                         // @ts-ignore
@@ -2646,7 +2859,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                     placeholder="https://api.openai.com (default)"
                                                                     className="flex-1 bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
                                                                 />
-                                                                <button
+                                                                <button type="button"
                                                                     onClick={async () => {
                                                                         // @ts-ignore
                                                                         await window.electronAPI?.setOpenAiSttBaseUrl?.(sttOpenaiBaseUrl.trim());
@@ -2663,7 +2876,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     )}
 
                                                     <div className="flex items-center gap-3">
-                                                        <button
+                                                        <button type="button"
                                                             onClick={handleTestSttConnection}
                                                             disabled={sttTestStatus === 'testing'}
                                                             className="text-xs bg-bg-input hover:bg-bg-elevated text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-2 disabled:opacity-50"
@@ -2676,7 +2889,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                 <>Test Connection</>
                                                             )}
                                                         </button>
-                                                        <button
+                                                        <button type="button"
                                                             onClick={() => {
                                                                 const urls: Record<string, string> = {
                                                                     groq: 'https://console.groq.com/keys',
@@ -2779,7 +2992,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         <p className="text-[11px] text-amber-200/60 mt-1 font-mono break-all">{deviceFallbackNotice.reason}</p>
                                                     )}
                                                 </div>
-                                                <button
+                                                <button type="button"
                                                     onClick={() => {
                                                         // Clear stale localStorage so the next meeting starts clean.
                                                         if (deviceFallbackNotice.kind === 'input') {
@@ -2855,7 +3068,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             />
 
                                             <div className="flex justify-end">
-                                                <button
+                                                <button type="button"
                                                     onClick={async () => {
                                                         try {
                                                             const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
@@ -2968,7 +3181,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         </div>
                                                     </div>
 
-                                                    <button
+                                                    <button type="button"
                                                         onClick={async () => {
                                                             setIsCalendarsLoading(true);
                                                             try {
@@ -3010,7 +3223,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                     : 'next 7 days from your primary calendar'}
                                                             </p>
                                                         </div>
-                                                        <button
+                                                        <button type="button"
                                                             onClick={async () => {
                                                                 if (!window.electronAPI?.calendarRefresh) return;
                                                                 setIsCalendarRefreshing(true);
@@ -3172,7 +3385,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     <p className="text-xs text-text-secondary">Get started by connecting a Google account.</p>
                                                 </div>
 
-                                                <button
+                                                <button type="button"
                                                     onClick={async () => {
                                                         setIsCalendarsLoading(true);
                                                         try {

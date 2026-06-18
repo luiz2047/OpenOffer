@@ -141,6 +141,12 @@ The dedicated local-STT guide is being refreshed for the standalone OpenOffer re
 
 For the shipped interview workspace architecture, see [Interview Command Center](docs/engineering/interview-command-center.md).
 
+OpenOffer includes built-in English and Russian interface locales plus data-only
+custom translation packs from the app-data translations folder. Interface
+language is independent of transcription language and AI response language. See
+[Interface Translations](docs/translations.md) for pack rules and the current
+localization boundary.
+
 ## Quick Start
 
 ### System Requirements
@@ -236,6 +242,8 @@ npm run build            # clean, typecheck frontend, and build Vite output
 npm run build:electron   # build Electron main/preload code
 npm run typecheck:electron
 npm run build:native     # build native audio module
+npm run i18n:check       # verify translated interface keys and hardcoded-copy guardrails
+npm run test:i18n        # run focused interface localization tests
 npm run test:answer-style-yandex
 npm run test             # node/electron test gate through repo script
 npm run app:build        # production package build
@@ -261,7 +269,7 @@ npm run app:build        # production package build
 
 ## Project Status
 
-OpenOffer is public source at version `1.0.0`.
+OpenOffer is public source at version `1.2.0`.
 
 Current baseline:
 

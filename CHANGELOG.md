@@ -4,6 +4,22 @@
 
     ## [Unreleased]
 
+    ## [1.2.0] - 2026-06-18
+
+    ### Added
+
+    - **Interface localization layer**: Added English and Russian interface locales, data-only custom translation packs from the app-data folder, a Settings language selector, Electron settings persistence, preload events, i18next runtime wiring, and source-level guardrails for translated UI copy.
+
+    ### Changed
+
+    - **Localized core app surfaces**: Migrated the launcher, top pill, settings shell, onboarding permission toaster, and interview command center copy to the translation catalog while keeping transcription language and AI response language as separate preferences.
+    - **Translation contribution docs**: Documented the supported locale boundary, key conventions, interpolation/plural rules, custom pack validation limits, and refresh workflow.
+
+    ### Tests
+
+    - Added translation catalog parity tests, locale resolution coverage, custom pack validation tests, IPC wiring guards, and a hardcoded-copy scanner for migrated surfaces.
+    - Refreshed source-level UI reachability tests so they assert against translation keys instead of stale English literals.
+
     ## [1.1.0] - 2026-06-18
 
     ### What's New
