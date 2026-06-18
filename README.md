@@ -141,6 +141,12 @@ The dedicated local-STT guide is being refreshed for the standalone OpenOffer re
 
 For the shipped interview workspace architecture, see [Interview Command Center](docs/engineering/interview-command-center.md).
 
+OpenOffer includes built-in English and Russian interface locales plus data-only
+custom translation packs from the app-data translations folder. Interface
+language is independent of transcription language and AI response language. See
+[Interface Translations](docs/translations.md) for pack rules and the current
+localization boundary.
+
 ## Quick Start
 
 ### System Requirements

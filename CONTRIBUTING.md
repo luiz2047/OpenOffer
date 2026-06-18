@@ -76,6 +76,12 @@ If you've added code that should be tested, add tests.
 If you've changed APIs, update the documentation.
 Ensure the test suite passes.
 
+If you add or change interface copy, update the English and Russian entries in
+`src/i18n/resources.ts` and run `npm run i18n:check`. User-owned languages can
+also be tested as data-only custom packs from the app-data translations folder.
+See `docs/translations.md` for key naming, interpolation, pack validation, and
+plural rules.
+
 ### Architecture Overview
 
 OpenOffer uses a modern stack consisting of:
