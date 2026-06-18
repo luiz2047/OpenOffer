@@ -1,5 +1,12 @@
 import crypto from 'crypto';
 import type {
+  ApplicationCreateFromIntakeResult,
+  ApplicationDetail,
+  ApplicationIntakeResult,
+  ApplicationStatus,
+  InterviewStage,
+  InterviewStageStatus,
+  InterviewStageType,
   InterviewCreatePayload,
   InterviewDetail,
   InterviewEvent,
@@ -110,6 +117,8 @@ function eventFromRow(row: any): InterviewEvent {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     archivedAt: row.archived_at ?? null,
+    applicationId: row.application_id ?? null,
+    selectedStageId: row.stage_id ?? null,
   };
 }
 
@@ -130,7 +139,83 @@ function listItemFromRow(row: any): InterviewListItem {
     updatedAt: row.updated_at,
     linkedMeetingCount: Number(row.linked_meeting_count ?? 0),
     questionCount: Number(row.question_count ?? 0),
+    applicationId: row.application_id ?? null,
+    selectedStageId: row.stage_id ?? null,
   };
+}
+
+function applicationFromRow(row: any): ApplicationDetail {
+  return {
+    id: row.id,
+    title: row.title,
+    company: row.company ?? null,
+    roleTitle: row.role_title ?? null,
+    status: row.status,
+    priority: row.priority ?? 'normal',
+    source: row.source ?? null,
+    sourceUrl: row.source_url ?? null,
+    vacancyUrl: row.vacancy_url ?? null,
+    compensationText: row.compensation_text ?? null,
+    locationFormat: row.location_format ?? null,
+    nextAction: row.next_action ?? null,
+    nextActionDueAt: row.next_action_due_at ?? null,
+    rawSourceText: row.raw_source_text ?? null,
+    legacyInterviewEventId: row.legacy_interview_event_id ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    archivedAt: row.archived_at ?? null,
+    selectedStageId: row.selected_stage_id ?? null,
+    stages: [],
+  };
+}
+
+function stageFromRow(row: any): InterviewStage {
+  return {
+    id: row.id,
+    applicationId: row.application_id,
+    stageType: row.stage_type ?? 'custom',
+    title: row.title,
+    status: row.status ?? 'draft',
+    startsAt: row.starts_at ?? null,
+    endsAt: row.ends_at ?? null,
+    timezone: row.timezone ?? null,
+    format: row.format ?? null,
+    meetingUrl: row.meeting_url ?? null,
+    calendarProvider: row.calendar_provider ?? null,
+    calendarId: row.calendar_id ?? null,
+    calendarEventId: row.calendar_event_id ?? null,
+    calendarSnapshot: parseJsonObject(row.calendar_snapshot_json),
+    calendarLastSeenAt: row.calendar_last_seen_at ?? null,
+    calendarMissingSince: row.calendar_missing_since ?? null,
+    calendarSyncStatus: row.calendar_sync_status ?? 'local_only',
+    rawSourceText: row.raw_source_text ?? null,
+    legacyInterviewEventId: row.legacy_interview_event_id ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    archivedAt: row.archived_at ?? null,
+  };
+}
+
+function applicationStatusFromIntake(intake: ApplicationIntakeResult): ApplicationStatus {
+  if (intake.stage?.startsAt) return 'interviewing';
+  return 'lead_found';
+}
+
+function stageStatusFromIntake(intake: ApplicationIntakeResult): InterviewStageStatus {
+  if (intake.stage?.status) return intake.stage.status;
+  if (intake.stage?.startsAt) return 'scheduled';
+  return 'draft';
+}
+
+function stageTypeFromText(value?: string | null): InterviewStageType {
+  const text = (value ?? '').toLowerCase();
+  if (/recruit|hr|screen|скрин|рекрутер|эйчар|hr/.test(text)) return 'recruiter_screen';
+  if (/system|design|архитект/.test(text)) return 'system_design';
+  if (/lead|manager|руковод/.test(text)) return 'leadership';
+  if (/final|финал/.test(text)) return 'final';
+  if (/offer|security|оффер|сб/.test(text)) return 'offer_security';
+  if (/tech|technical|тех/.test(text)) return 'technical_screen';
+  return 'custom';
 }
 
 function dossierFromRow(row: any): VacancyDossier {
@@ -230,9 +315,11 @@ export class InterviewRepository {
       SELECT
         e.id, e.title, e.company, e.role_title, e.stage, e.status, e.priority,
         e.source, e.starts_at, e.ends_at, e.timezone, e.calendar_sync_status, e.updated_at,
+        map.application_id, map.stage_id,
         COUNT(DISTINCT m.id) AS linked_meeting_count,
         COUNT(DISTINCT q.id) AS question_count
       FROM interview_events e
+      LEFT JOIN legacy_interview_event_map map ON map.legacy_interview_event_id = e.id
       LEFT JOIN meetings m ON m.interview_event_id = e.id
       LEFT JOIN interview_questions q ON q.interview_event_id = e.id
       WHERE ${where.join(' AND ')}
@@ -248,7 +335,12 @@ export class InterviewRepository {
   }
 
   get(id: string, include: Array<'dossier' | 'prep' | 'retros' | 'questions' | 'contacts' | 'meetings'> = []): InterviewDetail | null {
-    const row = this.db.prepare('SELECT * FROM interview_events WHERE id = ?').get<any>(id);
+    const row = this.db.prepare(`
+      SELECT e.*, map.application_id, map.stage_id
+      FROM interview_events e
+      LEFT JOIN legacy_interview_event_map map ON map.legacy_interview_event_id = e.id
+      WHERE e.id = ?
+    `).get<any>(id);
     if (!row) return null;
 
     const detail: InterviewDetail = eventFromRow(row);
@@ -323,6 +415,181 @@ export class InterviewRepository {
     });
   }
 
+  listApplications(): ApplicationDetail[] {
+    const rows = this.db.prepare(`
+      SELECT a.*, (
+        SELECT s.id
+        FROM interview_stages s
+        WHERE s.application_id = a.id AND s.archived_at IS NULL
+        ORDER BY
+          CASE WHEN s.starts_at IS NULL THEN 1 ELSE 0 END,
+          s.starts_at ASC,
+          s.updated_at DESC
+        LIMIT 1
+      ) AS selected_stage_id
+      FROM applications a
+      WHERE a.archived_at IS NULL
+      ORDER BY a.updated_at DESC
+      LIMIT 200
+    `).all<any>();
+    return rows.map(row => {
+      const application = applicationFromRow(row);
+      application.stages = this.listStages(application.id);
+      return application;
+    });
+  }
+
+  getApplication(id: string): ApplicationDetail | null {
+    const row = this.db.prepare(`
+      SELECT a.*, (
+        SELECT s.id
+        FROM interview_stages s
+        WHERE s.application_id = a.id AND s.archived_at IS NULL
+        ORDER BY
+          CASE WHEN s.starts_at IS NULL THEN 1 ELSE 0 END,
+          s.starts_at ASC,
+          s.updated_at DESC
+        LIMIT 1
+      ) AS selected_stage_id
+      FROM applications a
+      WHERE a.id = ?
+    `).get<any>(id);
+    if (!row) return null;
+    const application = applicationFromRow(row);
+    application.stages = this.listStages(id);
+    const dossier = this.db.prepare('SELECT * FROM vacancy_dossiers WHERE interview_event_id = ?').get<any>(application.legacyInterviewEventId);
+    application.dossier = dossier ? dossierFromRow(dossier) : null;
+    return application;
+  }
+
+  listStages(applicationId: string): InterviewStage[] {
+    return this.db.prepare(`
+      SELECT *
+      FROM interview_stages
+      WHERE application_id = ?
+      ORDER BY
+        CASE WHEN starts_at IS NULL THEN 1 ELSE 0 END,
+        starts_at ASC,
+        updated_at DESC
+    `).all<any>(applicationId).map(stageFromRow);
+  }
+
+  createApplicationFromIntake(
+    intake: ApplicationIntakeResult,
+    operationId?: string,
+  ): ApplicationCreateFromIntakeResult {
+    return this.withOperation(operationId, 'applications:create-from-intake', () => {
+      return this.db.transaction(() => {
+        const timestamp = nowIso();
+        const appId = newId('app');
+        const stageId = intake.stage ? newId('stage') : null;
+        const legacyId = newId('interview');
+        const title = intake.application.title
+          || [intake.application.company, intake.application.roleTitle].filter(Boolean).join(' · ')
+          || 'Untitled vacancy';
+        const stageTitle = intake.stage?.title || intake.stage?.stageType || 'Initial stage';
+        const applicationStatus = applicationStatusFromIntake(intake);
+        const stageStatus = stageStatusFromIntake(intake);
+        const timezone = intake.stage?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+        this.db.prepare(`
+          INSERT INTO applications (
+            id, title, company, role_title, status, priority, source, vacancy_url,
+            compensation_text, raw_source_text, legacy_interview_event_id, created_at, updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          appId,
+          title,
+          intake.application.company ?? null,
+          intake.application.roleTitle ?? null,
+          applicationStatus,
+          'normal',
+          intake.application.source ?? null,
+          intake.application.vacancyUrl ?? null,
+          intake.application.compensationText ?? null,
+          intake.application.rawSourceText,
+          legacyId,
+          timestamp,
+          timestamp,
+        );
+
+        if (stageId) {
+          this.db.prepare(`
+            INSERT INTO interview_stages (
+              id, application_id, stage_type, title, status, starts_at, ends_at, timezone,
+              meeting_url, calendar_sync_status, raw_source_text, legacy_interview_event_id,
+              created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            stageId,
+            appId,
+            intake.stage?.stageType ?? stageTypeFromText(stageTitle),
+            stageTitle,
+            stageStatus,
+            intake.stage?.startsAt ?? null,
+            intake.stage?.endsAt ?? null,
+            timezone,
+            intake.stage?.meetingUrl ?? null,
+            'local_only',
+            intake.application.rawSourceText,
+            legacyId,
+            timestamp,
+            timestamp,
+          );
+        }
+
+        this.db.prepare(`
+          INSERT INTO interview_events (
+            id, title, company, role_title, stage, status, priority, source, vacancy_url,
+            meeting_url, starts_at, ends_at, timezone, raw_source_text, calendar_sync_status,
+            created_at, updated_at
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          legacyId,
+          title,
+          intake.application.company ?? null,
+          intake.application.roleTitle ?? null,
+          stageTitle,
+          applicationStatus === 'lead_found' ? 'active' : applicationStatus,
+          'normal',
+          intake.application.source ?? null,
+          intake.application.vacancyUrl ?? null,
+          intake.stage?.meetingUrl ?? null,
+          intake.stage?.startsAt ?? null,
+          intake.stage?.endsAt ?? null,
+          timezone,
+          intake.application.rawSourceText,
+          'local_only',
+          timestamp,
+          timestamp,
+        );
+
+        this.db.prepare(`
+          INSERT INTO legacy_interview_event_map (legacy_interview_event_id, application_id, stage_id)
+          VALUES (?, ?, ?)
+        `).run(legacyId, appId, stageId);
+
+        if (intake.application.requirements?.length || intake.application.risks?.length || intake.application.questionsToAsk?.length || intake.application.compensationText) {
+          this.saveDossier(legacyId, {
+            description: intake.application.rawSourceText,
+            requirements: intake.application.requirements ?? [],
+            compensationText: intake.application.compensationText ?? null,
+            fitHypothesis: null,
+            risks: intake.application.risks ?? [],
+            questionsToAsk: intake.application.questionsToAsk ?? [],
+          });
+        }
+
+        const application = this.getApplication(appId) as ApplicationDetail;
+        const legacyInterview = this.get(legacyId, ['dossier', 'prep', 'retros', 'questions', 'meetings']);
+        return { application, legacyInterview };
+      });
+    });
+  }
+
   update(id: string, patch: InterviewUpdatePatch): InterviewEvent | null {
     const columns: Record<string, unknown> = {};
     const map: Array<[keyof InterviewUpdatePatch, string]> = [
@@ -363,6 +630,48 @@ export class InterviewRepository {
       WHERE id = ?
     `).run(...names.map(name => columns[name]), id);
     return this.get(id);
+  }
+
+  updateStageCalendarForLegacyInterview(legacyInterviewId: string, patch: InterviewUpdatePatch): InterviewStage | null {
+    const map = this.db
+      .prepare('SELECT stage_id FROM legacy_interview_event_map WHERE legacy_interview_event_id = ?')
+      .get<{ stage_id?: string | null }>(legacyInterviewId);
+    if (!map?.stage_id) return null;
+    const columns: Record<string, unknown> = {};
+    const calendarMap: Array<[keyof InterviewUpdatePatch, string]> = [
+      ['calendarProvider', 'calendar_provider'],
+      ['calendarId', 'calendar_id'],
+      ['calendarEventId', 'calendar_event_id'],
+      ['calendarLastSeenAt', 'calendar_last_seen_at'],
+      ['calendarMissingSince', 'calendar_missing_since'],
+      ['calendarSyncStatus', 'calendar_sync_status'],
+    ];
+    for (const [key, column] of calendarMap) {
+      if (Object.prototype.hasOwnProperty.call(patch, key)) {
+        columns[column] = (patch as any)[key] ?? null;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'calendarSnapshot')) {
+      columns.calendar_snapshot_json = patch.calendarSnapshot ? JSON.stringify(patch.calendarSnapshot) : null;
+    }
+    columns.updated_at = nowIso();
+    const names = Object.keys(columns);
+    this.db.prepare(`
+      UPDATE interview_stages
+      SET ${names.map(name => `${name} = ?`).join(', ')}
+      WHERE id = ?
+    `).run(...names.map(name => columns[name]), map.stage_id);
+    const row = this.db.prepare('SELECT * FROM interview_stages WHERE id = ?').get<any>(map.stage_id);
+    return row ? stageFromRow(row) : null;
+  }
+
+  updateCalendarForLegacyInterview(legacyInterviewId: string, patch: InterviewUpdatePatch): InterviewEvent | null {
+    return this.db.transaction(() => {
+      const updated = this.update(legacyInterviewId, patch);
+      if (!updated) return null;
+      this.updateStageCalendarForLegacyInterview(legacyInterviewId, patch);
+      return updated;
+    });
   }
 
   archive(id: string): boolean {

@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import type {
+  ApplicationIntakeResult,
   CalendarProvider,
   CalendarSnapshot,
   InterviewCreatePayload,
@@ -28,14 +29,13 @@ import type {
   InterviewPriority,
   InterviewQuestionPayload,
   InterviewRetroPayload,
-  InterviewSourceParseResult,
   InterviewStatus,
   PrepBriefPayload,
   ReadinessResult,
   RetroPromptDecision,
   VacancyDossierPayload,
 } from '../../types/interviews';
-import { interviewApi } from './api';
+import { applicationApi, interviewApi } from './api';
 
 interface MeetingSummary {
   id: string;
@@ -301,8 +301,11 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<InterviewCreatePayload>(initialCreateForm);
   const [createCalendarProvider, setCreateCalendarProvider] = useState<'none' | 'google' | 'macos'>('none');
-  const [sourceParsePreview, setSourceParsePreview] = useState<InterviewSourceParseResult | null>(null);
+  const [intakePreview, setIntakePreview] = useState<ApplicationIntakeResult | null>(null);
   const [parseWarnings, setParseWarnings] = useState<string[]>([]);
+  const [agentOpen, setAgentOpen] = useState(false);
+  const [agentText, setAgentText] = useState('');
+  const [agentPreview, setAgentPreview] = useState<ApplicationIntakeResult | null>(null);
   const [dossierDraft, setDossierDraft] = useState(initialDossierDraft);
   const [prepDraft, setPrepDraft] = useState({
     oneLineGoal: '',
@@ -464,42 +467,60 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     await Promise.all([Promise.resolve(onRefresh()), loadInterviews(), loadCalendarStatus()]);
   };
 
-  const parseSourceText = async () => {
+  const applyIntakePreviewToForm = (preview: ApplicationIntakeResult) => {
+    setCreateForm(prev => ({
+      ...prev,
+      title: prev.title.trim() || preview.application.title || prev.title,
+      company: prev.company?.trim() ? prev.company : preview.application.company ?? prev.company,
+      roleTitle: prev.roleTitle?.trim() ? prev.roleTitle : preview.application.roleTitle ?? prev.roleTitle,
+      stage: prev.stage?.trim() && prev.stage !== 'Recruiter screen' ? prev.stage : preview.stage?.title ?? prev.stage,
+      source: preview.application.source ?? prev.source,
+      vacancyUrl: prev.vacancyUrl?.trim() ? prev.vacancyUrl : preview.application.vacancyUrl ?? prev.vacancyUrl,
+      meetingUrl: prev.meetingUrl?.trim() ? prev.meetingUrl : preview.stage?.meetingUrl ?? prev.meetingUrl,
+      startsAt: prev.startsAt ?? preview.stage?.startsAt ?? null,
+      endsAt: prev.endsAt ?? preview.stage?.endsAt ?? null,
+      timezone: preview.stage?.timezone ?? prev.timezone,
+      rawSourceText: preview.application.rawSourceText ?? prev.rawSourceText,
+    }));
+  };
+
+  const parseSourceText = async (useAi = false) => {
     const rawText = createForm.rawSourceText ?? '';
     await run(async () => {
-      const parsed = await interviewApi.parseSourceText(rawText);
-      setSourceParsePreview(parsed);
+      const parsed = await applicationApi.parseIntake({ text: rawText, useAi });
+      setIntakePreview(parsed);
       setParseWarnings(parsed.warnings);
-      setCreateForm(prev => ({
-        ...prev,
-        title: prev.title.trim() || parsed.fields.title || prev.title,
-        company: prev.company?.trim() ? prev.company : parsed.fields.company ?? prev.company,
-        roleTitle: prev.roleTitle?.trim() ? prev.roleTitle : parsed.fields.roleTitle ?? prev.roleTitle,
-        stage: prev.stage?.trim() && prev.stage !== 'Recruiter screen' ? prev.stage : parsed.fields.stage ?? prev.stage,
-        source: parsed.fields.source ?? prev.source,
-        vacancyUrl: prev.vacancyUrl?.trim() ? prev.vacancyUrl : parsed.fields.vacancyUrl ?? prev.vacancyUrl,
-        meetingUrl: prev.meetingUrl?.trim() ? prev.meetingUrl : parsed.fields.meetingUrl ?? prev.meetingUrl,
-        rawSourceText: parsed.fields.rawSourceText ?? prev.rawSourceText,
-      }));
+      applyIntakePreviewToForm(parsed);
     });
   };
 
   const createInterview = async () => {
     await run(async () => {
-      const created = await interviewApi.create(createForm);
-      if (sourceParsePreview && hasDossierPayload(sourceParsePreview.dossier)) {
-        await interviewApi.saveDossier(created.id, sourceParsePreview.dossier);
-      }
-      if (sourceParsePreview && hasPrepPayload(sourceParsePreview.prep)) {
-        await interviewApi.savePrep(created.id, {
-          expectedTopics: sourceParsePreview.prep.expectedTopics ?? [],
-          cheatsheet: sourceParsePreview.prep.cheatsheet ?? null,
-          riskHandling: sourceParsePreview.prep.riskHandling ?? [],
-        });
-      }
-      if (createCalendarProvider !== 'none' && createForm.startsAt && createForm.endsAt) {
+      const preview = intakePreview ?? await applicationApi.parseIntake({ text: createForm.rawSourceText ?? createForm.title, useAi: false });
+      const result = await applicationApi.createFromIntake({
+        ...preview,
+        application: {
+          ...preview.application,
+          title: createForm.title || preview.application.title,
+          company: createForm.company ?? preview.application.company,
+          roleTitle: createForm.roleTitle ?? preview.application.roleTitle,
+          source: createForm.source ?? preview.application.source,
+          vacancyUrl: createForm.vacancyUrl ?? preview.application.vacancyUrl,
+          rawSourceText: createForm.rawSourceText ?? preview.application.rawSourceText,
+        },
+        stage: preview.stage ? {
+          ...preview.stage,
+          title: createForm.stage ?? preview.stage.title,
+          startsAt: createForm.startsAt ?? preview.stage.startsAt,
+          endsAt: createForm.endsAt ?? preview.stage.endsAt,
+          timezone: createForm.timezone ?? preview.stage.timezone,
+          meetingUrl: createForm.meetingUrl ?? preview.stage.meetingUrl,
+        } : undefined,
+      });
+      const legacyId = result.legacyInterview?.id;
+      if (legacyId && createCalendarProvider !== 'none' && createForm.startsAt && createForm.endsAt) {
         try {
-          await interviewApi.createCalendarEvent(created.id, createCalendarProvider);
+          await interviewApi.createCalendarEvent(legacyId, createCalendarProvider);
         } catch (err: any) {
           setError(`Created locally. Calendar sync failed: ${err?.message || 'unknown error'}`);
         }
@@ -507,10 +528,24 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       setShowCreate(false);
       setCreateForm(initialCreateForm());
       setCreateCalendarProvider('none');
-      setSourceParsePreview(null);
+      setIntakePreview(null);
       setParseWarnings([]);
       await loadInterviews();
-      setSelectedId(created.id);
+      setSelectedId(legacyId ?? result.application.legacyInterviewEventId ?? null);
+    });
+  };
+
+  const runAgent = async (apply = false) => {
+    await run(async () => {
+      const preview = agentPreview ?? await applicationApi.parseIntake({ text: agentText, useAi: true });
+      setAgentPreview(preview);
+      if (!apply) return;
+      const result = await applicationApi.createFromIntake(preview);
+      await loadInterviews();
+      setSelectedId(result.legacyInterview?.id ?? result.application.legacyInterviewEventId ?? null);
+      setAgentText('');
+      setAgentPreview(null);
+      setAgentOpen(false);
     });
   };
 
@@ -767,7 +802,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       <section className="flex min-h-[560px] flex-col bg-[#0c0e10] lg:min-h-0 lg:border-r lg:border-white/[0.07]">
         <div className={paneHeaderClass}>
           <div>
-            <div className="text-[15px] font-semibold">{t('interviews.interviewOS')}</div>
+            <div className="text-[15px] font-semibold">{t('interviews.vacancyOS')}</div>
             <div className="text-[11px] text-text-tertiary">{t('interviews.activeProcessCount', { count: interviews.length })}</div>
           </div>
           <button type="button"
@@ -775,7 +810,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
             className={primaryButtonClass}
           >
             <Plus size={14} />
-            {t('interviews.newInterviewShort')}
+            {t('interviews.newVacancyShort')}
           </button>
         </div>
 
@@ -819,7 +854,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
             ))}
             {filteredInterviews.length === 0 && (
               <div className="rounded-md bg-white/[0.025] p-4 text-[13px] text-text-tertiary">
-                {t('interviews.noInterviewsYet')}
+                {t('interviews.noVacanciesYet')}
               </div>
             )}
           </div>
@@ -1070,7 +1105,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               <BriefcaseBusiness size={26} className="mx-auto text-cyan-300" />
               <div className="mt-3 text-[15px] font-semibold">{t('interviews.startProcess')}</div>
               <div className="mt-2 text-[13px] leading-5 text-text-tertiary">{t('interviews.noActiveProcessSelected')}</div>
-              <button type="button" onClick={() => setShowCreate(true)} className={`${primaryButtonClass} mt-4`}>{t('interviews.newInterview')}</button>
+              <button type="button" onClick={() => setShowCreate(true)} className={`${primaryButtonClass} mt-4`}>{t('interviews.newVacancy')}</button>
             </div>
           </div>
         )}
@@ -1081,19 +1116,59 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
           <div className="max-h-[calc(100vh-24px)] w-[min(760px,calc(100vw-24px))] overflow-y-auto rounded-md bg-[#111417] p-5 shadow-2xl ring-1 ring-white/[0.1]">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <div className="text-[16px] font-semibold">{t('interviews.newInterview')}</div>
-                <div className="text-[12px] text-text-tertiary">{t('interviews.detail.manualIntake')}</div>
+                <div className="text-[16px] font-semibold">{t('interviews.newVacancy')}</div>
+                <div className="text-[12px] text-text-tertiary">{t('interviews.detail.rawIntake')}</div>
               </div>
               <button type="button" className={iconButtonClass} onClick={() => {
                 setShowCreate(false);
                 setCreateCalendarProvider('none');
-                setSourceParsePreview(null);
+                setIntakePreview(null);
                 setParseWarnings([]);
               }} aria-label={t('common.close')}>
                 <X size={15} />
               </button>
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <Field label={t('interviews.detail.sourceText')}>
+                  <textarea
+                    className={`${inputClass} min-h-[160px] resize-none`}
+                    value={createForm.rawSourceText ?? ''}
+                    onChange={event => {
+                      setIntakePreview(null);
+                      setParseWarnings([]);
+                      setCreateForm(prev => ({ ...prev, rawSourceText: event.target.value }));
+                    }}
+                    placeholder={t('interviews.detail.rawIntakePlaceholder')}
+                  />
+                </Field>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0 text-[11px] text-text-tertiary">
+                    {intakePreview
+                      ? `${intakePreview.classification} · ${Math.round(intakePreview.confidence * 100)}%`
+                      : t('interviews.detail.unparsedSource')}
+                    {parseWarnings.length > 0 ? ` · ${parseWarnings.join(', ')}` : ''}
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="button"
+                      onClick={() => parseSourceText(false)}
+                      disabled={busy || !(createForm.rawSourceText ?? '').trim()}
+                      className={secondaryButtonClass}
+                    >
+                      <FileText size={14} />
+                      {t('interviews.detail.extractFields')}
+                    </button>
+                    <button type="button"
+                      onClick={() => parseSourceText(true)}
+                      disabled={busy || !(createForm.rawSourceText ?? '').trim()}
+                      className={secondaryButtonClass}
+                    >
+                      <MessageSquareText size={14} />
+                      {t('interviews.detail.extractWithAi')}
+                    </button>
+                  </div>
+                </div>
+              </div>
               <Field label={t('interviews.detail.title')}><input className={inputClass} value={createForm.title} onChange={event => setCreateForm(prev => ({ ...prev, title: event.target.value }))} /></Field>
               <Field label={t('interviews.detail.company')}><input className={inputClass} value={createForm.company ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, company: event.target.value }))} /></Field>
               <Field label={t('interviews.detail.role')}><input className={inputClass} value={createForm.roleTitle ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, roleTitle: event.target.value }))} /></Field>
@@ -1119,48 +1194,56 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                   <option value="macos">{t('interviews.detail.createInMacCalendar')}</option>
                 </select>
               </Field>
-              <div className="md:col-span-2">
-                <Field label={t('interviews.detail.sourceText')}>
-                  <textarea
-                    className={`${inputClass} min-h-[130px] resize-none`}
-                    value={createForm.rawSourceText ?? ''}
-                    onChange={event => {
-                      setSourceParsePreview(null);
-                      setParseWarnings([]);
-                      setCreateForm(prev => ({ ...prev, rawSourceText: event.target.value }));
-                    }}
-                  />
-                </Field>
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <div className="min-w-0 truncate text-[11px] text-text-tertiary">
-                    {sourceParsePreview ? t('interviews.detail.fieldsDetected', { count: sourceParsePreview.fieldCount }) : t('interviews.detail.unparsedSource')}
-                    {parseWarnings.length > 0 ? ` · ${parseWarnings.join(', ')}` : ''}
-                  </div>
-                  <button type="button"
-                    onClick={parseSourceText}
-                    disabled={busy || !(createForm.rawSourceText ?? '').trim()}
-                    className={secondaryButtonClass}
-                  >
-                    <FileText size={14} />
-                    {t('interviews.detail.parse')}
-                  </button>
-                </div>
-              </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => {
                 setShowCreate(false);
                 setCreateCalendarProvider('none');
-                setSourceParsePreview(null);
+                setIntakePreview(null);
                 setParseWarnings([]);
               }} className={secondaryButtonClass}>{t('common.cancel')}</button>
-              <button type="button" onClick={createInterview} disabled={busy || !createForm.title.trim()} className={primaryButtonClass}>
-                {t('interviews.detail.create')}
+              <button type="button" onClick={createInterview} disabled={busy || !(createForm.rawSourceText ?? createForm.title).trim()} className={primaryButtonClass}>
+                {intakePreview?.stage ? t('interviews.detail.createVacancyStage') : t('interviews.detail.createVacancy')}
               </button>
             </div>
           </div>
         </div>
       )}
+      <div className="fixed bottom-4 right-4 z-[350] w-[min(360px,calc(100vw-32px))]">
+        {agentOpen ? (
+          <div className="rounded-md border border-white/[0.08] bg-[#101214] p-3 shadow-2xl">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-[13px] font-semibold">{t('interviews.agent.title')}</div>
+              <button type="button" className={iconButtonClass} onClick={() => setAgentOpen(false)} aria-label={t('common.close')}><X size={14} /></button>
+            </div>
+            <textarea
+              value={agentText}
+              onChange={event => {
+                setAgentText(event.target.value);
+                setAgentPreview(null);
+              }}
+              className={`${inputClass} min-h-[110px] resize-none`}
+              placeholder={t('interviews.agent.placeholder')}
+            />
+            {agentPreview && (
+              <div className="mt-3 rounded-md border border-cyan-300/20 bg-cyan-300/[0.06] p-3 text-[12px]">
+                <div className="font-semibold text-cyan-100">{agentPreview.classification}</div>
+                <div className="mt-1 text-text-secondary">{agentPreview.application.title || agentPreview.application.company || t('interviews.agent.untitled')}</div>
+                <div className="mt-1 text-text-tertiary">{Math.round(agentPreview.confidence * 100)}% confidence</div>
+              </div>
+            )}
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" onClick={() => runAgent(false)} disabled={busy || !agentText.trim()} className={secondaryButtonClass}>{t('interviews.agent.propose')}</button>
+              <button type="button" onClick={() => runAgent(true)} disabled={busy || (!agentPreview && !agentText.trim())} className={primaryButtonClass}>{t('interviews.agent.apply')}</button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setAgentOpen(true)} className={`${secondaryButtonClass} bg-[#101214] shadow-xl`}>
+            <MessageSquareText size={15} />
+            {t('interviews.agent.title')}
+          </button>
+        )}
+      </div>
     </div>
   );
 };

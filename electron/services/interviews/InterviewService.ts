@@ -1,4 +1,9 @@
 import type {
+  ApplicationCreateFromIntakePayload,
+  ApplicationCreateFromIntakeResult,
+  ApplicationDetail,
+  ApplicationIntakeInput,
+  ApplicationIntakeResult,
   InterviewCreatePayload,
   InterviewDetail,
   InterviewErrorAction,
@@ -12,6 +17,7 @@ import type {
   InterviewRetro,
   InterviewRetroPayload,
   InterviewSourceParseResult,
+  InterviewStageType,
   InterviewUpdatePatch,
   PrepBrief,
   PrepBriefPayload,
@@ -29,6 +35,9 @@ const VALID_STATUSES = new Set(['active', 'applied', 'screening', 'interviewing'
 const VALID_PRIORITIES = new Set(['low', 'normal', 'high']);
 const VALID_CALENDAR_PROVIDERS = new Set(['google', 'macos', 'manual']);
 const VALID_CALENDAR_SYNC_STATUSES = new Set(['local_only', 'linked', 'changed', 'missing', 'calendar_disabled', 'refresh_error']);
+const VALID_INTAKE_CLASSIFICATIONS = new Set(['vacancy_only', 'vacancy_with_scheduled_stage', 'stage_update_for_existing_vacancy', 'calendar_only', 'unknown']);
+const VALID_STAGE_TYPES = new Set(['recruiter_screen', 'technical_screen', 'system_design', 'leadership', 'final', 'offer_security', 'custom']);
+const VALID_STAGE_STATUSES = new Set(['draft', 'scheduled', 'done', 'waiting_feedback', 'passed', 'rejected', 'canceled', 'archived']);
 
 export class InterviewDomainError extends Error {
   constructor(
@@ -134,6 +143,14 @@ function optionalEpoch(value: unknown, field: string): number | null {
   return value;
 }
 
+function requiredEpoch(value: unknown, field: string): number {
+  const epoch = optionalEpoch(value, field);
+  if (epoch === null) {
+    throw new InterviewDomainError('invalid_payload', `${field} is required.`, false, 'fix_input');
+  }
+  return epoch;
+}
+
 function optionalUrl(value: unknown, field: string): string | null {
   const raw = text(value, field, 2048, false);
   if (!raw) return null;
@@ -159,6 +176,36 @@ function stringArray(value: unknown, field: string, maxItems = 200): string[] {
     throw new InterviewDomainError('invalid_payload', `${field} must be a bounded list.`, false, 'fix_input');
   }
   return value.map((item, index) => text(item, `${field}[${index}]`, 1000, true) as string);
+}
+
+function booleanValue(value: unknown, field: string): boolean {
+  if (typeof value !== 'boolean') {
+    throw new InterviewDomainError('invalid_payload', `${field} must be a boolean.`, false, 'fix_input');
+  }
+  return value;
+}
+
+function boundedConfidence(value: unknown, field: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 1) {
+    throw new InterviewDomainError('invalid_payload', `${field} must be a number from 0 to 1.`, false, 'fix_input');
+  }
+  return value;
+}
+
+function enumText<T extends string>(
+  value: unknown,
+  allowed: Set<string>,
+  field: string,
+  fallback?: T,
+): T {
+  if (value === undefined || value === null || value === '') {
+    if (fallback !== undefined) return fallback;
+    throw new InterviewDomainError('invalid_payload', `${field} is required.`, false, 'fix_input');
+  }
+  if (typeof value !== 'string' || !allowed.has(value)) {
+    throw new InterviewDomainError('invalid_payload', `${field} is invalid.`, false, 'fix_input');
+  }
+  return value as T;
 }
 
 function normalizeCreatePayload(payload: any): InterviewCreatePayload {
@@ -313,6 +360,123 @@ function normalizeSourceParseInput(input: unknown): string {
   return raw;
 }
 
+function normalizeApplicationIntakeInput(input: unknown): ApplicationIntakeInput {
+  const payload = typeof input === 'string' ? { text: input } : (input as any);
+  const textValue = normalizeSourceParseInput(payload);
+  const sourceHint = text(payload?.sourceHint, 'sourceHint', 80);
+  return {
+    text: textValue,
+    sourceHint: sourceHint as ApplicationIntakeInput['sourceHint'],
+    candidateApplicationIds: Array.isArray(payload?.candidateApplicationIds)
+      ? payload.candidateApplicationIds.map((id: unknown, index: number) => assertId(id, `candidateApplicationIds[${index}]`))
+      : undefined,
+    useAi: Boolean(payload?.useAi),
+  };
+}
+
+function normalizeApplicationIntakeResult(input: unknown): ApplicationIntakeResult {
+  const payload = optionalObject<any>(input, 'intake');
+  if (!payload) {
+    throw new InterviewDomainError('invalid_payload', 'intake is required.', false, 'fix_input');
+  }
+  const application = optionalObject<any>(payload.application, 'intake.application');
+  if (!application) {
+    throw new InterviewDomainError('invalid_payload', 'intake.application is required.', false, 'fix_input');
+  }
+  const normalized: ApplicationIntakeResult = {
+    classification: enumText(payload.classification, VALID_INTAKE_CLASSIFICATIONS, 'intake.classification'),
+    confidence: boundedConfidence(payload.confidence, 'intake.confidence'),
+    application: {
+      title: text(application.title, 'intake.application.title', 180) ?? undefined,
+      company: text(application.company, 'intake.application.company', 120) ?? undefined,
+      roleTitle: text(application.roleTitle, 'intake.application.roleTitle', 120) ?? undefined,
+      source: text(application.source, 'intake.application.source', 120) ?? undefined,
+      vacancyUrl: optionalUrl(application.vacancyUrl, 'intake.application.vacancyUrl') ?? undefined,
+      compensationText: text(application.compensationText, 'intake.application.compensationText', 2000) ?? undefined,
+      requirements: stringArray(application.requirements, 'intake.application.requirements', 80),
+      risks: stringArray(application.risks, 'intake.application.risks', 80),
+      questionsToAsk: stringArray(application.questionsToAsk, 'intake.application.questionsToAsk', 80),
+      rawSourceText: text(application.rawSourceText, 'intake.application.rawSourceText', 50000, true) as string,
+    },
+    warnings: stringArray(payload.warnings, 'intake.warnings', 50),
+    missingFields: stringArray(payload.missingFields, 'intake.missingFields', 50),
+  };
+
+  const stage = optionalObject<any>(payload.stage, 'intake.stage');
+  if (stage) {
+    normalized.stage = {
+      stageType: enumText(stage.stageType, VALID_STAGE_TYPES, 'intake.stage.stageType', 'custom'),
+      title: text(stage.title, 'intake.stage.title', 180) ?? undefined,
+      startsAt: optionalEpoch(stage.startsAt, 'intake.stage.startsAt') ?? undefined,
+      endsAt: optionalEpoch(stage.endsAt, 'intake.stage.endsAt') ?? undefined,
+      timezone: text(stage.timezone, 'intake.stage.timezone', 120) ?? undefined,
+      meetingUrl: optionalUrl(stage.meetingUrl, 'intake.stage.meetingUrl') ?? undefined,
+      status: enumText(stage.status, VALID_STAGE_STATUSES, 'intake.stage.status', 'draft'),
+    };
+  }
+
+  const existingApplicationMatch = optionalObject<any>(payload.existingApplicationMatch, 'intake.existingApplicationMatch');
+  if (existingApplicationMatch) {
+    normalized.existingApplicationMatch = {
+      applicationId: assertId(existingApplicationMatch.applicationId, 'intake.existingApplicationMatch.applicationId'),
+      confidence: boundedConfidence(existingApplicationMatch.confidence, 'intake.existingApplicationMatch.confidence'),
+      reason: text(existingApplicationMatch.reason, 'intake.existingApplicationMatch.reason', 1000, true) as string,
+    };
+  }
+
+  const calendarProposal = optionalObject<any>(payload.calendarProposal, 'intake.calendarProposal');
+  if (calendarProposal) {
+    normalized.calendarProposal = {
+      shouldCreate: booleanValue(calendarProposal.shouldCreate, 'intake.calendarProposal.shouldCreate'),
+      title: text(calendarProposal.title, 'intake.calendarProposal.title', 180, true) as string,
+      startsAt: requiredEpoch(calendarProposal.startsAt, 'intake.calendarProposal.startsAt'),
+      endsAt: requiredEpoch(calendarProposal.endsAt, 'intake.calendarProposal.endsAt'),
+      timezone: text(calendarProposal.timezone, 'intake.calendarProposal.timezone', 120, true) as string,
+      locationOrUrl: text(calendarProposal.locationOrUrl, 'intake.calendarProposal.locationOrUrl', 2048) ?? undefined,
+      description: text(calendarProposal.description, 'intake.calendarProposal.description', 5000, true) as string,
+      reminders: Array.isArray(calendarProposal.reminders)
+        ? calendarProposal.reminders.slice(0, 10).map((reminder: any, index: number) => {
+          const minutesBefore = reminder?.minutesBefore;
+          if (typeof minutesBefore !== 'number' || !Number.isInteger(minutesBefore) || minutesBefore < 0 || minutesBefore > 10080) {
+            throw new InterviewDomainError('invalid_payload', `intake.calendarProposal.reminders[${index}].minutesBefore is invalid.`, false, 'fix_input');
+          }
+          return { minutesBefore };
+        })
+        : [],
+    };
+  }
+
+  return normalized;
+}
+
+function classificationFromParsed(parsed: InterviewSourceParseResult): ApplicationIntakeResult['classification'] {
+  if (parsed.fields.startsAt || parsed.fields.meetingUrl || parsed.fields.stage) return 'vacancy_with_scheduled_stage';
+  if (parsed.fields.company || parsed.fields.roleTitle || parsed.fields.vacancyUrl || parsed.fieldCount > 1) return 'vacancy_only';
+  return 'unknown';
+}
+
+function intakeConfidence(parsed: InterviewSourceParseResult): number {
+  let score = 0.45;
+  if (parsed.fields.company) score += 0.12;
+  if (parsed.fields.roleTitle) score += 0.12;
+  if (parsed.fields.vacancyUrl) score += 0.08;
+  if (parsed.fields.startsAt) score += 0.08;
+  if (parsed.fields.meetingUrl) score += 0.05;
+  if ((parsed.dossier?.requirements?.length ?? 0) > 0) score += 0.05;
+  return Math.max(0.1, Math.min(0.95, score));
+}
+
+function stageTypeFromParsedStage(stage?: string | null): InterviewStageType {
+  const textValue = (stage ?? '').toLowerCase();
+  if (/recruit|hr|screen|скрин|рекрутер|эйчар/.test(textValue)) return 'recruiter_screen';
+  if (/system|design|архитект/.test(textValue)) return 'system_design';
+  if (/lead|manager|руковод/.test(textValue)) return 'leadership';
+  if (/final|финал/.test(textValue)) return 'final';
+  if (/offer|security|оффер|сб/.test(textValue)) return 'offer_security';
+  if (/tech|technical|тех/.test(textValue)) return 'technical_screen';
+  return 'custom';
+}
+
 function normalizeRetroPromptAction(payload: any): { action: RetroPromptAction; snoozeUntil?: number | null } {
   const action = payload?.action;
   if (!['prompted', 'snooze', 'dismiss', 'complete'].includes(action)) {
@@ -373,8 +537,105 @@ export class InterviewService {
     }
   }
 
+  parseApplicationIntake(input: unknown): ApplicationIntakeResult {
+    const normalized = normalizeApplicationIntakeInput(input);
+    const parsed = this.parseSourceText({ text: normalized.text });
+    const classification = classificationFromParsed(parsed);
+    const timezone = parsed.fields.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const hasStage = classification === 'vacancy_with_scheduled_stage';
+    const warnings = [...parsed.warnings];
+    if (normalized.useAi) {
+      warnings.push('AI enrichment is not configured yet; deterministic extraction was used.');
+    }
+    const missingFields: string[] = [];
+    if (!parsed.fields.company) missingFields.push('company');
+    if (!parsed.fields.roleTitle && !parsed.fields.title) missingFields.push('roleTitle');
+    if (hasStage && parsed.fields.startsAt && !parsed.fields.endsAt) missingFields.push('endsAt');
+    const title = parsed.fields.title
+      || [parsed.fields.company, parsed.fields.roleTitle].filter(Boolean).join(' · ')
+      || 'Untitled vacancy';
+    const result: ApplicationIntakeResult = {
+      classification,
+      confidence: intakeConfidence(parsed),
+      application: {
+        title,
+        company: parsed.fields.company ?? undefined,
+        roleTitle: parsed.fields.roleTitle ?? undefined,
+        source: parsed.fields.source ?? parsed.detectedSource ?? normalized.sourceHint ?? undefined,
+        vacancyUrl: parsed.fields.vacancyUrl ?? undefined,
+        compensationText: parsed.dossier?.compensationText ?? undefined,
+        requirements: parsed.dossier?.requirements ?? [],
+        risks: parsed.dossier?.risks ?? [],
+        questionsToAsk: parsed.dossier?.questionsToAsk ?? [],
+        rawSourceText: parsed.fields.rawSourceText ?? parsed.normalizedText ?? normalized.text,
+      },
+      warnings,
+      missingFields,
+    };
+    if (hasStage) {
+      result.stage = {
+        stageType: stageTypeFromParsedStage(parsed.fields.stage),
+        title: parsed.fields.stage ?? 'Initial stage',
+        startsAt: parsed.fields.startsAt ?? undefined,
+        endsAt: parsed.fields.endsAt ?? undefined,
+        timezone,
+        meetingUrl: parsed.fields.meetingUrl ?? undefined,
+        status: parsed.fields.startsAt ? 'scheduled' : 'draft',
+      };
+    }
+    if (result.stage?.startsAt && result.stage.endsAt) {
+      result.calendarProposal = {
+        shouldCreate: true,
+        title,
+        startsAt: result.stage.startsAt,
+        endsAt: result.stage.endsAt,
+        timezone,
+        locationOrUrl: result.stage.meetingUrl,
+        description: [
+          result.application.company ? `Company: ${result.application.company}` : null,
+          result.application.roleTitle ? `Role: ${result.application.roleTitle}` : null,
+          result.application.vacancyUrl ? `Vacancy: ${result.application.vacancyUrl}` : null,
+        ].filter(Boolean).join('\n'),
+        reminders: [{ minutesBefore: 15 }],
+      };
+    }
+    return result;
+  }
+
+  listApplications(): ApplicationDetail[] {
+    return this.repo.listApplications();
+  }
+
+  getApplication(id: string): ApplicationDetail {
+    const detail = this.repo.getApplication(assertId(id, 'applicationId'));
+    if (!detail) throw new InterviewDomainError('not_found', 'Application not found.', false, 'none');
+    return detail;
+  }
+
+  createApplicationFromIntake(operationId: string, payload: unknown): ApplicationCreateFromIntakeResult {
+    assertId(operationId, 'operationId');
+    const input = payload as ApplicationCreateFromIntakePayload;
+    return this.repo.createApplicationFromIntake(normalizeApplicationIntakeResult(input?.intake), operationId);
+  }
+
   update(id: string, patch: unknown): InterviewDetail {
     const updated = this.repo.update(assertId(id), normalizeUpdatePatch(patch));
+    if (!updated) throw new InterviewDomainError('not_found', 'Interview not found.', false, 'none');
+    return this.repo.get(updated.id, ['dossier', 'prep', 'retros', 'questions', 'meetings']) as InterviewDetail;
+  }
+
+  updateStageCalendarForLegacyInterview(interviewId: string, patch: unknown): void {
+    this.repo.updateStageCalendarForLegacyInterview(
+      assertId(interviewId, 'interviewId'),
+      normalizeUpdatePatch(patch),
+    );
+  }
+
+  updateCalendarForLegacyInterview(interviewId: string, patch: unknown): InterviewDetail {
+    const updated = this.repo.updateCalendarForLegacyInterview(
+      assertId(interviewId, 'interviewId'),
+      normalizeUpdatePatch(patch),
+    );
     if (!updated) throw new InterviewDomainError('not_found', 'Interview not found.', false, 'none');
     return this.repo.get(updated.id, ['dossier', 'prep', 'retros', 'questions', 'meetings']) as InterviewDetail;
   }

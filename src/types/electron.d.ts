@@ -1,4 +1,9 @@
 import type {
+  ApplicationCreateFromIntakePayload,
+  ApplicationCreateFromIntakeResult,
+  ApplicationDetail,
+  ApplicationIntakeInput,
+  ApplicationIntakeResult,
   InterviewCreatePayload,
   InterviewDetail,
   InterviewIpcResult,
@@ -317,6 +322,10 @@ export interface ElectronAPI {
   interviewsGet: (input: { id: string; include?: Array<'dossier' | 'prep' | 'retros' | 'questions' | 'contacts' | 'meetings'> }) => Promise<InterviewIpcResult<InterviewDetail>>
   interviewsCreate: (operationId: string, payload: InterviewCreatePayload) => Promise<InterviewIpcResult<InterviewDetail>>
   interviewsParseSourceText: (input: InterviewSourceParseInput | string) => Promise<InterviewIpcResult<InterviewSourceParseResult>>
+  applicationIntakeParse: (input: ApplicationIntakeInput | string) => Promise<InterviewIpcResult<ApplicationIntakeResult>>
+  applicationsList: () => Promise<InterviewIpcResult<ApplicationDetail[]>>
+  applicationsGet: (id: string) => Promise<InterviewIpcResult<ApplicationDetail>>
+  applicationsCreateFromIntake: (operationId: string, payload: ApplicationCreateFromIntakePayload) => Promise<InterviewIpcResult<ApplicationCreateFromIntakeResult>>
   interviewsUpdate: (id: string, patch: InterviewUpdatePatch) => Promise<InterviewIpcResult<InterviewDetail>>
   interviewsArchive: (id: string) => Promise<InterviewIpcResult<{ archived: boolean }>>
   interviewsDelete: (id: string, includeLinkedMeetings?: boolean) => Promise<InterviewIpcResult<{ deleted: boolean }>>

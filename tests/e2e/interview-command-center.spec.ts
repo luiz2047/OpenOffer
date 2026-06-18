@@ -192,6 +192,75 @@ test.describe('Interview Command Center', () => {
             normalizedText: text,
           });
         },
+        applicationIntakeParse: async (input: any) => {
+          const text = typeof input === 'string' ? input : input?.text ?? '';
+          return result({
+            classification: 'vacancy_only',
+            confidence: 0.88,
+            application: {
+              title: 'Acme Backend interview',
+              company: 'Acme',
+              roleTitle: 'Backend Developer',
+              source: 'HH',
+              rawSourceText: text,
+              requirements: ['Node.js'],
+              risks: ['Legacy stack'],
+              questionsToAsk: ['How do releases work?'],
+            },
+            warnings: [],
+            missingFields: [],
+          });
+        },
+        applicationsList: async () => result([]),
+        applicationsGet: async (id: string) => result({ id, title: 'Acme Backend interview', status: 'lead_found', priority: 'normal', stages: [] }),
+        applicationsCreateFromIntake: async (_operationId: string, payload: any) => {
+          const intake = payload.intake;
+          const row = {
+            id: `interview_${interviews.length + 1}`,
+            title: intake.application.title,
+            company: intake.application.company ?? null,
+            roleTitle: intake.application.roleTitle ?? null,
+            stage: intake.stage?.title ?? 'Recruiter screen',
+            status: intake.stage ? 'interviewing' : 'active',
+            priority: 'normal',
+            source: intake.application.source ?? 'manual',
+            vacancyUrl: intake.application.vacancyUrl ?? null,
+            meetingUrl: intake.stage?.meetingUrl ?? null,
+            calendarSyncStatus: 'local_only',
+            startsAt: intake.stage?.startsAt ?? null,
+            endsAt: intake.stage?.endsAt ?? null,
+            timezone: intake.stage?.timezone ?? 'UTC',
+            rawSourceText: intake.application.rawSourceText ?? null,
+            applicationId: `app_${interviews.length + 1}`,
+            selectedStageId: intake.stage ? `stage_${interviews.length + 1}` : null,
+            createdAt: '2026-06-18T00:00:00.000Z',
+            updatedAt: '2026-06-18T00:00:00.000Z',
+            dossier: {
+              id: `dossier_${interviews.length + 1}`,
+              interviewEventId: `interview_${interviews.length + 1}`,
+              requirements: intake.application.requirements ?? [],
+              risks: intake.application.risks ?? [],
+              questionsToAsk: intake.application.questionsToAsk ?? [],
+            },
+            questions: [],
+            retros: [],
+            linkedMeetings: [],
+          };
+          interviews.unshift(row);
+          return result({
+            application: {
+              id: row.applicationId,
+              title: row.title,
+              company: row.company,
+              roleTitle: row.roleTitle,
+              status: 'lead_found',
+              priority: 'normal',
+              legacyInterviewEventId: row.id,
+              stages: row.selectedStageId ? [{ id: row.selectedStageId, applicationId: row.applicationId, title: row.stage, status: 'draft', stageType: 'custom', calendarSyncStatus: 'local_only' }] : [],
+            },
+            legacyInterview: detail(row.id),
+          });
+        },
         vacancyDossierSave: async (id: string, _operationId: string, payload: any) => {
           const row = interviews.find(item => item.id === id);
           row.dossier = { id: `dossier_${id}`, interviewEventId: id, ...payload, createdAt: '2026-06-18T00:00:00.000Z', updatedAt: '2026-06-18T00:00:00.000Z' };

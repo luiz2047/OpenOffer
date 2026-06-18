@@ -123,6 +123,62 @@ export function applyInterviewSchema(db: InterviewSchemaDb): void {
       PRIMARY KEY(operation_id, action)
     );
 
+    CREATE TABLE IF NOT EXISTS applications (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      company TEXT,
+      role_title TEXT,
+      status TEXT NOT NULL DEFAULT 'lead_found',
+      priority TEXT DEFAULT 'normal',
+      source TEXT,
+      source_url TEXT,
+      vacancy_url TEXT,
+      compensation_text TEXT,
+      location_format TEXT,
+      next_action TEXT,
+      next_action_due_at INTEGER,
+      raw_source_text TEXT,
+      legacy_interview_event_id TEXT UNIQUE,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      archived_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS interview_stages (
+      id TEXT PRIMARY KEY,
+      application_id TEXT NOT NULL,
+      stage_type TEXT NOT NULL DEFAULT 'custom',
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'draft',
+      starts_at INTEGER,
+      ends_at INTEGER,
+      timezone TEXT,
+      format TEXT,
+      meeting_url TEXT,
+      calendar_provider TEXT,
+      calendar_id TEXT,
+      calendar_event_id TEXT,
+      calendar_snapshot_json TEXT,
+      calendar_last_seen_at INTEGER,
+      calendar_missing_since INTEGER,
+      calendar_sync_status TEXT DEFAULT 'local_only',
+      raw_source_text TEXT,
+      legacy_interview_event_id TEXT UNIQUE,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      archived_at TEXT,
+      FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS legacy_interview_event_map (
+      legacy_interview_event_id TEXT PRIMARY KEY,
+      application_id TEXT NOT NULL,
+      stage_id TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE,
+      FOREIGN KEY(stage_id) REFERENCES interview_stages(id) ON DELETE SET NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_interview_events_time ON interview_events(starts_at);
     CREATE INDEX IF NOT EXISTS idx_interview_events_status ON interview_events(status);
     CREATE INDEX IF NOT EXISTS idx_interview_events_calendar_ref ON interview_events(calendar_provider, calendar_id, calendar_event_id);
@@ -132,6 +188,16 @@ export function applyInterviewSchema(db: InterviewSchemaDb): void {
     CREATE INDEX IF NOT EXISTS idx_interview_questions_event ON interview_questions(interview_event_id);
     CREATE INDEX IF NOT EXISTS idx_interview_contacts_contact ON interview_contacts(contact_id);
     CREATE INDEX IF NOT EXISTS idx_interview_client_operations_created_at ON interview_client_operations(created_at);
+    CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
+    CREATE INDEX IF NOT EXISTS idx_applications_updated_at ON applications(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_applications_vacancy_url ON applications(vacancy_url);
+    CREATE INDEX IF NOT EXISTS idx_interview_stages_application_id ON interview_stages(application_id);
+    CREATE INDEX IF NOT EXISTS idx_interview_stages_time ON interview_stages(starts_at);
+    CREATE INDEX IF NOT EXISTS idx_interview_stages_status ON interview_stages(status);
+    CREATE INDEX IF NOT EXISTS idx_interview_stages_calendar_ref ON interview_stages(calendar_provider, calendar_id, calendar_event_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_interview_stages_calendar_ref
+      ON interview_stages(calendar_provider, calendar_id, calendar_event_id)
+      WHERE calendar_provider IS NOT NULL AND calendar_id IS NOT NULL AND calendar_event_id IS NOT NULL;
   `);
 
   try {
@@ -143,4 +209,14 @@ export function applyInterviewSchema(db: InterviewSchemaDb): void {
   }
 
   db.exec('CREATE INDEX IF NOT EXISTS idx_meetings_interview_event_id ON meetings(interview_event_id);');
+
+  try {
+    db.exec('ALTER TABLE meetings ADD COLUMN interview_stage_id TEXT');
+  } catch (error: any) {
+    if (!/duplicate column name/i.test(String(error?.message || error))) {
+      throw error;
+    }
+  }
+
+  db.exec('CREATE INDEX IF NOT EXISTS idx_meetings_interview_stage_id ON meetings(interview_stage_id);');
 }
