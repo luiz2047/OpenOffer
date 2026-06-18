@@ -205,7 +205,7 @@ export const AboutSection: React.FC<AboutSectionProps> = () => {
                                     <p className="text-xs text-text-secondary leading-relaxed max-w-lg">
                                         OpenOffer is becoming a local-first workspace for job-search context, interview preparation, and career process memory.
                                         <br />
-                                        <span className="font-bold text-text-primary">The app experience stays focused on the user's work, not creator promotion or fundraising.</span>
+                                        <span className="font-bold text-text-primary">The app experience stays focused on the user's workflow and preparation context.</span>
                                     </p>
                                 </div>
                             </div>

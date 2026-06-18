@@ -121,6 +121,9 @@ describe('OpenOffer commercial-path removal', () => {
       'evinjohn',
       'Creator</span>',
       'Creator"',
+      'creator promotion',
+      'fundraising',
+      'Pro Intelligence',
       'Contact Me',
       'mailto:evinjohn',
     ]) {

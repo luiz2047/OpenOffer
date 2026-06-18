@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
     Command, Monitor, Mic, Settings, Zap, Key, User, Play, Image, ArrowUp, FileText, Sparkles, Search, ChevronUp, Copy,
     FileJson, MessageSquare, Briefcase, Eye, EyeOff, Ghost, ChevronDown, ChevronRight, HelpCircle, Upload, CheckCircle2,
-    RefreshCw, Trash2, Check, ExternalLink, Volume2, Globe, Brain, Cpu, Calendar, Star, CreditCard, X, Pencil, Lightbulb,
+    RefreshCw, Trash2, Check, ExternalLink, Volume2, Globe, Brain, Cpu, Calendar, Star, X, Pencil, Lightbulb,
     SlidersHorizontal, PointerOff, ArrowRight, LayoutGrid, Smartphone, Wifi, Lock, DollarSign, Building2
 } from 'lucide-react';
 import { SiOpenai, SiGoogle } from 'react-icons/si';
@@ -1462,7 +1462,7 @@ export const HelpSettings: React.FC<{ onNavigate?: (tab: string) => void }> = ()
 
 
 
-                <AccordionSection title="7. Pro Intelligence" icon={<Star className="w-4 h-4" />}>
+                <AccordionSection title="7. Profile Intelligence" icon={<Star className="w-4 h-4" />}>
                     <div className="space-y-6">
                         {/* Profile */}
                         <div>
@@ -1489,7 +1489,7 @@ export const HelpSettings: React.FC<{ onNavigate?: (tab: string) => void }> = ()
 
                                 <div className="p-4 rounded-xl border bg-accent-primary/5 border-border-subtle">
                                     <h4 className="font-semibold text-sm mb-2 text-text-primary flex items-center gap-2">
-                                        <CreditCard className="w-4 h-4 text-accent-primary" /> Local Profile Context
+                                        <FileText className="w-4 h-4 text-accent-primary" /> Local Profile Context
                                     </h4>
                                     <p className="text-[11px] text-text-secondary mb-2">
                                         Profile Intelligence is included in OpenOffer and runs from your local files and configured providers.
