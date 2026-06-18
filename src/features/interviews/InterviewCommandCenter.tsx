@@ -664,7 +664,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
             <CalendarDays size={18} className="text-cyan-300" />
             <span className="text-[15px] font-semibold">{t('interviews.calendar')}</span>
           </div>
-          <button className={iconButtonClass} onClick={refreshAll} title={t('common.refresh')}>
+          <button type="button" className={iconButtonClass} onClick={refreshAll} title={t('common.refresh')}>
             <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
           </button>
         </div>
@@ -672,7 +672,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         <div className="border-b border-white/[0.07] p-3">
           <div className="grid grid-cols-2 rounded-md bg-black/25 p-1">
             {(['google', 'macos'] as CalendarProvider[]).map(provider => (
-              <button
+              <button type="button"
                 key={provider}
                 onClick={() => setActiveProvider(provider)}
                 className={`min-h-11 rounded px-2 text-[12px] font-medium transition ${activeProvider === provider ? 'bg-white/[0.09] text-white shadow-sm' : 'text-white/70 hover:bg-white/[0.04] hover:text-white'}`}
@@ -691,7 +691,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               </div>
             </div>
             {activeProvider === 'google' ? (
-              <button
+              <button type="button"
                 className="min-h-11 rounded-md bg-cyan-500 px-3 text-[12px] font-semibold text-black transition hover:bg-cyan-300"
                 onClick={() => window.electronAPI?.calendarConnect?.().then(result => {
                   if (result.success) void loadCalendarStatus();
@@ -701,7 +701,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 {calendarStatus?.connected ? t('common.reconnect') : t('interviews.connect')}
               </button>
             ) : (
-              <button
+              <button type="button"
                 className="min-h-11 rounded-md border border-white/[0.08] px-3 text-[12px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white"
                 onClick={() => onOpenSettings('calendar')}
               >
@@ -731,7 +731,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
           </div>
           <div className="space-y-2">
             {upcomingForProvider.slice(0, 12).map(event => (
-              <button
+              <button type="button"
                 key={event.id}
                 onClick={() => createFromEvent(event)}
                 className="min-h-16 w-full rounded-md border border-transparent px-3 py-2.5 text-left transition hover:bg-white/[0.055] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60"
@@ -763,7 +763,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
             <div className="text-[15px] font-semibold">{t('interviews.interviewOS')}</div>
             <div className="text-[11px] text-text-tertiary">{t('interviews.activeProcessCount', { count: interviews.length })}</div>
           </div>
-          <button
+          <button type="button"
             onClick={() => setShowCreate(true)}
             className={primaryButtonClass}
           >
@@ -776,6 +776,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
           <div className="flex min-h-11 items-center gap-2 rounded-md border border-white/[0.08] bg-black/20 px-3">
             <Search size={15} className="text-text-tertiary" />
             <input
+              aria-label={t('interviews.searchPlaceholder')}
               value={query}
               onChange={event => setQuery(event.target.value)}
               placeholder={t('interviews.searchPlaceholder')}
@@ -787,7 +788,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
           <div className="space-y-2">
             {filteredInterviews.map(item => (
-              <button
+              <button type="button"
                 key={item.id}
                 onClick={() => setSelectedId(item.id)}
                 className={`min-h-24 w-full rounded-md border p-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60 ${selectedId === item.id ? 'border-cyan-300/35 bg-cyan-300/[0.08]' : 'border-transparent bg-transparent hover:bg-white/[0.045]'}`}
@@ -820,13 +821,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         <div className="border-t border-white/[0.07] p-3">
           <div className="mb-2 flex items-center justify-between">
             <span className={labelClass}>{t('interviews.recordings')}</span>
-            <button onClick={startSelectedInterview} className="min-h-11 px-2 text-[11px] font-semibold text-cyan-300 hover:text-cyan-200" style={{ minWidth: 44 }}>
+            <button type="button" onClick={startSelectedInterview} className="min-h-11 px-2 text-[11px] font-semibold text-cyan-300 hover:text-cyan-200" style={{ minWidth: 44 }}>
               {isMeetingActive ? t('common.openLive') : t('common.start')}
             </button>
           </div>
           <div className="space-y-1.5">
             {meetings.slice(0, 3).map(meeting => (
-              <button key={meeting.id} onClick={() => onOpenMeeting(meeting)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-2 text-left text-[12px] transition hover:bg-white/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60">
+              <button type="button" key={meeting.id} onClick={() => onOpenMeeting(meeting)} className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-2 text-left text-[12px] transition hover:bg-white/[0.05] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60">
                 <span className="truncate text-text-secondary">{meeting.title}</span>
                 <ChevronRight size={14} className="shrink-0 text-text-tertiary" />
               </button>
@@ -848,7 +849,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
           </div>
           {detail && (
             <div className="flex items-center gap-2">
-              <button
+              <button type="button"
                 onClick={startSelectedInterview}
                 className={primaryButtonClass}
                 style={{ minWidth: 44 }}
@@ -862,7 +863,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               >
                 {STATUS_OPTIONS.map(status => <option key={status} value={status}>{t(`interviews.status.${status}`)}</option>)}
               </select>
-              <button className={iconButtonClass} title={t('interviews.archive')} onClick={() => detail && run(async () => {
+              <button type="button" className={iconButtonClass} title={t('interviews.archive')} onClick={() => detail && run(async () => {
                 await interviewApi.archive(detail.id);
                 await loadInterviews();
               })}>
@@ -884,7 +885,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
             <div className="min-h-0 overflow-y-auto p-5 custom-scrollbar">
               <div className="mb-5 flex items-center gap-1 border-b border-white/[0.07]">
                 {DETAIL_TABS.map(tab => (
-                  <button
+                  <button type="button"
                     key={tab}
                     onClick={() => setDetailTab(tab)}
                     className={`min-h-11 flex-1 px-3 text-[12px] font-semibold transition ${detailTab === tab ? 'border-b-2 border-cyan-300 text-white' : 'border-b-2 border-transparent text-text-secondary hover:text-white'}`}
@@ -903,14 +904,14 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                     <InfoTile icon={<Clock3 size={16} />} label="Schedule" value={formatDateTime(detail.startsAt)} />
                   </div>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <button
+                    <button type="button"
                       className="flex min-h-14 items-center justify-between rounded-md bg-white/[0.025] p-3 text-left transition hover:bg-white/[0.055] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60"
                       onClick={() => detail.vacancyUrl && window.electronAPI?.openExternal?.(detail.vacancyUrl)}
                     >
                       <span className="text-[13px] text-text-secondary">Vacancy URL</span>
                       <ArrowUpRight size={15} className="text-text-tertiary" />
                     </button>
-                    <button
+                    <button type="button"
                       className="flex min-h-14 items-center justify-between rounded-md bg-white/[0.025] p-3 text-left transition hover:bg-white/[0.055] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60"
                       onClick={() => detail.meetingUrl && window.electronAPI?.openExternal?.(detail.meetingUrl)}
                     >
@@ -947,7 +948,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                         <option value="">Select meeting</option>
                         {meetings.map(meeting => <option key={meeting.id} value={meeting.id}>{meeting.title}</option>)}
                       </select>
-                      <button onClick={attachMeeting} disabled={!attachMeetingId || busy} className={secondaryButtonClass}>
+                      <button type="button" onClick={attachMeeting} disabled={!attachMeetingId || busy} className={secondaryButtonClass}>
                         Link
                       </button>
                     </div>
@@ -982,9 +983,9 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       <div className="text-[13px] font-semibold text-amber-100">Retro is due</div>
                       <div className="mt-1 text-[12px] text-amber-100/75">Capture what changed before the interview context decays.</div>
                       <div className="mt-3 flex gap-2">
-                        <button onClick={() => setDetailTab('Retro')} className="min-h-11 rounded-md bg-amber-300 px-3 text-[12px] font-semibold text-black">Write</button>
-                        <button onClick={() => updateRetroPrompt('snooze')} className="min-h-11 rounded-md border border-amber-300/25 px-3 text-[12px] font-semibold text-amber-100">Snooze</button>
-                        <button onClick={() => updateRetroPrompt('dismiss')} className="min-h-11 rounded-md border border-white/[0.08] px-3 text-[12px] font-semibold text-text-secondary">Dismiss</button>
+                        <button type="button" onClick={() => setDetailTab('Retro')} className="min-h-11 rounded-md bg-amber-300 px-3 text-[12px] font-semibold text-black">Write</button>
+                        <button type="button" onClick={() => updateRetroPrompt('snooze')} className="min-h-11 rounded-md border border-amber-300/25 px-3 text-[12px] font-semibold text-amber-100">Snooze</button>
+                        <button type="button" onClick={() => updateRetroPrompt('dismiss')} className="min-h-11 rounded-md border border-white/[0.08] px-3 text-[12px] font-semibold text-text-secondary">Dismiss</button>
                       </div>
                     </div>
                   )}
@@ -1013,7 +1014,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                     <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_150px_auto]">
                       <input value={questionText} onChange={event => setQuestionText(event.target.value)} className={inputClass} placeholder="Question" />
                       <input value={questionCategory} onChange={event => setQuestionCategory(event.target.value)} className={inputClass} placeholder="Category" />
-                      <button onClick={addQuestion} className={primaryButtonClass}>Add</button>
+                      <button type="button" onClick={addQuestion} className={primaryButtonClass}>Add</button>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -1023,13 +1024,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                           <div className="text-[13px] font-medium">{question.questionText}</div>
                           <div className="mt-1 text-[11px] text-text-tertiary">{question.category || 'uncategorized'}</div>
                         </div>
-                        <button className={iconButtonClass} onClick={() => setQuestionDrafts(prev => prev.filter((_, i) => i !== index))}>
+                        <button type="button" className={iconButtonClass} onClick={() => setQuestionDrafts(prev => prev.filter((_, i) => i !== index))}>
                           <Trash2 size={14} />
                         </button>
                       </div>
                     ))}
                   </div>
-                  <button onClick={saveQuestions} disabled={busy} className={primaryButtonClass}>Save questions</button>
+                  <button type="button" onClick={saveQuestions} disabled={busy} className={primaryButtonClass}>Save questions</button>
                 </div>
               )}
             </div>
@@ -1062,7 +1063,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               <BriefcaseBusiness size={26} className="mx-auto text-cyan-300" />
               <div className="mt-3 text-[15px] font-semibold">{t('interviews.startProcess')}</div>
               <div className="mt-2 text-[13px] leading-5 text-text-tertiary">{t('interviews.noActiveProcessSelected')}</div>
-              <button onClick={() => setShowCreate(true)} className={`${primaryButtonClass} mt-4`}>{t('interviews.newInterview')}</button>
+              <button type="button" onClick={() => setShowCreate(true)} className={`${primaryButtonClass} mt-4`}>{t('interviews.newInterview')}</button>
             </div>
           </div>
         )}
@@ -1076,7 +1077,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 <div className="text-[16px] font-semibold">New interview</div>
                 <div className="text-[12px] text-text-tertiary">Manual intake</div>
               </div>
-              <button className={iconButtonClass} onClick={() => {
+              <button type="button" className={iconButtonClass} onClick={() => {
                 setShowCreate(false);
                 setCreateCalendarProvider('none');
                 setSourceParsePreview(null);
@@ -1128,7 +1129,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                     {sourceParsePreview ? `${sourceParsePreview.fieldCount} fields detected` : 'Unparsed source'}
                     {parseWarnings.length > 0 ? ` · ${parseWarnings.join(', ')}` : ''}
                   </div>
-                  <button
+                  <button type="button"
                     onClick={parseSourceText}
                     disabled={busy || !(createForm.rawSourceText ?? '').trim()}
                     className={secondaryButtonClass}
@@ -1140,13 +1141,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               </div>
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => {
+              <button type="button" onClick={() => {
                 setShowCreate(false);
                 setCreateCalendarProvider('none');
                 setSourceParsePreview(null);
                 setParseWarnings([]);
               }} className={secondaryButtonClass}>Cancel</button>
-              <button onClick={createInterview} disabled={busy || !createForm.title.trim()} className={primaryButtonClass}>
+              <button type="button" onClick={createInterview} disabled={busy || !createForm.title.trim()} className={primaryButtonClass}>
                 Create
               </button>
             </div>
@@ -1201,7 +1202,7 @@ const EditorPanel: React.FC<{
           {status === 'dirty' ? 'Draft changed' : status === 'saved' ? 'Draft saved locally' : status === 'failed' ? 'Draft not saved locally' : 'Synced'}
         </div>
       </div>
-      <button onClick={onSave} disabled={busy} className={primaryButtonClass}>
+      <button type="button" onClick={onSave} disabled={busy} className={primaryButtonClass}>
         {action}
       </button>
     </div>

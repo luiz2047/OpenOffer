@@ -1,7 +1,8 @@
 import React from "react"
 import ReactDOM from "react-dom/client"
 import App from "./App"
-import { InterfaceI18nProvider, initI18n } from "./i18n"
+import { InterfaceI18nProvider } from "./i18n/I18nProvider"
+import { initI18n } from "./i18n/i18n"
 import "./index.css"
 
 const THEME_CACHE_KEY = 'natively_resolved_theme';

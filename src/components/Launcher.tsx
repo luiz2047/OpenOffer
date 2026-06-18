@@ -212,16 +212,16 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
         };
     }, [isShortcutPressed]);
 
-    if (!window.electronAPI) {
-        return <div className="text-white p-10">Error: Electron API not initialized. Check preload script.</div>;
-    }
-
     // Notify parent if we are on the main launcher list view
     useEffect(() => {
         if (onPageChange) {
             onPageChange(!selectedMeeting && !isGlobalChatOpen);
         }
     }, [selectedMeeting, isGlobalChatOpen, onPageChange]);
+
+    if (!window.electronAPI) {
+        return <div className="text-white p-10">Error: Electron API not initialized. Check preload script.</div>;
+    }
 
     const handleOpenMeeting = async (meeting: Meeting) => {
         setForwardMeeting(null); // Clear forward history on new navigation
@@ -271,7 +271,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                     {isMac && <div className="w-[70px]" />} {/* Traffic Light Spacer (macOS only) */}
 
                     {/* Back Button */}
-                    <button
+                    <button type="button"
                         onClick={selectedMeeting ? handleBack : undefined}
                         disabled={!selectedMeeting}
                         className={`
@@ -285,7 +285,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                     </button>
 
                     {/* Forward Button */}
-                    <button
+                    <button type="button"
                         onClick={handleForward}
                         disabled={!forwardMeeting}
                         className={`
@@ -349,7 +349,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                 {/* Right: Actions */}
                 <div className={`flex items-center gap-1 no-drag shrink-0 ${isMac ? 'mr-1' : ''}`}>
                     <div className="relative group/profile-btn select-none">
-                        <button
+                        <button type="button"
                             data-testid="open-profile-intelligence"
                             onClick={() => {
                                 setShowProfileOnboarding(false);
@@ -408,7 +408,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                                                 {t('launcher.profileDescription')}
                                             </p>
                                             <div className="flex justify-end gap-1.5 isolate">
-                                                <button 
+                                                <button type="button"
                                                     onClick={(e) => { 
                                                         e.stopPropagation(); 
                                                         setShowProfileOnboarding(false); 
@@ -423,7 +423,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                                                 >
                                                     {t('common.dismiss')}
                                                 </button>
-                                                <button 
+                                                <button type="button"
                                                     onClick={(e) => { 
                                                         e.stopPropagation(); 
                                                         onOpenProfile?.(); 
@@ -447,7 +447,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                         </AnimatePresence>
                     </div>
                     <div className="relative group/modes-btn select-none">
-                        <button
+                        <button type="button"
                             onClick={() => {
                                 setShowModesOnboarding(false);
                                 localStorage.setItem('natively_seen_modes_onboarding_v5', 'true');
@@ -515,7 +515,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                                                 {t('launcher.modesDescription')}
                                             </p>
                                             <div className="flex justify-end gap-1.5 isolate">
-                                                <button 
+                                                <button type="button"
                                                     onClick={(e) => { 
                                                         e.stopPropagation(); 
                                                         setShowModesOnboarding(false); 
@@ -530,7 +530,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                                                 >
                                                     {t('common.dismiss')}
                                                 </button>
-                                                <button 
+                                                <button type="button"
                                                     onClick={(e) => { 
                                                         e.stopPropagation(); 
                                                         onOpenModes?.(); 
@@ -553,7 +553,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                             )}
                         </AnimatePresence>
                     </div>
-                    <button
+                    <button type="button"
                         onClick={() => {
                             onOpenSettings();
                         }}
