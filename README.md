@@ -54,11 +54,12 @@ OpenOffer is an Electron desktop app with live capture, model routing, local sto
 ### Interview Command Center
 
 - Open into an Interview OS workspace instead of a product landing page.
-- Track active job-search processes with status, priority, company, role, stage, source, and scheduled time.
-- Keep a vacancy dossier, prep brief, readiness checklist, question bank, and post-interview retro for each process.
-- Create interviews from pasted HH/Getmatch/Telegram/calendar text and keep the original source locally.
-- Link existing meeting recordings to an interview so prep, live context, and follow-up stay together.
-- Create scheduled interview events in Google Calendar or macOS Calendar from OpenOffer when calendar access is configured.
+- Track active vacancies as the center of the workspace, with inactive/rejected/archived processes kept out of the daily list.
+- Add interview stages to a vacancy from pasted HH/Getmatch/Telegram/calendar text, including scheduled times and meeting links.
+- Let the agent parse recruiter chat, compare it with active vacancies, and propose either a new vacancy or a stage on an existing one.
+- Keep vacancy dossier, prep brief, question bank, AI-first retro, manual retro notes, and linked recordings together.
+- Link recordings to the relevant interview stage so transcripts, retros, and follow-up context stay attached to the right call.
+- Sync with configured Google Calendar or macOS Calendar sources from the calendar rail without exposing setup controls on the main screen.
 
 ### Live Interview and Meeting Assistance
 
@@ -309,7 +310,7 @@ Near-term:
 Next product slices:
 
 - Better resume/JD preparation flows.
-- More explicit interview-stage tracking.
+- Stage-level transcript, retro, and follow-up workflows.
 - Follow-up drafting and offer/negotiation workflows.
 - Job-search monitoring and application pipeline tools.
 - Cleaner release packaging and update metadata for the standalone repository.
