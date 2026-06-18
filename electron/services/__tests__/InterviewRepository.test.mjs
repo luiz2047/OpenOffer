@@ -51,6 +51,9 @@ describe('Interview schema', () => {
     const tableNames = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map(row => row.name);
     for (const table of [
       'interview_events',
+      'applications',
+      'interview_stages',
+      'legacy_interview_event_map',
       'vacancy_dossiers',
       'prep_briefs',
       'interview_retros',
@@ -65,11 +68,14 @@ describe('Interview schema', () => {
 
     const meetingColumns = db.prepare('PRAGMA table_info(meetings)').all().map(row => row.name);
     assert.ok(meetingColumns.includes('interview_event_id'));
+    assert.ok(meetingColumns.includes('interview_stage_id'));
 
     const eventIndexes = db.prepare('PRAGMA index_list(interview_events)').all().map(row => row.name);
     assert.ok(eventIndexes.includes('idx_interview_events_time'));
     assert.ok(eventIndexes.includes('idx_interview_events_status'));
     assert.ok(eventIndexes.includes('uq_interview_events_calendar_ref'));
+    const stageIndexes = db.prepare('PRAGMA index_list(interview_stages)').all().map(row => row.name);
+    assert.ok(stageIndexes.includes('uq_interview_stages_calendar_ref'));
 
     const operationColumns = db.prepare('PRAGMA table_info(interview_client_operations)').all();
     assert.deepEqual(
@@ -203,6 +209,74 @@ describe('InterviewRepository', () => {
     assert.equal(repo.list({ limit: 1000 }).length, 200);
   });
 
+  test('creates application and stage from intake while preserving legacy interview compatibility', () => {
+    const { repo } = createStack();
+    const result = repo.createApplicationFromIntake({
+      classification: 'vacancy_with_scheduled_stage',
+      confidence: 0.9,
+      application: {
+        title: 'Acme ML Engineer',
+        company: 'Acme',
+        roleTitle: 'ML Engineer',
+        source: 'HH',
+        vacancyUrl: 'https://example.com/vacancy/1',
+        requirements: ['Python'],
+        risks: ['Legacy stack'],
+        questionsToAsk: ['How is ML deployed?'],
+        rawSourceText: 'Acme ML Engineer interview tomorrow',
+      },
+      stage: {
+        title: 'Recruiter screen',
+        stageType: 'recruiter_screen',
+        startsAt: 1_800_000_000_000,
+        endsAt: 1_800_003_600_000,
+        timezone: 'Europe/Moscow',
+        meetingUrl: 'https://meet.example/acme',
+        status: 'scheduled',
+      },
+      warnings: [],
+      missingFields: [],
+    }, 'op-app-intake-1');
+
+    assert.equal(result.application.company, 'Acme');
+    assert.equal(result.application.stages.length, 1);
+    assert.equal(result.application.stages[0].status, 'scheduled');
+    assert.ok(result.legacyInterview?.id);
+
+    const mapped = repo.get(result.legacyInterview.id, ['dossier']);
+    assert.equal(mapped.applicationId, result.application.id);
+    assert.equal(mapped.selectedStageId, result.application.stages[0].id);
+    assert.deepEqual(mapped.dossier.requirements, ['Python']);
+    const stage = repo.updateStageCalendarForLegacyInterview(result.legacyInterview.id, {
+      calendarProvider: 'google',
+      calendarId: 'primary',
+      calendarEventId: 'evt-stage-1',
+      calendarSyncStatus: 'linked',
+    });
+    assert.equal(stage.calendarEventId, 'evt-stage-1');
+    assert.equal(repo.getApplication(result.application.id).stages[0].calendarSyncStatus, 'linked');
+    assert.equal(repo.listApplications()[0].id, result.application.id);
+
+    const legacyOnly = repo.create({ title: 'Legacy only calendar owner' });
+    repo.update(legacyOnly.id, {
+      calendarProvider: 'google',
+      calendarId: 'primary',
+      calendarEventId: 'evt-legacy-only',
+      calendarSyncStatus: 'linked',
+    });
+    assert.throws(
+      () => repo.updateCalendarForLegacyInterview(result.legacyInterview.id, {
+        calendarProvider: 'google',
+        calendarId: 'primary',
+        calendarEventId: 'evt-legacy-only',
+        calendarSyncStatus: 'linked',
+      }),
+      /UNIQUE constraint failed|constraint/i,
+      'legacy and stage calendar updates must roll back together on duplicate references',
+    );
+    assert.equal(repo.getApplication(result.application.id).stages[0].calendarEventId, 'evt-stage-1');
+  });
+
   test('filters lists by status and time range, archives rows, and can delete linked meetings', () => {
     const { db, repo } = createStack();
     const now = 1_800_000_000_000;
@@ -304,6 +378,45 @@ describe('InterviewService', () => {
     );
     assert.throws(
       () => service.saveRetro(detail.id, 'op-invalid-retro', { passProbability: 101 }),
+      error => error instanceof InterviewDomainError && error.code === 'invalid_payload',
+    );
+    assert.throws(
+      () => service.createApplicationFromIntake('op-invalid-intake-url', {
+        intake: {
+          classification: 'vacancy_with_scheduled_stage',
+          confidence: 0.8,
+          application: {
+            title: 'Unsafe intake',
+            vacancyUrl: 'not-a-url',
+            rawSourceText: 'raw',
+          },
+          stage: {
+            stageType: 'recruiter_screen',
+            status: 'scheduled',
+          },
+          warnings: [],
+          missingFields: [],
+        },
+      }),
+      error => error instanceof InterviewDomainError && error.code === 'invalid_payload',
+    );
+    assert.throws(
+      () => service.createApplicationFromIntake('op-invalid-intake-stage', {
+        intake: {
+          classification: 'vacancy_with_scheduled_stage',
+          confidence: 0.8,
+          application: {
+            title: 'Unsafe intake',
+            rawSourceText: 'raw',
+          },
+          stage: {
+            stageType: 'unknown_stage',
+            status: 'scheduled',
+          },
+          warnings: [],
+          missingFields: [],
+        },
+      }),
       error => error instanceof InterviewDomainError && error.code === 'invalid_payload',
     );
     assert.throws(

@@ -50,5 +50,6 @@ test('manual interview creation can push an event to Google or Mac calendar', ()
   assert.match(ui, /interviews\.detail\.createInMacCalendar/);
   assert.match(resources, /Создать в Google Calendar/);
   assert.match(resources, /Создать в календаре Mac/);
-  assert.match(ui, /interviewApi\.createCalendarEvent\(created\.id, createCalendarProvider\)/);
+  assert.match(ui, /const legacyId = result\.legacyInterview\?\.id/);
+  assert.match(ui, /interviewApi\.createCalendarEvent\(legacyId, createCalendarProvider\)/);
 });

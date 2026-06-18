@@ -12,6 +12,35 @@ export type InterviewPriority = 'low' | 'normal' | 'high';
 
 export type CalendarProvider = 'google' | 'macos' | 'manual';
 
+export type ApplicationStatus =
+  | 'lead_found'
+  | 'applied'
+  | 'screening'
+  | 'interviewing'
+  | 'offer'
+  | 'rejected'
+  | 'withdrawn'
+  | 'archived';
+
+export type InterviewStageStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'done'
+  | 'waiting_feedback'
+  | 'passed'
+  | 'rejected'
+  | 'canceled'
+  | 'archived';
+
+export type InterviewStageType =
+  | 'recruiter_screen'
+  | 'technical_screen'
+  | 'system_design'
+  | 'leadership'
+  | 'final'
+  | 'offer_security'
+  | 'custom';
+
 export type CalendarSyncStatus =
   | 'local_only'
   | 'linked'
@@ -22,6 +51,8 @@ export type CalendarSyncStatus =
 
 export type InterviewErrorCode =
   | 'invalid_payload'
+  | 'ambiguous_stage'
+  | 'ambiguous_application_match'
   | 'local_database_unavailable'
   | 'not_found'
   | 'calendar_disabled'
@@ -35,6 +66,9 @@ export type InterviewErrorCode =
   | 'interview_deleted_or_archived'
   | 'parser_input_too_large'
   | 'parser_no_fields'
+  | 'migration_incomplete'
+  | 'provider_unavailable'
+  | 'stale_proposal'
   | 'unexpected_error';
 
 export type InterviewErrorAction =
@@ -44,6 +78,8 @@ export type InterviewErrorAction =
   | 'open_existing'
   | 'retry'
   | 'manual_attach'
+  | 'choose_stage'
+  | 'choose_application'
   | 'none';
 
 export type InterviewIpcResult<T> =
@@ -95,6 +131,8 @@ export interface InterviewEvent {
   createdAt: string;
   updatedAt: string;
   archivedAt?: string | null;
+  applicationId?: string | null;
+  selectedStageId?: string | null;
 }
 
 export interface InterviewListItem
@@ -118,6 +156,128 @@ export interface InterviewListItem
   readinessScore?: number;
   linkedMeetingCount: number;
   questionCount: number;
+  applicationId?: string | null;
+  selectedStageId?: string | null;
+}
+
+export interface ApplicationRecord {
+  id: string;
+  title: string;
+  company?: string | null;
+  roleTitle?: string | null;
+  status: ApplicationStatus;
+  priority: InterviewPriority;
+  source?: string | null;
+  sourceUrl?: string | null;
+  vacancyUrl?: string | null;
+  compensationText?: string | null;
+  locationFormat?: string | null;
+  nextAction?: string | null;
+  nextActionDueAt?: number | null;
+  rawSourceText?: string | null;
+  legacyInterviewEventId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt?: string | null;
+}
+
+export interface InterviewStage {
+  id: string;
+  applicationId: string;
+  stageType: InterviewStageType;
+  title: string;
+  status: InterviewStageStatus;
+  startsAt?: number | null;
+  endsAt?: number | null;
+  timezone?: string | null;
+  format?: 'online' | 'onsite' | 'phone' | 'async' | 'unknown' | null;
+  meetingUrl?: string | null;
+  calendarProvider?: CalendarProvider | null;
+  calendarId?: string | null;
+  calendarEventId?: string | null;
+  calendarSnapshot?: CalendarSnapshot | null;
+  calendarLastSeenAt?: number | null;
+  calendarMissingSince?: number | null;
+  calendarSyncStatus: CalendarSyncStatus;
+  rawSourceText?: string | null;
+  legacyInterviewEventId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt?: string | null;
+}
+
+export interface ApplicationDetail extends ApplicationRecord {
+  stages: InterviewStage[];
+  selectedStageId?: string | null;
+  legacyInterviewEventId?: string | null;
+  dossier?: VacancyDossier | null;
+}
+
+export type IntakeClassification =
+  | 'vacancy_only'
+  | 'vacancy_with_scheduled_stage'
+  | 'stage_update_for_existing_vacancy'
+  | 'calendar_only'
+  | 'unknown';
+
+export interface ApplicationIntakeInput {
+  text: string;
+  sourceHint?: 'telegram' | 'hh' | 'getmatch' | 'email' | 'calendar' | 'browser' | 'manual';
+  candidateApplicationIds?: string[];
+  useAi?: boolean;
+}
+
+export interface ApplicationIntakeResult {
+  classification: IntakeClassification;
+  confidence: number;
+  application: {
+    title?: string;
+    company?: string;
+    roleTitle?: string;
+    source?: string;
+    vacancyUrl?: string;
+    compensationText?: string;
+    requirements?: string[];
+    risks?: string[];
+    questionsToAsk?: string[];
+    rawSourceText: string;
+  };
+  stage?: {
+    stageType?: InterviewStageType;
+    title?: string;
+    startsAt?: number;
+    endsAt?: number;
+    timezone?: string;
+    meetingUrl?: string;
+    status?: InterviewStageStatus;
+  };
+  existingApplicationMatch?: {
+    applicationId: string;
+    confidence: number;
+    reason: string;
+  };
+  calendarProposal?: {
+    shouldCreate: boolean;
+    title: string;
+    startsAt: number;
+    endsAt: number;
+    timezone: string;
+    locationOrUrl?: string;
+    description: string;
+    reminders: Array<{ minutesBefore: number }>;
+  };
+  warnings: string[];
+  missingFields: string[];
+}
+
+export interface ApplicationCreateFromIntakePayload {
+  intake: ApplicationIntakeResult;
+  selectedApplicationId?: string | null;
+}
+
+export interface ApplicationCreateFromIntakeResult {
+  application: ApplicationDetail;
+  legacyInterview?: InterviewDetail | null;
 }
 
 export interface VacancyDossier {

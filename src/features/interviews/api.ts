@@ -1,4 +1,8 @@
 import type {
+  ApplicationCreateFromIntakeResult,
+  ApplicationDetail,
+  ApplicationIntakeInput,
+  ApplicationIntakeResult,
   InterviewCreatePayload,
   InterviewDetail,
   InterviewIpcResult,
@@ -103,5 +107,26 @@ export const interviewApi = {
 
   async saveQuestions(interviewId: string, questions: InterviewQuestionPayload[]): Promise<InterviewQuestion[]> {
     return unwrap(await requireBridge().interviewQuestionsSave(interviewId, newOperationId('interview-questions:save'), questions));
+  },
+};
+
+export const applicationApi = {
+  async parseIntake(input: ApplicationIntakeInput | string): Promise<ApplicationIntakeResult> {
+    return unwrap(await requireBridge().applicationIntakeParse(input));
+  },
+
+  async list(): Promise<ApplicationDetail[]> {
+    return unwrap(await requireBridge().applicationsList());
+  },
+
+  async get(id: string): Promise<ApplicationDetail> {
+    return unwrap(await requireBridge().applicationsGet(id));
+  },
+
+  async createFromIntake(intake: ApplicationIntakeResult): Promise<ApplicationCreateFromIntakeResult> {
+    return unwrap(await requireBridge().applicationsCreateFromIntake(
+      newOperationId('applications:create-from-intake'),
+      { intake },
+    ));
   },
 };

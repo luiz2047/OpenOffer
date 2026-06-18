@@ -1,5 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
+  ApplicationCreateFromIntakePayload,
+  ApplicationIntakeInput,
   InterviewCreatePayload,
   InterviewDetail,
   InterviewIpcResult,
@@ -2207,6 +2209,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('interviews:create', operationId, payload),
   interviewsParseSourceText: (input: InterviewSourceParseInput | string) =>
     ipcRenderer.invoke('interviews:parse-source-text', input),
+  applicationIntakeParse: (input: ApplicationIntakeInput | string) =>
+    ipcRenderer.invoke('application-intake:parse', input),
+  applicationsList: () => ipcRenderer.invoke('applications:list'),
+  applicationsGet: (id: string) => ipcRenderer.invoke('applications:get', id),
+  applicationsCreateFromIntake: (operationId: string, payload: ApplicationCreateFromIntakePayload) =>
+    ipcRenderer.invoke('applications:create-from-intake', operationId, payload),
   interviewsUpdate: (id: string, patch: InterviewUpdatePatch) =>
     ipcRenderer.invoke('interviews:update', id, patch),
   interviewsArchive: (id: string) => ipcRenderer.invoke('interviews:archive', id),

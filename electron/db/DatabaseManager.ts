@@ -709,6 +709,91 @@ export class DatabaseManager {
             this.db.pragma('user_version = 17');
         }
 
+        // Version 17 → 18: Vacancy/application parent + interview stage child schema.
+        // Additive and idempotent: old interview_events rows stay readable while
+        // new application/stage APIs can write the real parent/child model.
+        if (version < 18) {
+            console.log('[DatabaseManager] Applying migration v17 → v18: Application/stage domain schema');
+            const tx = this.db.transaction(() => {
+                applyInterviewSchema(this.db!);
+                this.db!.exec(`
+                    INSERT OR IGNORE INTO applications (
+                      id, title, company, role_title, status, priority, source, vacancy_url,
+                      raw_source_text, legacy_interview_event_id, created_at, updated_at, archived_at
+                    )
+                    SELECT
+                      'app_' || id,
+                      title,
+                      company,
+                      role_title,
+                      CASE
+                        WHEN status IN ('applied', 'screening', 'interviewing', 'offer', 'rejected', 'withdrawn', 'archived') THEN status
+                        WHEN starts_at IS NOT NULL THEN 'interviewing'
+                        ELSE 'lead_found'
+                      END,
+                      COALESCE(priority, 'normal'),
+                      source,
+                      vacancy_url,
+                      raw_source_text,
+                      id,
+                      created_at,
+                      updated_at,
+                      archived_at
+                    FROM interview_events;
+
+                    INSERT OR IGNORE INTO interview_stages (
+                      id, application_id, stage_type, title, status, starts_at, ends_at, timezone,
+                      meeting_url, calendar_provider, calendar_id, calendar_event_id,
+                      calendar_snapshot_json, calendar_last_seen_at, calendar_missing_since,
+                      calendar_sync_status, raw_source_text, legacy_interview_event_id,
+                      created_at, updated_at, archived_at
+                    )
+                    SELECT
+                      'stage_' || id,
+                      'app_' || id,
+                      'custom',
+                      COALESCE(stage, title),
+                      CASE
+                        WHEN archived_at IS NOT NULL OR status = 'archived' THEN 'archived'
+                        WHEN status = 'rejected' THEN 'rejected'
+                        WHEN starts_at IS NOT NULL AND starts_at > (strftime('%s','now') * 1000) THEN 'scheduled'
+                        WHEN ends_at IS NOT NULL AND ends_at < (strftime('%s','now') * 1000) THEN 'done'
+                        ELSE 'draft'
+                      END,
+                      starts_at,
+                      ends_at,
+                      timezone,
+                      meeting_url,
+                      calendar_provider,
+                      calendar_id,
+                      calendar_event_id,
+                      calendar_snapshot_json,
+                      calendar_last_seen_at,
+                      calendar_missing_since,
+                      calendar_sync_status,
+                      raw_source_text,
+                      id,
+                      created_at,
+                      updated_at,
+                      archived_at
+                    FROM interview_events;
+
+                    INSERT OR IGNORE INTO legacy_interview_event_map (
+                      legacy_interview_event_id, application_id, stage_id
+                    )
+                    SELECT id, 'app_' || id, 'stage_' || id
+                    FROM interview_events;
+
+                    UPDATE meetings
+                    SET interview_stage_id = 'stage_' || interview_event_id
+                    WHERE interview_event_id IS NOT NULL
+                      AND interview_stage_id IS NULL;
+                `);
+                this.db!.pragma('user_version = 18');
+            });
+            tx();
+        }
+
         console.log('[DatabaseManager] Migrations completed.');
     }
 

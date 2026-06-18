@@ -6076,6 +6076,22 @@ export function initializeIpcHandlers(appState: AppState): void {
     safeInterviewHandle(() => getInterviewService().parseSourceText(input))
   ));
 
+  safeHandle('application-intake:parse', async (_, input: unknown) => (
+    safeInterviewHandle(() => getInterviewService().parseApplicationIntake(input))
+  ));
+
+  safeHandle('applications:list', async () => (
+    safeInterviewHandle(() => getInterviewService().listApplications())
+  ));
+
+  safeHandle('applications:get', async (_, id: string) => (
+    safeInterviewHandle(() => getInterviewService().getApplication(id))
+  ));
+
+  safeHandle('applications:create-from-intake', async (_, operationId: string, payload: unknown) => (
+    safeInterviewHandle(() => getInterviewService().createApplicationFromIntake(operationId, payload))
+  ));
+
   safeHandle('interviews:update', async (_, id: string, patch: unknown) => (
     safeInterviewHandle(() => getInterviewService().update(id, patch))
   ));
@@ -6149,14 +6165,15 @@ export function initializeIpcHandlers(appState: AppState): void {
         attendeeNames: (event.attendees ?? []).map((attendee: any) => attendee.name || attendee.email).filter(Boolean),
         capturedAt: Date.now(),
       };
-      return service.update(detail.id, {
+      const calendarPatch = {
         calendarProvider: provider,
         calendarId: snapshot.calendarId,
         calendarEventId: event.id,
         calendarSnapshot: snapshot,
         calendarLastSeenAt: Date.now(),
         calendarSyncStatus: 'linked',
-      });
+      };
+      return service.updateCalendarForLegacyInterview(detail.id, calendarPatch);
     })
   ));
 
