@@ -13,7 +13,17 @@ import { DatabaseManager } from './db/DatabaseManager'; // Import Database Manag
 import { AppState } from './main';
 import { CodexCliService } from './services/CodexCliService';
 import { PhoneMirrorService } from './services/PhoneMirrorService';
-import { SettingsManager } from './services/SettingsManager';
+import {
+  SettingsManager,
+  type InterfaceLanguagePreference,
+} from './services/SettingsManager';
+import { InterfaceTranslationManager } from './services/InterfaceTranslationManager';
+import {
+  isSelectableInterfaceLanguage,
+  normalizeInterfaceLocaleCode,
+  resolveInterfaceLanguagePreference,
+  type InterfaceTranslationsSnapshot,
+} from './services/InterfaceTranslationPacks';
 import { SkillsManager } from './services/SkillsManager';
 import { createBetterSqliteExecutor, InterviewRepository } from './services/interviews/InterviewRepository';
 import { InterviewDomainError, InterviewService, safeInterviewHandle } from './services/interviews/InterviewService';
@@ -63,6 +73,44 @@ type LocalHttpCheckResult = {
   error?: string;
   code?: string;
 };
+
+type InterfaceLanguageState = {
+  preference: InterfaceLanguagePreference;
+  resolvedLanguage: string;
+  systemLanguage: string;
+};
+
+function getInterfaceTranslationsSnapshot(): InterfaceTranslationsSnapshot {
+  return InterfaceTranslationManager.getInstance().getSnapshot();
+}
+
+function getInterfaceLanguageState(preference = SettingsManager.getInstance().getInterfaceLanguage()): InterfaceLanguageState {
+  const preferredLanguages = app.getPreferredSystemLanguages?.() ?? [];
+  const systemLanguages = [...preferredLanguages, app.getLocale()].filter((value): value is string => Boolean(value));
+  const systemLanguage = systemLanguages[0] || 'en';
+  const snapshot = getInterfaceTranslationsSnapshot();
+  return {
+    preference,
+    resolvedLanguage: resolveInterfaceLanguagePreference(preference, systemLanguages, snapshot),
+    systemLanguage,
+  };
+}
+
+function broadcastInterfaceLanguageChanged(state: InterfaceLanguageState): void {
+  BrowserWindow.getAllWindows().forEach((win) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send('interface-language-changed', state);
+    }
+  });
+}
+
+function broadcastInterfaceTranslationsChanged(snapshot: InterfaceTranslationsSnapshot): void {
+  BrowserWindow.getAllWindows().forEach((win) => {
+    if (!win.isDestroyed()) {
+      win.webContents.send('interface-translations-changed', snapshot);
+    }
+  });
+}
 
 const GIGASTT_HTTP_BASE_URL = 'http://127.0.0.1:9876';
 const GIGASTT_LOG_PATH = path.join(os.homedir(), '.gigastt', 'openoffer-gigastt.log');
@@ -1987,6 +2035,41 @@ export function initializeIpcHandlers(appState: AppState): void {
   safeHandle('set-verbose-logging', async (_, enabled: boolean) => {
     appState.setVerboseLogging(enabled);
     return { success: true };
+  });
+
+  safeHandle('get-interface-locales', async () => {
+    return getInterfaceTranslationsSnapshot().locales;
+  });
+
+  safeHandle('get-interface-translations', async () => {
+    return getInterfaceTranslationsSnapshot();
+  });
+
+  safeHandle('refresh-interface-translations', async () => {
+    const snapshot = getInterfaceTranslationsSnapshot();
+    broadcastInterfaceTranslationsChanged(snapshot);
+    broadcastInterfaceLanguageChanged(getInterfaceLanguageState());
+    return snapshot;
+  });
+
+  safeHandle('open-interface-translations-folder', async () => {
+    return InterfaceTranslationManager.getInstance().openTranslationsFolder();
+  });
+
+  safeHandle('get-interface-language', async () => {
+    return getInterfaceLanguageState();
+  });
+
+  safeHandle('set-interface-language', async (_, preference: InterfaceLanguagePreference) => {
+    const snapshot = getInterfaceTranslationsSnapshot();
+    const normalized = preference === 'system' ? 'system' : normalizeInterfaceLocaleCode(preference);
+    if (!normalized || !isSelectableInterfaceLanguage(normalized, snapshot)) {
+      return { success: false, error: 'invalid_interface_language' };
+    }
+    SettingsManager.getInstance().setInterfaceLanguage(normalized);
+    const state = getInterfaceLanguageState(normalized);
+    broadcastInterfaceLanguageChanged(state);
+    return { success: true, state };
   });
 
   safeHandle('get-meeting-retention', async () => {

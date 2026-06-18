@@ -21,10 +21,46 @@ import type {
   VacancyDossierPayload,
 } from '../src/types/interviews';
 
+type InterfaceLanguagePreference = 'system' | (string & {});
+
+interface InterfaceLanguageState {
+  preference: InterfaceLanguagePreference;
+  resolvedLanguage: string;
+  systemLanguage: string;
+}
+
+interface InterfaceLocaleOption {
+  code: string;
+  label: string;
+  nativeLabel: string;
+  description: string;
+  source: 'builtin' | 'custom';
+  coverage: number;
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+interface InterfaceTranslationsSnapshot {
+  translationsPath: string;
+  locales: InterfaceLocaleOption[];
+  resources: Record<string, Record<string, unknown>>;
+}
+
 // Types for the exposed Electron API
 interface ElectronAPI {
   updateContentDimensions: (dimensions: { width: number; height: number }) => Promise<void>;
   updateContentDimensionsCentered: (dimensions: { width: number; height: number }) => Promise<void>;
+  getInterfaceLocales: () => Promise<InterfaceLocaleOption[]>;
+  getInterfaceTranslations: () => Promise<InterfaceTranslationsSnapshot>;
+  refreshInterfaceTranslations: () => Promise<InterfaceTranslationsSnapshot>;
+  openInterfaceTranslationsFolder: () => Promise<{ success: boolean; path: string; error?: string }>;
+  getInterfaceLanguage: () => Promise<InterfaceLanguageState>;
+  setInterfaceLanguage: (
+    preference: InterfaceLanguagePreference,
+  ) => Promise<{ success: boolean; state?: InterfaceLanguageState; error?: string }>;
+  onInterfaceLanguageChanged: (callback: (state: InterfaceLanguageState) => void) => () => void;
+  onInterfaceTranslationsChanged: (callback: (snapshot: InterfaceTranslationsSnapshot) => void) => () => void;
   getRecognitionLanguages: () => Promise<Record<string, any>>;
   getScreenshots: () => Promise<Array<{ path: string; preview: string }>>;
   deleteScreenshot: (path: string) => Promise<{ success: boolean; error?: string }>;
@@ -877,6 +913,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('update-content-dimensions', dimensions),
   updateContentDimensionsCentered: (dimensions: { width: number; height: number }) =>
     ipcRenderer.invoke('update-content-dimensions-centered', dimensions),
+  getInterfaceLocales: () => ipcRenderer.invoke('get-interface-locales'),
+  getInterfaceTranslations: () => ipcRenderer.invoke('get-interface-translations'),
+  refreshInterfaceTranslations: () => ipcRenderer.invoke('refresh-interface-translations'),
+  openInterfaceTranslationsFolder: () => ipcRenderer.invoke('open-interface-translations-folder'),
+  getInterfaceLanguage: () => ipcRenderer.invoke('get-interface-language'),
+  setInterfaceLanguage: (preference: InterfaceLanguagePreference) =>
+    ipcRenderer.invoke('set-interface-language', preference),
+  onInterfaceLanguageChanged: (callback: (state: InterfaceLanguageState) => void) => {
+    const subscription = (_: any, state: InterfaceLanguageState) => callback(state);
+    ipcRenderer.on('interface-language-changed', subscription);
+    return () => {
+      ipcRenderer.removeListener('interface-language-changed', subscription);
+    };
+  },
+  onInterfaceTranslationsChanged: (callback: (snapshot: InterfaceTranslationsSnapshot) => void) => {
+    const subscription = (_: any, snapshot: InterfaceTranslationsSnapshot) => callback(snapshot);
+    ipcRenderer.on('interface-translations-changed', subscription);
+    return () => {
+      ipcRenderer.removeListener('interface-translations-changed', subscription);
+    };
+  },
   getRecognitionLanguages: () => ipcRenderer.invoke('get-recognition-languages'),
   takeScreenshot: () => ipcRenderer.invoke('take-screenshot'),
   takeSelectiveScreenshot: () => ipcRenderer.invoke('take-selective-screenshot'),

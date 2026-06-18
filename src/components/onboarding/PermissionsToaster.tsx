@@ -13,6 +13,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { X, Monitor, Mic, Settings } from 'lucide-react';
 import openOfferIcon from '../../../assets/icon.png';
 import { useResolvedTheme } from '../../hooks/useResolvedTheme';
+import { useTranslation } from 'react-i18next';
 
 const STORAGE_KEY  = 'natively_perms_shown_v1';
 const STARTUP_DELAY_MS = 1_200;
@@ -43,6 +44,7 @@ const SPRING = {
 const FADE = { enter: { opacity: 0, y: 12, filter: 'blur(4px)' }, in: { opacity: 1, y: 0, filter: 'blur(0px)' }, exit: { opacity: 0, scale: 0.97, filter: 'blur(3px)' } };
 
 export const PermissionsToaster: React.FC<Props> = ({ isOpen, onDismiss }) => {
+  const { t } = useTranslation();
   const [visible,    setVisible]    = useState(false);
   const [platform,   setPlatform]   = useState<string>('darwin');
   const [micStatus,  setMicStatus]  = useState<PermStatus>('loading');
@@ -222,7 +224,7 @@ export const PermissionsToaster: React.FC<Props> = ({ isOpen, onDismiss }) => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <img src={openOfferIcon} alt="OpenOffer" style={{ width: '18px', height: '18px', borderRadius: '4px', flexShrink: 0 }} />
                     <span style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: t3 }}>
-                      Permissions
+                      {t('onboarding.permissionsEyebrow')}
                     </span>
                   </div>
                 </div>
@@ -234,10 +236,10 @@ export const PermissionsToaster: React.FC<Props> = ({ isOpen, onDismiss }) => {
                   style={{ marginBottom: '28px' }}
                 >
                   <h2 style={{ fontSize: '24px', fontWeight: 700, letterSpacing: '-0.03em', color: t1, margin: '0 0 8px', lineHeight: 1.2 }}>
-                    Let's get you set up
+                    {t('onboarding.permissionsTitle')}
                   </h2>
                   <p style={{ fontSize: '13px', lineHeight: 1.65, color: t3, margin: 0 }}>
-                    OpenOffer needs a few permissions to capture meetings and transcribe speech.
+                    {t('onboarding.permissionsDescription')}
                   </p>
                 </motion.div>
 
@@ -250,8 +252,8 @@ export const PermissionsToaster: React.FC<Props> = ({ isOpen, onDismiss }) => {
                   {platform === 'darwin' && (
                     <PermItem
                       icon={Monitor}
-                      label="Screen Recording"
-                      description="Required to capture meeting content"
+                      label={t('onboarding.screenRecording')}
+                      description={t('onboarding.screenRecordingDescription')}
                       status={scrStatus}
                       platform={platform}
                       onToggle={handleScrToggle}
@@ -262,8 +264,8 @@ export const PermissionsToaster: React.FC<Props> = ({ isOpen, onDismiss }) => {
                   )}
                   <PermItem
                     icon={Mic}
-                    label="Microphone"
-                    description="Required for speech transcription"
+                      label={t('onboarding.microphone')}
+                    description={t('onboarding.microphoneDescription')}
                     status={micStatus}
                     platform={platform}
                     onToggle={handleMicToggle}
@@ -299,7 +301,7 @@ export const PermissionsToaster: React.FC<Props> = ({ isOpen, onDismiss }) => {
                     
                     <span style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Settings size={14} strokeWidth={2} />
-                      Open Settings
+                      {t('common.openSettings')}
                     </span>
                   </motion.button>
 
@@ -406,7 +408,7 @@ export const PermissionsToaster: React.FC<Props> = ({ isOpen, onDismiss }) => {
                           transition={{ repeat: Infinity, duration: 2.2, ease: "easeInOut", repeatDelay: 0.5 }}
                           style={{ padding: '4px 8px', borderRadius: '5px', background: colors.step1BtnBg, border: colors.step1BtnBorder, fontSize: '8px', fontWeight: 600, color: colors.step1BtnText, letterSpacing: '-0.01em' }}
                         >
-                          Open Settings
+                          {t('common.openSettings')}
                         </motion.div>
                         <div style={{ padding: '4px 8px', borderRadius: '5px', background: '#007AFF', fontSize: '8px', fontWeight: 600, color: '#FFFFFF', letterSpacing: '-0.01em', boxShadow: '0 2px 6px rgba(0,122,255,0.3)' }}>
                           Deny

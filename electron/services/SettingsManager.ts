@@ -111,10 +111,28 @@ export interface AppSettings {
         byProvider?: Record<string, string | undefined>;
         byModel?: Record<string, string | undefined>;
     };
+    // Interface language controls app chrome only. STT recognition and AI response
+    // language remain separate settings.
+    interfaceLanguage?: InterfaceLanguagePreference;
 }
 
 export const VALID_SCREEN_UNDERSTANDING_MODES = ['vision_first', 'vision_only', 'private_vision'] as const;
 export type ScreenUnderstandingMode = typeof VALID_SCREEN_UNDERSTANDING_MODES[number];
+
+// Built-ins are the only locales bundled with the app. Valid custom locale codes
+// are accepted by the interface-language pack runtime after validation.
+export const VALID_INTERFACE_LANGUAGES = ['system', 'en', 'ru'] as const;
+export type InterfaceLanguagePreference = 'system' | (string & {});
+
+const INTERFACE_LOCALE_CODE_RE = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/;
+
+function normalizeInterfaceLanguagePreference(value: unknown): InterfaceLanguagePreference | null {
+    if (value === 'system') return 'system';
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim().replace(/_/g, '-').toLowerCase();
+    if (!INTERFACE_LOCALE_CODE_RE.test(normalized)) return null;
+    return normalized;
+}
 
 // LEGACY values kept ONLY for migration of existing settings.json files written by older builds.
 // New code MUST NOT branch on these — they are normalized to a VALID_SCREEN_UNDERSTANDING_MODES value on load.
@@ -216,6 +234,19 @@ export class SettingsManager {
             throw new Error(`[SettingsManager] Invalid screenUnderstandingMode: ${mode}`);
         }
         this.settings.screenUnderstandingMode = mode;
+        this.saveSettings();
+    }
+
+    public getInterfaceLanguage(): InterfaceLanguagePreference {
+        return normalizeInterfaceLanguagePreference(this.settings.interfaceLanguage) ?? 'system';
+    }
+
+    public setInterfaceLanguage(language: InterfaceLanguagePreference): void {
+        const normalized = normalizeInterfaceLanguagePreference(language);
+        if (!normalized) {
+            throw new Error(`[SettingsManager] Invalid interfaceLanguage: ${language}`);
+        }
+        this.settings.interfaceLanguage = normalized;
         this.saveSettings();
     }
 

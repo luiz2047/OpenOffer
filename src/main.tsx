@@ -1,9 +1,12 @@
 import React from "react"
 import ReactDOM from "react-dom/client"
 import App from "./App"
+import { InterfaceI18nProvider, initI18n } from "./i18n"
 import "./index.css"
 
 const THEME_CACHE_KEY = 'natively_resolved_theme';
+
+initI18n();
 
 // Set platform attribute synchronously — before React renders — so CSS selectors
 // like html[data-platform="win32"] work immediately without a flash on first paint.
@@ -32,6 +35,8 @@ if (window.electronAPI?.getThemeMode) {
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <InterfaceI18nProvider>
+      <App />
+    </InterfaceI18nProvider>
   </React.StrictMode>
 )

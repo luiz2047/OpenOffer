@@ -45,6 +45,7 @@ const CardCopyButton = ({
   isModernTheme?: boolean;
   isGlassTheme?: boolean;
 }) => {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
     onCopy(text);
@@ -60,7 +61,7 @@ const CardCopyButton = ({
     <button
       onClick={handleCopy}
       className={`p-1 transition-colors duration-200 flex items-center justify-center ${buttonColorClass}`}
-      title="Copy answer"
+      title={t('overlay.copyAnswer')}
     >
       {copied ? (
         <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -80,6 +81,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   collapseConsecutiveDuplicateSystemMessages,
   shouldDedupeOverlayAction,
@@ -556,6 +558,7 @@ const NativelyInterface: React.FC<NativelyInterfaceProps> = ({
   overlayOpacity = OVERLAY_OPACITY_DEFAULT,
   interfaceTheme = 'default',
 }) => {
+  const { t } = useTranslation();
   const isLightTheme = useResolvedTheme() === 'light';
   const isGlassTheme = interfaceTheme === 'liquid-glass';
   const isModernTheme = interfaceTheme === 'modern';
@@ -5211,8 +5214,8 @@ Provide only the answer, nothing else.`;
                       </div>
                       <span>
                         {systemAudioWarning.kind === 'screen-recording-permission'
-                          ? 'Screen Recording Permission Denied'
-                          : 'Audio Capture Issue'}
+                          ? t('overlay.screenRecordingDenied')
+                          : t('overlay.audioCaptureIssue')}
                       </span>
                     </div>
                     <p className="text-[11px] text-yellow-600/70 dark:text-yellow-400/60 leading-snug pl-[26px]">
@@ -5262,16 +5265,16 @@ Provide only the answer, nothing else.`;
                             title={
                               deepLinkUrl
                                 ? wantsMicrophonePane
-                                  ? 'Open macOS Microphone privacy settings'
-                                  : 'Open macOS Screen Recording privacy settings'
-                                : 'Open OpenOffer Settings'
+                                  ? t('overlay.openMicSettings')
+                                  : t('overlay.openScreenSettings')
+                                : t('common.openSettings')
                             }
                           >
                             {deepLinkUrl
                               ? wantsMicrophonePane
-                                ? 'Open Mic Settings'
-                                : 'Open Screen Settings'
-                              : 'Open Settings'}
+                                ? t('overlay.openMicSettings')
+                                : t('overlay.openScreenSettings')
+                              : t('common.openSettings')}
                           </button>
                           {/*
                             UX2: in-app TCC repair button. macOS only.
@@ -5308,9 +5311,9 @@ Provide only the answer, nothing else.`;
                               }}
                               disabled={tccRepairing}
                               className="px-3 py-1.5 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-700 dark:text-yellow-500 text-[11px] font-medium transition-all active:scale-95 border border-yellow-500/15 disabled:opacity-60 disabled:cursor-not-allowed"
-                              title="Reset macOS permission entries for OpenOffer (you will need to grant them again after relaunch)"
+                              title={t('overlay.resetMacPermissionsTitle')}
                             >
-                              {tccRepairing ? 'Resetting…' : 'Repair Permissions'}
+                              {tccRepairing ? t('overlay.resetting') : t('overlay.repairPermissions')}
                             </button>
                           )}
                         </>
@@ -5319,7 +5322,7 @@ Provide only the answer, nothing else.`;
                     <button
                       onClick={() => setSystemAudioWarning(null)}
                       className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-yellow-600/50 hover:text-yellow-700 dark:text-yellow-500/50 dark:hover:text-yellow-400 transition-colors absolute top-1 right-1 opacity-0 group-hover/warning:opacity-100"
-                      title="Dismiss"
+                      title={t('common.dismiss')}
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -5347,10 +5350,10 @@ Provide only the answer, nothing else.`;
                           />
                         </svg>
                       </div>
-                      <span>Transcription Not Configured</span>
+                      <span>{t('overlay.transcriptionNotConfigured')}</span>
                     </div>
                     <p className="text-[11px] text-orange-600/70 dark:text-orange-400/60 leading-snug pl-[26px]">
-                      No STT provider selected. Open Settings → Audio to pick one.
+                      {t('overlay.noSttProvider')}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -5360,12 +5363,12 @@ Provide only the answer, nothing else.`;
                       }}
                       className="px-3 py-1.5 rounded-lg bg-orange-500/15 hover:bg-orange-500/25 text-orange-700 dark:text-orange-500 text-[11px] font-semibold transition-all active:scale-95 border border-orange-500/20 shadow-sm"
                     >
-                      Open Settings
+                      {t('common.openSettings')}
                     </button>
                     <button
                       onClick={() => setSttNotConfigured(false)}
                       className="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-orange-600/50 hover:text-orange-700 dark:text-orange-500/50 dark:hover:text-orange-400 transition-colors absolute top-1 right-1 opacity-0 group-hover/stt-warning:opacity-100"
-                      title="Dismiss"
+                      title={t('common.dismiss')}
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -5466,7 +5469,7 @@ Provide only the answer, nothing else.`;
                           className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce"
                           style={{ animationDelay: '300ms' }}
                         />
-                        <span className="text-[10px] text-emerald-400/70 ml-1">Listening...</span>
+                        <span className="text-[10px] text-emerald-400/70 ml-1">{t('overlay.listening')}</span>
                       </div>
                     </div>
                   )}
@@ -5522,14 +5525,14 @@ Provide only the answer, nothing else.`;
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border transition-all active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`}
                   style={appearance.chipStyle}
                 >
-                  <Pencil className="w-3 h-3 opacity-70" /> What to answer?
+                  <Pencil className="w-3 h-3 opacity-70" /> {t('overlay.whatToAnswer')}
                 </button>
                 <button
                   onClick={handleClarify}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border transition-all active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`}
                   style={appearance.chipStyle}
                 >
-                  <MessageSquare className="w-3 h-3 opacity-70" /> Clarify
+                  <MessageSquare className="w-3 h-3 opacity-70" /> {t('overlay.clarify')}
                 </button>
                 <button
                   onClick={actionButtonMode === 'brainstorm' ? handleBrainstorm : handleRecap}
@@ -5538,11 +5541,11 @@ Provide only the answer, nothing else.`;
                 >
                   {actionButtonMode === 'brainstorm' ? (
                     <>
-                      <Lightbulb className="w-3 h-3 opacity-70" /> Brainstorm
+                      <Lightbulb className="w-3 h-3 opacity-70" /> {t('overlay.brainstorm')}
                     </>
                   ) : (
                     <>
-                      <RefreshCw className="w-3 h-3 opacity-70" /> Recap
+                      <RefreshCw className="w-3 h-3 opacity-70" /> {t('overlay.recap')}
                     </>
                   )}
                 </button>
@@ -5551,7 +5554,7 @@ Provide only the answer, nothing else.`;
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border transition-all active:scale-95 duration-200 interaction-base interaction-press whitespace-nowrap shrink-0 ${quickActionClass}`}
                   style={appearance.chipStyle}
                 >
-                  <HelpCircle className="w-3 h-3 opacity-70" /> Follow Up Question
+                  <HelpCircle className="w-3 h-3 opacity-70" /> {t('overlay.followUpQuestion')}
                 </button>
                 <button
                   onClick={handleAnswerNow}
@@ -5565,11 +5568,11 @@ Provide only the answer, nothing else.`;
                   {isManualRecording ? (
                     <>
                       <div className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                      Stop
+                      {t('common.stop')}
                     </>
                   ) : (
                     <>
-                      <Zap className="w-3 h-3 opacity-70" /> Answer
+                      <Zap className="w-3 h-3 opacity-70" /> {t('overlay.answer')}
                     </>
                   )}
                 </button>
@@ -5585,13 +5588,12 @@ Provide only the answer, nothing else.`;
                   >
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-[11px] font-medium overlay-text-primary">
-                        {attachedContext.length} screenshot{attachedContext.length > 1 ? 's' : ''}{' '}
-                        attached
+                        {t('overlay.screenshotAttached', { count: attachedContext.length })}
                       </span>
                       <button
                         onClick={() => setAttachedContext([])}
                         className="p-1 rounded-full transition-colors overlay-icon-surface overlay-icon-surface-hover overlay-text-interactive"
-                        title="Remove all"
+                        title={t('overlay.removeAll')}
                         style={appearance.iconStyle}
                       >
                         <X className="w-3.5 h-3.5" />
@@ -5610,7 +5612,7 @@ Provide only the answer, nothing else.`;
                               setAttachedContext((prev) => prev.filter((_, i) => i !== idx))
                             }
                             className="absolute -top-1 -right-1 w-4 h-4 bg-red-500/80 hover:bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity"
-                            title="Remove"
+                            title={t('overlay.remove')}
                           >
                             <X className="w-2.5 h-2.5 text-white" />
                           </button>
@@ -5618,7 +5620,7 @@ Provide only the answer, nothing else.`;
                       ))}
                     </div>
                     <span className="text-[10px] overlay-text-muted">
-                      Ask a question or click Answer
+                      {t('overlay.askOrClickAnswer')}
                     </span>
                   </div>
                 )}
@@ -5634,18 +5636,14 @@ Provide only the answer, nothing else.`;
                     data-stealth-ignore="true"
                   >
                     <span className="overlay-text-primary flex-1">
-                      Stealth typing hotkey{' '}
-                      <kbd className="px-1 py-0.5 rounded bg-white/10 font-mono text-[10px]">
-                        {stealthHotkeyConflict}
-                      </kbd>{' '}
-                      is already in use. Click the input to activate, or rebind in Settings.
+                      {t('overlay.stealthHotkeyConflict', { hotkey: stealthHotkeyConflict })}
                     </span>
                     <button
                       onClick={() => window.electronAPI.openSettingsTab('keybinds')}
                       className="px-2 py-1 rounded-md bg-rose-500/20 hover:bg-rose-500/30 transition-colors text-[11px] font-medium overlay-text-primary whitespace-nowrap"
                       data-stealth-ignore="true"
                     >
-                      Rebind
+                      {t('common.rebind')}
                     </button>
                     <button
                       onClick={() => setStealthHotkeyConflict(null)}
@@ -5670,15 +5668,14 @@ Provide only the answer, nothing else.`;
                     data-stealth-ignore="true"
                   >
                     <span className="overlay-text-primary flex-1">
-                      Stealth typing needs Accessibility access. Grant it in System Settings, then
-                      restart OpenOffer.
+                      {t('overlay.stealthAccessibility')}
                     </span>
                     <button
                       onClick={() => window.electronAPI.stealthTapOpenSettings()}
                       className="px-2 py-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 transition-colors text-[11px] font-medium overlay-text-primary whitespace-nowrap"
                       data-stealth-ignore="true"
                     >
-                      Open Settings
+                      {t('common.openSettings')}
                     </button>
                     <button
                       onClick={() => setStealthPermissionMissing(false)}
@@ -5725,7 +5722,7 @@ Provide only the answer, nothing else.`;
                   {/* Custom Rich Placeholder */}
                   {!inputValue && (
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none text-[13px] overlay-text-muted">
-                      <span>Ask anything on screen or conversation, or</span>
+                      <span>{t('overlay.inputPlaceholderPrefix')}</span>
                       <div className="flex items-center gap-1 opacity-80">
                         {(
                           shortcuts.selectiveScreenshot || [getModifierSymbol('cmd'), 'Shift', 'H']
@@ -5741,7 +5738,7 @@ Provide only the answer, nothing else.`;
                           </React.Fragment>
                         ))}
                       </div>
-                      <span>for selective screenshot</span>
+                      <span>{t('overlay.inputPlaceholderSuffix')}</span>
                     </div>
                   )}
 

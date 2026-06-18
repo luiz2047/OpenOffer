@@ -118,16 +118,12 @@ test('electron.d.ts declares repairTccPermissions with ok:boolean and message:st
 test('NativelyInterface.tsx renders a Repair Permissions button gated by isMac', () => {
   assert.match(
     interfaceTsx,
-    /Repair Permissions/,
-    "expected literal 'Repair Permissions' button label in NativelyInterface.tsx",
+    /overlay\.repairPermissions/,
+    "expected localized 'overlay.repairPermissions' button label in NativelyInterface.tsx",
   );
-  // Locate the *button label* literal (quoted string-literal rendered into
-  // JSX), not earlier occurrences in code comments. Earlier matches may
-  // exist in comments documenting the button (e.g. "Repair Permissions"
-  // in JSDoc). Use the LAST occurrence — the actual rendered label sits
-  // deep in the JSX tree, far below any comment.
-  const allMatches = [...interfaceTsx.matchAll(/Repair Permissions/g)];
-  assert.ok(allMatches.length > 0, "expected a 'Repair Permissions' literal");
+  // Locate the rendered localized button label, not earlier comments.
+  const allMatches = [...interfaceTsx.matchAll(/t\(['"]overlay\.repairPermissions['"]\)/g)];
+  assert.ok(allMatches.length > 0, "expected an 'overlay.repairPermissions' label");
   const labelIdx = allMatches[allMatches.length - 1].index;
   // Walk back a generously sized window — the surrounding JSX block is
   // verbose (handler, className, title attrs all inline). 5000 chars is

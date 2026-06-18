@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AlertCircle,
   ArrowUpRight,
@@ -280,6 +281,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   onOpenSettings,
   onCalendarConnected,
 }) => {
+  const { t } = useTranslation();
   const [interviews, setInterviews] = useState<InterviewListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<InterviewDetail | null>(null);
@@ -660,9 +662,9 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         <div className={paneHeaderClass}>
           <div className="flex items-center gap-2">
             <CalendarDays size={18} className="text-cyan-300" />
-            <span className="text-[15px] font-semibold">Calendar</span>
+            <span className="text-[15px] font-semibold">{t('interviews.calendar')}</span>
           </div>
-          <button className={iconButtonClass} onClick={refreshAll} title="Refresh">
+          <button className={iconButtonClass} onClick={refreshAll} title={t('common.refresh')}>
             <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} />
           </button>
         </div>
@@ -675,17 +677,17 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 onClick={() => setActiveProvider(provider)}
                 className={`min-h-11 rounded px-2 text-[12px] font-medium transition ${activeProvider === provider ? 'bg-white/[0.09] text-white shadow-sm' : 'text-white/70 hover:bg-white/[0.04] hover:text-white'}`}
               >
-                {provider === 'google' ? 'Google' : 'Mac'}
+                {provider === 'google' ? t('interviews.google') : t('interviews.mac')}
               </button>
             ))}
           </div>
           <div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-white/[0.035] px-3 py-2.5">
             <div className="min-w-0">
               <div className="text-[12px] font-medium text-text-primary">
-                {activeProvider === 'google' ? (calendarStatus?.connected ? 'Connected' : 'Not connected') : 'Local calendar'}
+                {activeProvider === 'google' ? (calendarStatus?.connected ? t('common.connected') : t('common.notConnected')) : t('interviews.localCalendar')}
               </div>
               <div className="truncate text-[11px] text-text-tertiary">
-                {activeProvider === 'google' ? (calendarStatus?.email ?? 'Google Calendar') : 'macOS Calendar'}
+                {activeProvider === 'google' ? (calendarStatus?.email ?? t('interviews.googleCalendar')) : t('interviews.macosCalendar')}
               </div>
             </div>
             {activeProvider === 'google' ? (
@@ -696,14 +698,14 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                   else setError(result.error || 'Calendar connection failed.');
                 })}
               >
-                {calendarStatus?.connected ? 'Reconnect' : 'Connect'}
+                {calendarStatus?.connected ? t('common.reconnect') : t('interviews.connect')}
               </button>
             ) : (
               <button
                 className="min-h-11 rounded-md border border-white/[0.08] px-3 text-[12px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white"
                 onClick={() => onOpenSettings('calendar')}
               >
-                Settings
+                {t('common.settings')}
               </button>
             )}
           </div>
@@ -724,7 +726,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
           <div className="mb-2 flex items-center justify-between">
-            <span className={labelClass}>Upcoming</span>
+            <span className={labelClass}>{t('interviews.upcoming')}</span>
             <span className="text-[11px] text-text-tertiary">{upcomingForProvider.length}</span>
           </div>
           <div className="space-y-2">
@@ -748,7 +750,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
             ))}
             {upcomingForProvider.length === 0 && (
               <div className="rounded-md bg-white/[0.025] p-4 text-[12px] text-text-tertiary">
-                No scheduled events.
+                {t('interviews.noScheduledEvents')}
               </div>
             )}
           </div>
@@ -758,15 +760,15 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       <section className="flex min-h-[560px] flex-col bg-[#0c0e10] lg:min-h-0 lg:border-r lg:border-white/[0.07]">
         <div className={paneHeaderClass}>
           <div>
-            <div className="text-[15px] font-semibold">Interview OS</div>
-            <div className="text-[11px] text-text-tertiary">{interviews.length} active process{interviews.length === 1 ? '' : 'es'}</div>
+            <div className="text-[15px] font-semibold">{t('interviews.interviewOS')}</div>
+            <div className="text-[11px] text-text-tertiary">{t('interviews.activeProcessCount', { count: interviews.length })}</div>
           </div>
           <button
             onClick={() => setShowCreate(true)}
             className={primaryButtonClass}
           >
             <Plus size={14} />
-            Interview
+            {t('interviews.newInterviewShort')}
           </button>
         </div>
 
@@ -776,7 +778,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
             <input
               value={query}
               onChange={event => setQuery(event.target.value)}
-              placeholder="Search company, role, stage"
+              placeholder={t('interviews.searchPlaceholder')}
               className="min-h-11 w-full bg-transparent text-[13px] outline-none placeholder:text-text-tertiary"
             />
           </div>
@@ -794,7 +796,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                   <div className="min-w-0">
                     <div className="truncate text-[14px] font-semibold">{item.title}</div>
                     <div className="mt-1 truncate text-[12px] text-text-secondary">
-                      {[item.company, item.roleTitle].filter(Boolean).join(' · ') || item.stage || 'No vacancy context'}
+                      {[item.company, item.roleTitle].filter(Boolean).join(' · ') || item.stage || t('interviews.noVacancyContext')}
                     </div>
                   </div>
                   <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold ${statusTone(item.status)}`}>
@@ -803,13 +805,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 </div>
                 <div className="mt-3 flex items-center justify-between text-[11px] text-text-tertiary">
                   <span>{formatDateTime(item.startsAt)}</span>
-                  <span>{item.questionCount} questions</span>
+                  <span>{t('interviews.questionsCount', { count: item.questionCount })}</span>
                 </div>
               </button>
             ))}
             {filteredInterviews.length === 0 && (
               <div className="rounded-md bg-white/[0.025] p-4 text-[13px] text-text-tertiary">
-                No interviews yet.
+                {t('interviews.noInterviewsYet')}
               </div>
             )}
           </div>
@@ -817,9 +819,9 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
         <div className="border-t border-white/[0.07] p-3">
           <div className="mb-2 flex items-center justify-between">
-            <span className={labelClass}>Recordings</span>
+            <span className={labelClass}>{t('interviews.recordings')}</span>
             <button onClick={startSelectedInterview} className="min-h-11 px-2 text-[11px] font-semibold text-cyan-300 hover:text-cyan-200" style={{ minWidth: 44 }}>
-              {isMeetingActive ? 'Open live' : 'Start'}
+              {isMeetingActive ? t('common.openLive') : t('common.start')}
             </button>
           </div>
           <div className="space-y-1.5">
@@ -840,8 +842,8 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               <BriefcaseBusiness size={17} />
             </div>
             <div className="min-w-0">
-              <div className="truncate text-[15px] font-semibold">{detail?.title ?? 'No interview selected'}</div>
-              <div className="truncate text-[11px] text-text-tertiary">{detail ? [detail.company, detail.roleTitle].filter(Boolean).join(' · ') || 'Vacancy context pending' : 'Create or select a process'}</div>
+              <div className="truncate text-[15px] font-semibold">{detail?.title ?? t('interviews.noInterviewSelected')}</div>
+              <div className="truncate text-[11px] text-text-tertiary">{detail ? [detail.company, detail.roleTitle].filter(Boolean).join(' · ') || t('interviews.vacancyContextPending') : t('interviews.createOrSelectProcess')}</div>
             </div>
           </div>
           {detail && (
@@ -851,16 +853,16 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 className={primaryButtonClass}
                 style={{ minWidth: 44 }}
               >
-                {isMeetingActive ? 'Open live' : 'Start'}
+                {isMeetingActive ? t('common.openLive') : t('common.start')}
               </button>
               <select
                 value={detail.status}
                 onChange={event => updateStatus(detail.id, event.target.value as InterviewStatus)}
                 className="min-h-11 rounded-md border border-white/[0.08] bg-black/20 px-3 text-[12px] outline-none focus:border-cyan-300/45"
               >
-                {STATUS_OPTIONS.map(status => <option key={status} value={status}>{status}</option>)}
+                {STATUS_OPTIONS.map(status => <option key={status} value={status}>{t(`interviews.status.${status}`)}</option>)}
               </select>
-              <button className={iconButtonClass} title="Archive" onClick={() => detail && run(async () => {
+              <button className={iconButtonClass} title={t('interviews.archive')} onClick={() => detail && run(async () => {
                 await interviewApi.archive(detail.id);
                 await loadInterviews();
               })}>
@@ -1058,9 +1060,9 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
           <div className="flex flex-1 items-center justify-center">
             <div className="w-full max-w-[360px] p-6 text-center">
               <BriefcaseBusiness size={26} className="mx-auto text-cyan-300" />
-              <div className="mt-3 text-[15px] font-semibold">Start a process</div>
-              <div className="mt-2 text-[13px] leading-5 text-text-tertiary">No active process selected.</div>
-              <button onClick={() => setShowCreate(true)} className={`${primaryButtonClass} mt-4`}>New interview</button>
+              <div className="mt-3 text-[15px] font-semibold">{t('interviews.startProcess')}</div>
+              <div className="mt-2 text-[13px] leading-5 text-text-tertiary">{t('interviews.noActiveProcessSelected')}</div>
+              <button onClick={() => setShowCreate(true)} className={`${primaryButtonClass} mt-4`}>{t('interviews.newInterview')}</button>
             </div>
           </div>
         )}
