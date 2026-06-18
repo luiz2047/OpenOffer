@@ -12,6 +12,7 @@ describe('STT runtime status settings wiring', () => {
   const preload = read('electron/preload.ts');
   const electronTypes = read('src/types/electron.d.ts');
   const settings = read('src/components/SettingsOverlay.tsx');
+  const resources = read('src/i18n/resources.ts');
 
   it('main process stores the latest STT status per channel for settings polling', () => {
     assert.match(main, /_lastSttStatusByChannel/);
@@ -51,7 +52,8 @@ describe('STT runtime status settings wiring', () => {
   });
 
   it('SettingsOverlay polls runtime status and merges live stt-status events', () => {
-    assert.match(settings, /Runtime status/);
+    assert.match(settings, /settings\.audio\.runtimeStatus/);
+    assert.match(resources, /Статус runtime/);
     assert.match(settings, /getSttRuntimeStatus/);
     assert.match(settings, /setInterval\(refreshSttRuntimeStatus,\s*3500\)/);
     assert.match(settings, /onSttStatusChanged/);

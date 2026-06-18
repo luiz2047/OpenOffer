@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check, Cloud, Terminal, Monitor, Server, Plus } from 'lucide-react';
 import { getCodexCliModelDisplayName, STANDARD_CLOUD_MODELS, prettifyModelId } from '../../utils/modelUtils';
+import { useTranslation } from 'react-i18next';
 
 interface ModelSelectorProps {
     currentModel: string;
@@ -24,6 +25,7 @@ interface AnswerStylePackOption {
 }
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSelectModel }) => {
+    const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'cloud' | 'custom' | 'local'>('cloud');
     const [ollamaModels, setOllamaModels] = useState<string[]>([]);
@@ -31,8 +33,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
     const [cloudModels, setCloudModels] = useState<{ id: string; name: string; desc: string; provider: string }[]>([]);
     const [answerStylePacks, setAnswerStylePacks] = useState<AnswerStylePackOption[]>([]);
     const [answerStyleSelectedId, setAnswerStyleSelectedId] = useState<string>('automatic');
-    const [answerStyleLabel, setAnswerStyleLabel] = useState<string>('Automatic');
-    const [answerStyleSummary, setAnswerStyleSummary] = useState<string>('Question-aware default behavior');
+    const [answerStyleLabel, setAnswerStyleLabel] = useState<string>(() => t('modelSelectorInline.automatic'));
+    const [answerStyleSummary, setAnswerStyleSummary] = useState<string>(() => t('modelSelectorInline.questionAware'));
     const [answerStyleSavingId, setAnswerStyleSavingId] = useState<string | null>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -42,10 +44,10 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
         const selected = packs.find(pack => pack.id === selectedId);
         setAnswerStylePacks(packs);
         setAnswerStyleSelectedId(selectedId);
-        setAnswerStyleLabel(selected?.shortLabel || selected?.label || 'Automatic');
+        setAnswerStyleLabel(selected?.shortLabel || selected?.label || t('modelSelectorInline.automatic'));
         setAnswerStyleSummary(selectedId === 'automatic'
-            ? (answerStyleState?.automaticSummary || 'Question-aware default behavior')
-            : (selected?.sample || selected?.description || 'Custom answer behavior'));
+            ? (answerStyleState?.automaticSummary || t('modelSelectorInline.questionAware'))
+            : (selected?.sample || selected?.description || t('modelSelectorInline.customBehavior')));
     };
 
     // Close on click outside
@@ -166,19 +168,19 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
                             onClick={() => setActiveTab('cloud')}
                             className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${activeTab === 'cloud' ? 'text-accent-primary bg-bg-item-surface border-t-2 border-t-accent-primary' : 'text-text-secondary hover:text-text-primary'}`}
                         >
-                            Cloud
+                            {t('modelSelectorInline.cloud')}
                         </button>
                         <button
                             onClick={() => setActiveTab('custom')}
                             className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${activeTab === 'custom' ? 'text-accent-primary bg-bg-item-surface border-t-2 border-t-accent-primary' : 'text-text-secondary hover:text-text-primary'}`}
                         >
-                            Custom
+                            {t('modelSelectorInline.custom')}
                         </button>
                         <button
                             onClick={() => setActiveTab('local')}
                             className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${activeTab === 'local' ? 'text-accent-primary bg-bg-item-surface border-t-2 border-t-accent-primary' : 'text-text-secondary hover:text-text-primary'}`}
                         >
-                            Local
+                            {t('modelSelectorInline.local')}
                         </button>
                     </div>
 
@@ -190,8 +192,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
                             <div className="space-y-1">
                                 {cloudModels.length === 0 ? (
                                     <div className="text-center py-6 text-text-tertiary">
-                                        <p className="text-xs mb-2">No cloud providers configured.</p>
-                                        <p className="text-[10px] opacity-70">Add API keys in Settings.</p>
+                                        <p className="text-xs mb-2">{t('modelSelectorInline.noCloudProviders')}</p>
+                                        <p className="text-[10px] opacity-70">{t('modelSelectorInline.addApiKeys')}</p>
                                     </div>
                                 ) : (
                                     cloudModels.map((m, idx) => {
@@ -221,8 +223,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
                             <div className="space-y-1">
                                 {customProviders.length === 0 ? (
                                     <div className="text-center py-6 text-text-tertiary">
-                                        <p className="text-xs mb-2">No custom providers.</p>
-                                        <button className="text-[10px] text-accent-primary hover:underline">Manage in Settings</button>
+                                        <p className="text-xs mb-2">{t('modelSelectorInline.noCustomProviders')}</p>
+                                        <button className="text-[10px] text-accent-primary hover:underline">{t('modelSelectorInline.manageInSettings')}</button>
                                     </div>
                                 ) : (
                                     customProviders.map(provider => (
@@ -245,8 +247,8 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
                             <div className="space-y-1">
                                 {ollamaModels.length === 0 ? (
                                     <div className="text-center py-6 text-text-tertiary">
-                                        <p className="text-xs">No Ollama models found.</p>
-                                        <p className="text-[10px] mt-1 opacity-70">Ensure Ollama is running.</p>
+                                        <p className="text-xs">{t('modelSelectorInline.noOllamaModels')}</p>
+                                        <p className="text-[10px] mt-1 opacity-70">{t('modelSelectorInline.ensureOllama')}</p>
                                     </div>
                                 ) : (
                                     ollamaModels.map(model => (
@@ -268,10 +270,10 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ currentModel, onSe
                     <div className="border-t border-border-subtle p-2 bg-bg-input/30">
                         <div className="flex items-start justify-between gap-3 px-1">
                             <div className="min-w-0">
-                                <span className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary">Answer style</span>
+                                <span className="block text-[10px] font-bold uppercase tracking-wider text-text-secondary">{t('modelSelectorInline.answerStyle')}</span>
                                 <span className="block text-[11px] font-medium text-text-primary truncate">{answerStyleLabel}</span>
                             </div>
-                            <span className="text-[9px] text-emerald-500 font-medium shrink-0">Model</span>
+                            <span className="text-[9px] text-emerald-500 font-medium shrink-0">{t('modelSelectorInline.model')}</span>
                         </div>
                         <p className="px-1 pt-1 text-[9px] text-text-tertiary leading-snug">{answerStyleSummary}</p>
                         {answerStylePacks.length > 0 && (

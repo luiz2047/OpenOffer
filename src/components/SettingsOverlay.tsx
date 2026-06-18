@@ -83,8 +83,8 @@ const MockupOpenOfferInterface = ({ opacity }: { opacity: number }) => {
                         {/* Rolling Transcript Bar */}
                         <div className="w-full flex justify-center py-2 px-4 border-b mb-1 overlay-transcript-surface" style={appearance.transcriptStyle}>
                             <p className="text-[13px] truncate max-w-[90%] font-medium overlay-text-primary">
-                                <span className={`${resolvedTheme === 'light' ? 'text-blue-700' : 'text-blue-400'} mr-2 font-semibold`}>Interviewer</span>
-                                <span className="opacity-95">So how would you optimize the current algorithm?</span>
+                                <span className={`${resolvedTheme === 'light' ? 'text-blue-700' : 'text-blue-400'} mr-2 font-semibold`}>Интервьюер</span>
+                                <span className="opacity-95">Как бы вы оптимизировали текущий алгоритм?</span>
                             </p>
                         </div>
 
@@ -92,8 +92,8 @@ const MockupOpenOfferInterface = ({ opacity }: { opacity: number }) => {
                         <div className="flex-1 overflow-y-auto px-4 py-2 space-y-3">
                             <div className="flex justify-start">
                                 <div className="max-w-[85%] px-4 py-3 text-[14px] leading-relaxed font-normal overlay-text-primary">
-                                    <span className="font-semibold text-emerald-500 block mb-1">Suggestion</span>
-                                    A good approach would be to use a hash map to cache the intermediate results, which brings the time complexity down from O(n²) to O(n).
+                                    <span className="font-semibold text-emerald-500 block mb-1">Подсказка</span>
+                                    Хороший подход — использовать хеш-таблицу для кеширования промежуточных результатов, что снижает временную сложность с O(n²) до O(n).
                                 </div>
                             </div>
                         </div>
@@ -154,7 +154,7 @@ interface CustomSelectProps {
     placeholder?: string;
 }
 
-const CustomSelect: React.FC<CustomSelectProps> = ({ label, icon, value, options, onChange, placeholder = "Select device" }) => {
+const CustomSelect: React.FC<CustomSelectProps> = ({ label, icon, value, options, onChange, placeholder = "Выберите устройство" }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -200,12 +200,12 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, icon, value, options
                                     }}
                                     className={`w-full text-left px-3 py-2 text-sm rounded-md flex items-center justify-between group transition-colors ${value === device.deviceId ? 'bg-bg-input hover:bg-bg-elevated text-text-primary' : 'text-text-secondary hover:bg-bg-input hover:text-text-primary'}`}
                                 >
-                                    <span className="truncate">{device.label || `Device ${device.deviceId.slice(0, 5)}...`}</span>
+                                    <span className="truncate">{device.label || `Устройство ${device.deviceId.slice(0, 5)}...`}</span>
                                     {value === device.deviceId && <Check size={14} className="text-accent-primary" />}
                                 </button>
                             ))}
                             {options.length === 0 && (
-                                <div className="px-3 py-2 text-sm text-gray-500 italic">No devices found</div>
+                                <div className="px-3 py-2 text-sm text-gray-500 italic">Устройства не найдены</div>
                             )}
                         </div>
                     </div>
@@ -291,13 +291,13 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChang
                             <div className="flex items-center gap-2">
                                 <span className="text-[13px] font-semibold text-text-primary truncate leading-tight">{selected.label}</span>
                                 {selected.badge && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ml-2 ${getBadgeStyle(selected.badge === 'Saved' ? 'green' : selected.color)}`}>{selected.badge}</span>}
-                                {selected.recommended && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ml-2 ${getBadgeStyle(selected.color)}`}>Recommended</span>}
+                                {selected.recommended && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ml-2 ${getBadgeStyle(selected.color)}`}>Рекомендуется</span>}
                             </div>
                             {/* Short description for trigger */}
                             <span className="text-[11px] text-text-tertiary truncate block leading-tight mt-0.5">{selected.desc}</span>
                         </div>
                     </div>
-                ) : <span className="text-text-secondary px-2 text-sm">Select Provider</span>}
+                ) : <span className="text-text-secondary px-2 text-sm">Выберите провайдера</span>}
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-text-tertiary transition-transform duration-300 group-hover:bg-bg-input ${isOpen ? 'rotate-180 bg-bg-input text-text-primary' : ''}`}>
                     <ChevronDown size={14} strokeWidth={2.5} />
                 </div>
@@ -329,7 +329,7 @@ const ProviderSelect: React.FC<ProviderSelectProps> = ({ value, options, onChang
                                                 <div className="flex items-center gap-2">
                                                     <span className={`text-[13px] font-medium transition-colors ${isSelected && !isLight ? 'text-white' : 'text-text-primary'}`}>{option.label}</span>
                                                     {option.badge && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${getBadgeStyle(option.badge === 'Saved' ? 'green' : option.color)}`}>{option.badge}</span>}
-                                                    {option.recommended && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${getBadgeStyle(option.color)}`}>Recommended</span>}
+                                                    {option.recommended && <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wide ${getBadgeStyle(option.color)}`}>Рекомендуется</span>}
                                                 </div>
                                                 {isSelected && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}><Check size={14} className="text-accent-primary" strokeWidth={3} /></motion.div>}
                                             </div>
@@ -1667,10 +1667,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     ) : (
                                                         <Ghost size={18} className="text-text-primary" />
                                                     )}
-                                                    <h3 className="text-lg font-bold text-text-primary">{isUndetectable ? 'Undetectable' : 'Detectable'}</h3>
+                                                    <h3 className="text-lg font-bold text-text-primary">{isUndetectable ? t('settings.general.undetectableTitle') : t('settings.general.detectableTitle')}</h3>
                                                 </div>
                                                 <p className="text-xs text-text-secondary">
-                                                    OpenOffer is currently {isUndetectable ? 'undetectable' : 'detectable'} by screen-sharing.
+                                                    {t('settings.general.undetectableStatus', { state: isUndetectable ? t('settingsPopup.undetectable').toLowerCase() : t('settingsPopup.detectable').toLowerCase() })}
                                                 </p>
                                             </div>
                                             <div
@@ -1692,10 +1692,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             <div className="flex flex-col gap-1">
                                                 <div className="flex items-center gap-2">
                                                     <PointerOff size={18} className={isMousePassthrough ? 'text-sky-400' : 'text-text-primary'} />
-                                                    <h3 className="text-lg font-bold text-text-primary">Mouse Passthrough</h3>
+                                                    <h3 className="text-lg font-bold text-text-primary">Пропуск кликов мыши</h3>
                                                 </div>
                                                 <p className="text-xs text-text-secondary">
-                                                    Overlay stays visible but lets all mouse clicks pass through to the app beneath.
+                                                    Оверлей остается видимым, но пропускает все клики мыши в приложение под ним.
                                                 </p>
                                             </div>
                                             <div
@@ -1790,8 +1790,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             <Terminal size={20} />
                                                         </div>
                                                         <div>
-                                                            <h3 className="text-sm font-bold text-text-primary">Verbose debug logging</h3>
-                                                            <p className="text-xs text-text-secondary mt-0.5">Print detailed audio, STT, and pipeline diagnostics</p>
+                                                            <h3 className="text-sm font-bold text-text-primary">Подробные debug-логи</h3>
+                                                            <p className="text-xs text-text-secondary mt-0.5">Печатает детальную диагностику аудио, STT и пайплайна</p>
                                                         </div>
                                                     </div>
                                                     <div
@@ -1824,14 +1824,14 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                 <div className="flex items-center gap-2.5 min-w-0">
                                                                     <Terminal size={14} className="text-amber-400 shrink-0" />
                                                                     <p className="text-xs text-amber-200/80 leading-snug truncate">
-                                                                        Logs: <span className="font-mono text-amber-300">~/Documents/openoffer_debug.log</span>
+                                                                        Логи: <span className="font-mono text-amber-300">~/Documents/openoffer_debug.log</span>
                                                                     </p>
                                                                 </div>
                                                                 <button type="button"
                                                                     onClick={() => window.electronAPI?.openLogFile?.()}
                                                                     className="shrink-0 text-[11px] font-medium text-amber-400 hover:text-amber-300 transition-colors px-2 py-0.5 rounded-md bg-amber-500/15 hover:bg-amber-500/25"
                                                                 >
-                                                                    Open
+                                                                    Открыть
                                                                 </button>
                                                             </div>
                                                             {/* 5-second drain bar */}
@@ -1858,8 +1858,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             <MessageSquare size={20} />
                                                         </div>
                                                         <div>
-                                                            <h3 className="text-sm font-bold text-text-primary">Interviewer Transcript</h3>
-                                                            <p className="text-xs text-text-secondary mt-0.5">Show real-time transcription of the interviewer</p>
+                                                            <h3 className="text-sm font-bold text-text-primary">Транскрипт интервьюера</h3>
+                                                            <p className="text-xs text-text-secondary mt-0.5">Показывает транскрипцию интервьюера в реальном времени</p>
                                                         </div>
                                                     </div>
                                                     <div
@@ -1888,8 +1888,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             <ArrowDown size={20} />
                                                         </div>
                                                         <div>
-                                                            <h3 className="text-sm font-bold text-text-primary">Auto Scroll</h3>
-                                                            <p className="text-xs text-text-secondary mt-0.5">Automatically scroll to the latest message as new responses arrive</p>
+                                                            <h3 className="text-sm font-bold text-text-primary">Автопрокрутка</h3>
+                                                            <p className="text-xs text-text-secondary mt-0.5">Автоматически прокручивает к последнему сообщению при появлении новых ответов</p>
                                                         </div>
                                                     </div>
                                                     <div
@@ -2191,7 +2191,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                         className={`w-full text-left px-2 py-1.5 rounded-md text-xs flex items-center gap-2 transition-colors ${aiResponseLanguage === option.code ? 'text-text-primary bg-bg-item-active/50' : 'text-text-secondary hover:bg-bg-input hover:text-text-primary'}`}
                                                                     >
                                                                         {option.code === 'auto' ? (
-                                                                            <span className="font-medium">Auto</span>
+                                                                            <span className="font-medium">Авто</span>
                                                                         ) : (
                                                                             <span className="font-medium">{option.label}</span>
                                                                         )}
@@ -2404,27 +2404,27 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                 <div className="space-y-5 animated fadeIn select-text pb-4">
                                     <div className="flex items-start justify-between">
                                         <div>
-                                            <h3 className="text-lg font-bold text-text-primary mb-1">Keyboard shortcuts</h3>
-                                            <p className="text-xs text-text-secondary">OpenOffer works with these easy to remember commands.</p>
+                                            <h3 className="text-lg font-bold text-text-primary mb-1">Горячие клавиши</h3>
+                                            <p className="text-xs text-text-secondary">OpenOffer работает с этими простыми командами.</p>
                                         </div>
                                         <button type="button"
                                             onClick={resetShortcuts}
                                             className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-border-subtle bg-bg-subtle/30 hover:bg-bg-subtle hover:border-green-500/30 transition-all duration-200 text-xs font-medium text-text-secondary hover:text-green-500 active:scale-95 mt-1"
                                         >
                                             <RotateCcw size={13} strokeWidth={2.5} />
-                                            Restore Default
+                                            Восстановить
                                         </button>
                                     </div>
 
                                     <div className="grid gap-6">
                                         {/* General Category */}
                                         <div>
-                                            <h4 className="text-sm font-bold text-text-primary mb-3">General</h4>
+                                            <h4 className="text-sm font-bold text-text-primary mb-3">Основное</h4>
                                             <div className="space-y-1">
                                                 <div className="flex items-center justify-between py-1.5 group">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-text-tertiary group-hover:text-text-primary transition-colors w-5 flex justify-center"><Eye size={14} /></span>
-                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Toggle Visibility</span>
+                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Показать / скрыть</span>
                                                     </div>
                                                     <KeyRecorder
                                                         currentKeys={shortcuts.toggleVisibility}
@@ -2434,7 +2434,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <div className="flex items-center justify-between py-1.5 group">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-text-tertiary group-hover:text-text-primary transition-colors w-5 flex justify-center"><PointerOff size={14} /></span>
-                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Toggle Mouse Passthrough</span>
+                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Пропуск кликов мыши</span>
                                                     </div>
                                                     <KeyRecorder
                                                         currentKeys={shortcuts.toggleMousePassthrough}
@@ -2444,7 +2444,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <div className="flex items-center justify-between py-1.5 group">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-text-tertiary group-hover:text-text-primary transition-colors w-5 flex justify-center"><MessageSquare size={14} /></span>
-                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Process Screenshots</span>
+                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Обработать скриншоты</span>
                                                     </div>
                                                     <KeyRecorder
                                                         currentKeys={shortcuts.processScreenshots}
@@ -2454,7 +2454,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <div className="flex items-center justify-between py-1.5 group">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-text-tertiary group-hover:text-text-primary transition-colors w-5 flex justify-center"><Sparkles size={14} /></span>
-                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Capture Screen & Ask AI</span>
+                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Снять экран и спросить AI</span>
                                                     </div>
                                                     <KeyRecorder
                                                         currentKeys={shortcuts.captureAndProcess}
@@ -2464,7 +2464,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <div className="flex items-center justify-between py-1.5 group">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-text-tertiary group-hover:text-text-primary transition-colors w-5 flex justify-center"><RotateCcw size={14} /></span>
-                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Reset / Cancel</span>
+                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Сброс / отмена</span>
                                                     </div>
                                                     <KeyRecorder
                                                         currentKeys={shortcuts.resetCancel}
@@ -2474,7 +2474,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <div className="flex items-center justify-between py-1.5 group">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-text-tertiary group-hover:text-text-primary transition-colors w-5 flex justify-center"><Camera size={14} /></span>
-                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Take Screenshot</span>
+                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Сделать скриншот</span>
                                                     </div>
                                                     <KeyRecorder
                                                         currentKeys={shortcuts.takeScreenshot}
@@ -2484,7 +2484,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <div className="flex items-center justify-between py-1.5 group">
                                                     <div className="flex items-center gap-3">
                                                         <span className="text-text-tertiary group-hover:text-text-primary transition-colors w-5 flex justify-center"><Crop size={14} /></span>
-                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Selective Screenshot</span>
+                                                        <span className="text-sm text-text-secondary font-medium group-hover:text-text-primary transition-colors">Выделенный скриншот</span>
                                                     </div>
                                                     <KeyRecorder
                                                         currentKeys={shortcuts.selectiveScreenshot}
@@ -2497,22 +2497,22 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                         {/* Chat Category */}
                                         <div>
                                             <div className="mb-3">
-                                                <h4 className="text-sm font-bold text-text-primary">Chat</h4>
+                                                <h4 className="text-sm font-bold text-text-primary">Чат</h4>
                                             </div>
                                             <div className="space-y-1">
                                                 {[
-                                                    { id: 'whatToAnswer', label: 'What to Answer', icon: <Sparkles size={14} /> },
-                                                    { id: 'clarify', label: 'Clarify', icon: <MessageSquare size={14} /> },
-                                                    { id: 'followUp', label: 'Follow Up', icon: <MessageSquare size={14} /> },
-                                                    { id: 'dynamicAction4', label: 'Recap / Brainstorm', icon: <RefreshCw size={14} /> },
-                                                    { id: 'answer', label: 'Answer / Record', icon: <Mic size={14} /> },
-                                                    { id: 'codeHint', label: 'Get Code Hint', icon: <Zap size={14} /> },
-                                                    { id: 'brainstorm', label: 'Brainstorm Approaches', icon: <Zap size={14} /> },
-                                                    { id: 'scrollUp', label: 'Scroll Up', icon: <ArrowUp size={14} /> },
-                                                    { id: 'scrollDown', label: 'Scroll Down', icon: <ArrowDown size={14} /> },
-                                                    { id: 'scrollLeft', label: 'Scroll Left (code block)', icon: <ArrowLeft size={14} /> },
-                                                    { id: 'scrollRight', label: 'Scroll Right (code block)', icon: <ArrowRight size={14} /> },
-                                                    { id: 'focusInput', label: 'Toggle Stealth Typing', icon: <MessageSquare size={14} /> },
+                                                    { id: 'whatToAnswer', label: 'Что ответить', icon: <Sparkles size={14} /> },
+                                                    { id: 'clarify', label: 'Уточнить', icon: <MessageSquare size={14} /> },
+                                                    { id: 'followUp', label: 'Follow-up вопрос', icon: <MessageSquare size={14} /> },
+                                                    { id: 'dynamicAction4', label: 'Рекап / брейншторм', icon: <RefreshCw size={14} /> },
+                                                    { id: 'answer', label: 'Ответ / запись', icon: <Mic size={14} /> },
+                                                    { id: 'codeHint', label: 'Подсказка по коду', icon: <Zap size={14} /> },
+                                                    { id: 'brainstorm', label: 'Подходы к решению', icon: <Zap size={14} /> },
+                                                    { id: 'scrollUp', label: 'Прокрутить вверх', icon: <ArrowUp size={14} /> },
+                                                    { id: 'scrollDown', label: 'Прокрутить вниз', icon: <ArrowDown size={14} /> },
+                                                    { id: 'scrollLeft', label: 'Прокрутить влево (код)', icon: <ArrowLeft size={14} /> },
+                                                    { id: 'scrollRight', label: 'Прокрутить вправо (код)', icon: <ArrowRight size={14} /> },
+                                                    { id: 'focusInput', label: 'Скрытый ввод', icon: <MessageSquare size={14} /> },
                                                 ].map((item, i) => (
                                                     <div key={i} className="flex items-center justify-between py-1.5 group">
                                                         <div className="flex items-center gap-3">
@@ -2530,13 +2530,13 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
                                         {/* Window Category */}
                                         <div>
-                                            <h4 className="text-sm font-bold text-text-primary mb-3">Window</h4>
+                                            <h4 className="text-sm font-bold text-text-primary mb-3">Окно</h4>
                                             <div className="space-y-1">
                                                 {[
-                                                    { id: 'moveWindowUp', label: 'Move Window Up', icon: <ArrowUp size={14} /> },
-                                                    { id: 'moveWindowDown', label: 'Move Window Down', icon: <ArrowDown size={14} /> },
-                                                    { id: 'moveWindowLeft', label: 'Move Window Left', icon: <ArrowLeft size={14} /> },
-                                                    { id: 'moveWindowRight', label: 'Move Window Right', icon: <ArrowRight size={14} /> }
+                                                    { id: 'moveWindowUp', label: 'Сдвинуть окно вверх', icon: <ArrowUp size={14} /> },
+                                                    { id: 'moveWindowDown', label: 'Сдвинуть окно вниз', icon: <ArrowDown size={14} /> },
+                                                    { id: 'moveWindowLeft', label: 'Сдвинуть окно влево', icon: <ArrowLeft size={14} /> },
+                                                    { id: 'moveWindowRight', label: 'Сдвинуть окно вправо', icon: <ArrowRight size={14} /> }
                                                 ].map((item, i) => (
                                                     <div key={i} className="flex items-center justify-between py-1.5 group">
                                                         <div className="flex items-center gap-3">
@@ -2559,27 +2559,27 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                 <div className="space-y-6 animated fadeIn">
                                     {/* ── Speech Provider Section ── */}
                                     <div>
-                                        <h3 className="text-lg font-bold text-text-primary mb-1">Speech Provider</h3>
-                                        <p className="text-xs text-text-secondary mb-5">Choose the engine that transcribes audio to text.</p>
+                                        <h3 className="text-lg font-bold text-text-primary mb-1">Провайдер распознавания речи</h3>
+                                        <p className="text-xs text-text-secondary mb-5">Выберите движок, который переводит аудио в текст.</p>
 
                                         <div className="space-y-4">
                                             <div className="bg-bg-card rounded-xl border border-border-subtle p-4 space-y-3">
-                                                <label className="text-xs font-medium text-text-secondary block">Speech Provider</label>
+                                                <label className="text-xs font-medium text-text-secondary block">Провайдер распознавания речи</label>
                                                 <div className="relative">
                                                     <ProviderSelect
                                                         value={sttProvider}
                                                         onChange={(val) => handleSttProviderChange(val as any)}
                                                         options={[
-                                                            { id: 'google', label: 'Google Cloud', badge: googleServiceAccountPath ? 'Saved' : null, recommended: true, desc: 'gRPC streaming via Service Account', color: 'blue', icon: <Mic size={14} /> },
-                                                            { id: 'groq', label: 'Groq Whisper', badge: hasStoredSttGroqKey ? 'Saved' : null, recommended: true, desc: 'Ultra-fast REST transcription', color: 'orange', icon: <Mic size={14} /> },
-                                                            { id: 'openai', label: 'OpenAI Whisper', badge: hasStoredSttOpenaiKey ? 'Saved' : null, desc: 'OpenAI-compatible Whisper API', color: 'green', icon: <Mic size={14} /> },
-                                                            { id: 'deepgram', label: 'Deepgram Nova-3', badge: hasStoredDeepgramKey ? 'Saved' : null, recommended: true, desc: 'High-accuracy REST transcription', color: 'purple', icon: <Mic size={14} /> },
-                                                            { id: 'elevenlabs', label: 'ElevenLabs Scribe', badge: hasStoredElevenLabsKey ? 'Saved' : null, desc: 'Scribe v2 Realtime API', color: 'teal', icon: <Mic size={14} /> },
-                                                            { id: 'azure', label: 'Azure Speech', badge: hasStoredAzureKey ? 'Saved' : null, desc: 'Microsoft Cognitive Services STT', color: 'cyan', icon: <Mic size={14} /> },
-                                                            { id: 'ibmwatson', label: 'IBM Watson', badge: hasStoredIbmWatsonKey ? 'Saved' : null, desc: 'IBM Watson cloud STT service', color: 'indigo', icon: <Mic size={14} /> },
-                                                            { id: 'soniox', label: 'Soniox', badge: hasStoredSonioxKey ? 'Saved' : null, recommended: true, desc: '60+ languages, multilingual, domain context', color: 'cyan', icon: <Mic size={14} /> },
-                                                            { id: 'local-whisper', label: 'Local Whisper', badge: null, desc: 'Privacy-first: runs 100% on your device', color: 'green', icon: <Cpu size={14} /> },
-                                                            { id: 'gigastt', label: 'GigaSTT', badge: null, recommended: true, desc: 'Local Russian-first STT server', color: 'green', icon: <Cpu size={14} /> },
+                                                            { id: 'google', label: 'Google Cloud', badge: googleServiceAccountPath ? 'Сохранено' : null, recommended: true, desc: 'gRPC-стриминг через Service Account', color: 'blue', icon: <Mic size={14} /> },
+                                                            { id: 'groq', label: 'Groq Whisper', badge: hasStoredSttGroqKey ? 'Сохранено' : null, recommended: true, desc: 'Очень быстрая REST-транскрипция', color: 'orange', icon: <Mic size={14} /> },
+                                                            { id: 'openai', label: 'OpenAI Whisper', badge: hasStoredSttOpenaiKey ? 'Сохранено' : null, desc: 'OpenAI-совместимый Whisper API', color: 'green', icon: <Mic size={14} /> },
+                                                            { id: 'deepgram', label: 'Deepgram Nova-3', badge: hasStoredDeepgramKey ? 'Сохранено' : null, recommended: true, desc: 'Высокоточная REST-транскрипция', color: 'purple', icon: <Mic size={14} /> },
+                                                            { id: 'elevenlabs', label: 'ElevenLabs Scribe', badge: hasStoredElevenLabsKey ? 'Сохранено' : null, desc: 'Realtime API Scribe v2', color: 'teal', icon: <Mic size={14} /> },
+                                                            { id: 'azure', label: 'Azure Speech', badge: hasStoredAzureKey ? 'Сохранено' : null, desc: 'STT Microsoft Cognitive Services', color: 'cyan', icon: <Mic size={14} /> },
+                                                            { id: 'ibmwatson', label: 'IBM Watson', badge: hasStoredIbmWatsonKey ? 'Сохранено' : null, desc: 'Облачный STT-сервис IBM Watson', color: 'indigo', icon: <Mic size={14} /> },
+                                                            { id: 'soniox', label: 'Soniox', badge: hasStoredSonioxKey ? 'Сохранено' : null, recommended: true, desc: '60+ языков, мультиязычность, доменный контекст', color: 'cyan', icon: <Mic size={14} /> },
+                                                            { id: 'local-whisper', label: 'Local Whisper', badge: null, desc: 'Приватность: 100% на вашем устройстве', color: 'green', icon: <Cpu size={14} /> },
+                                                            { id: 'gigastt', label: 'GigaSTT', badge: null, recommended: true, desc: 'Локальный STT-сервер с фокусом на русский', color: 'green', icon: <Cpu size={14} /> },
                                                         ]}
                                                     />
                                                 </div>
@@ -2590,9 +2590,9 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     <div className="flex items-center gap-2 min-w-0">
                                                         <Activity size={15} className="text-text-secondary shrink-0" />
                                                         <div className="min-w-0">
-                                                            <h4 className="text-sm font-semibold text-text-primary">Runtime status</h4>
+                                                            <h4 className="text-sm font-semibold text-text-primary">{t('settings.audio.runtimeStatus')}</h4>
                                                             <p className="text-[11px] text-text-tertiary truncate">
-                                                                {runtimeHealth?.message || sttRuntimeStatus?.error || 'Checking STT backend'}
+                                                                {runtimeHealth?.message || sttRuntimeStatus?.error || t('settings.audio.checkingSttBackend')}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -2600,7 +2600,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         onClick={refreshSttRuntimeStatus}
                                                         disabled={sttRuntimeLoading}
                                                         className="w-8 h-8 rounded-lg bg-bg-input hover:bg-bg-elevated border border-border-subtle text-text-secondary hover:text-text-primary transition-colors flex items-center justify-center disabled:opacity-50"
-                                                        title="Refresh runtime status"
+                                                        title={t('settings.audio.refreshRuntimeStatus')}
                                                     >
                                                         <RefreshCw size={14} className={sttRuntimeLoading ? 'animate-spin' : ''} />
                                                     </button>
@@ -2608,17 +2608,17 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
                                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                                     {renderRuntimePill(
-                                                        'Backend',
+                                                        t('settings.audio.backend'),
                                                         runtimeHealth?.state,
                                                         runtimeHealth?.label || sttRuntimeStatus?.provider || sttProvider
                                                     )}
                                                     {renderRuntimePill(
-                                                        'Mic',
+                                                        t('settings.audio.mic'),
                                                         sttRuntimeStatus?.lastStatus?.user?.state,
                                                         sttRuntimeStatus?.lastStatus?.user?.error
                                                     )}
                                                     {renderRuntimePill(
-                                                        'System',
+                                                        t('settings.audio.system'),
                                                         sttRuntimeStatus?.lastStatus?.interviewer?.state,
                                                         sttRuntimeStatus?.lastStatus?.interviewer?.error
                                                     )}
@@ -2627,17 +2627,17 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 {sttProvider === 'gigastt' && (
                                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-text-secondary">
                                                         <div className="bg-bg-input rounded-lg px-3 py-2 border border-border-subtle min-w-0">
-                                                            <span className="text-text-tertiary block mb-0.5">Pool</span>
-                                                            <span className="text-text-primary font-medium">{runtimePool || 'unknown'}</span>
+                                                            <span className="text-text-tertiary block mb-0.5">{t('settings.audio.pool')}</span>
+                                                            <span className="text-text-primary font-medium">{runtimePool || t('settings.audio.unknown')}</span>
                                                         </div>
                                                         <div className="bg-bg-input rounded-lg px-3 py-2 border border-border-subtle min-w-0">
-                                                            <span className="text-text-tertiary block mb-0.5">Binary</span>
+                                                            <span className="text-text-tertiary block mb-0.5">{t('settings.audio.binary')}</span>
                                                             <span className="text-text-primary font-medium truncate block">
-                                                                {runtimeHealth?.binary?.path || 'missing'}
+                                                                {runtimeHealth?.binary?.path || t('settings.audio.missing')}
                                                             </span>
                                                         </div>
                                                         <div className="bg-bg-input rounded-lg px-3 py-2 border border-border-subtle min-w-0">
-                                                            <span className="text-text-tertiary block mb-0.5">Log</span>
+                                                            <span className="text-text-tertiary block mb-0.5">{t('settings.audio.log')}</span>
                                                             <span className="text-text-primary font-medium truncate block">
                                                                 {runtimeHealth?.logPath || '~/.gigastt/openoffer-gigastt.log'}
                                                             </span>
@@ -2647,9 +2647,9 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
                                                 {sttProvider === 'local-whisper' && (
                                                     <div className="bg-bg-input rounded-lg px-3 py-2 border border-border-subtle text-[11px] text-text-secondary">
-                                                        <span className="text-text-tertiary block mb-0.5">Model</span>
+                                                        <span className="text-text-tertiary block mb-0.5">{t('settings.audio.model')}</span>
                                                         <span className="text-text-primary font-medium">
-                                                            {runtimeHealth?.modelName || runtimeHealth?.modelId || 'No model selected'}
+                                                            {runtimeHealth?.modelName || runtimeHealth?.modelId || t('settings.audio.noModelSelected')}
                                                         </span>
                                                         {runtimeHealth?.modelStatus && (
                                                             <span className="ml-2 text-text-tertiary">({runtimeHealth.modelStatus})</span>
@@ -2661,7 +2661,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             {/* Groq Model Selector */}
                                             {sttProvider === 'groq' && (
                                                 <div className="bg-bg-card rounded-xl border border-border-subtle p-4">
-                                                    <label className="text-xs font-medium text-text-secondary mb-2.5 block">Whisper Model</label>
+                                                    <label className="text-xs font-medium text-text-secondary mb-2.5 block">Модель Whisper</label>
                                                     <div className="grid grid-cols-2 gap-2">
                                                         {[
                                                             { id: 'whisper-large-v3-turbo', label: 'V3 Turbo', desc: 'Fastest' },
@@ -2695,12 +2695,12 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             {/* Google Cloud Service Account */}
                                             {sttProvider === 'google' && (
                                                 <div className="bg-bg-card rounded-xl border border-border-subtle p-4">
-                                                    <label className="text-xs font-medium text-text-secondary mb-2 block">Service Account JSON</label>
+                                                    <label className="text-xs font-medium text-text-secondary mb-2 block">JSON сервисного аккаунта</label>
                                                     <div className="flex gap-2">
                                                         <div className="flex-1 bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-xs text-text-secondary font-mono truncate">
                                                             {googleServiceAccountPath
                                                                 ? <span className="text-text-primary">{googleServiceAccountPath.split('/').pop()}</span>
-                                                                : <span className="text-text-tertiary italic">No file selected</span>}
+                                                                : <span className="text-text-tertiary italic">Файл не выбран</span>}
                                                         </div>
                                                         <button type="button"
                                                             onClick={async () => {
@@ -2716,7 +2716,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         </button>
                                                     </div>
                                                     <p className="text-[10px] text-text-tertiary mt-2">
-                                                        Required for Google Cloud Speech-to-Text.
+                                                        Требуется для Google Cloud Speech-to-Text.
                                                     </p>
                                                 </div>
                                             )}
@@ -2755,18 +2755,18 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             }}
                                                             placeholder={
                                                                 sttProvider === 'groq'
-                                                                    ? (hasStoredSttGroqKey ? '••••••••••••' : 'Enter Groq API key')
+                                                                    ? (hasStoredSttGroqKey ? '••••••••••••' : 'Введите API-ключ Groq')
                                                                     : sttProvider === 'openai'
-                                                                        ? (hasStoredSttOpenaiKey ? '••••••••••••' : 'Enter OpenAI STT API key')
+                                                                        ? (hasStoredSttOpenaiKey ? '••••••••••••' : 'Введите API-ключ OpenAI STT')
                                                                         : sttProvider === 'elevenlabs'
-                                                                            ? (hasStoredElevenLabsKey ? '••••••••••••' : 'Enter ElevenLabs API key')
+                                                                            ? (hasStoredElevenLabsKey ? '••••••••••••' : 'Введите API-ключ ElevenLabs')
                                                                             : sttProvider === 'azure'
-                                                                                ? (hasStoredAzureKey ? '••••••••••••' : 'Enter Azure API key')
+                                                                                ? (hasStoredAzureKey ? '••••••••••••' : 'Введите API-ключ Azure')
                                                                                 : sttProvider === 'ibmwatson'
-                                                                                    ? (hasStoredIbmWatsonKey ? '••••••••••••' : 'Enter IBM Watson API key')
+                                                                                    ? (hasStoredIbmWatsonKey ? '••••••••••••' : 'Введите API-ключ IBM Watson')
                                                                                     : sttProvider === 'soniox'
-                                                                                        ? (hasStoredSonioxKey ? '••••••••••••' : 'Enter Soniox API key')
-                                                                                        : (hasStoredDeepgramKey ? '••••••••••••' : 'Enter Deepgram API key')
+                                                                                        ? (hasStoredSonioxKey ? '••••••••••••' : 'Введите API-ключ Soniox')
+                                                                                        : (hasStoredDeepgramKey ? '••••••••••••' : 'Введите API-ключ Deepgram')
                                                             }
                                                             className="flex-1 bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary transition-colors"
                                                         />
@@ -2792,7 +2792,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                 : 'bg-bg-input hover:bg-bg-input/80 border border-border-subtle text-text-primary disabled:opacity-50'
                                                                 }`}
                                                         >
-                                                            {sttSaving ? 'Saving...' : sttSaved ? 'Saved!' : 'Save'}
+                                                            {sttSaving ? 'Сохранение...' : sttSaved ? 'Сохранено!' : 'Сохранить'}
                                                         </button>
                                                         {(() => {
                                                             const hasKeyMap: Record<string, boolean> = {
@@ -2808,7 +2808,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                 <button type="button"
                                                                     onClick={() => handleRemoveSttKey(sttProvider as any)}
                                                                     className="px-2.5 py-2.5 rounded-lg text-xs font-medium text-text-tertiary hover:text-red-500 hover:bg-red-500/10 transition-all"
-                                                                    title="Remove API Key"
+                                                                    title="Удалить API-ключ"
                                                                 >
                                                                     <Trash2 size={16} strokeWidth={1.5} />
                                                                 </button>
@@ -2819,7 +2819,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     {/* Azure Region Input */}
                                                     {sttProvider === 'azure' && (
                                                         <div className="space-y-1.5">
-                                                            <label className="text-xs font-medium text-text-secondary block">Region</label>
+                                                            <label className="text-xs font-medium text-text-secondary block">Регион</label>
                                                             <div className="flex gap-2">
                                                                 <input
                                                                     type="text"
@@ -2850,7 +2850,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         When set, the WebSocket Realtime path is skipped and REST is used against the custom host. */}
                                                     {sttProvider === 'openai' && (
                                                         <div className="space-y-1.5">
-                                                            <label className="text-xs font-medium text-text-secondary block">Custom Base URL <span className="text-text-tertiary">(optional)</span></label>
+                                                            <label className="text-xs font-medium text-text-secondary block">Пользовательский Base URL <span className="text-text-tertiary">(необязательно)</span></label>
                                                             <div className="flex gap-2">
                                                                 <input
                                                                     type="text"
@@ -2871,7 +2871,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                     Save
                                                                 </button>
                                                             </div>
-                                                            <p className="text-[10px] text-text-tertiary">Point at any OpenAI-compatible server (e.g. Speaches). Custom servers use REST only — Realtime WebSocket is skipped. Leave blank for default.</p>
+                                                            <p className="text-[10px] text-text-tertiary">Укажите любой OpenAI-совместимый сервер (например Speaches). Пользовательские серверы используют только REST — Realtime WebSocket пропускается. Оставьте пустым для значения по умолчанию.</p>
                                                         </div>
                                                     )}
 
@@ -2882,11 +2882,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             className="text-xs bg-bg-input hover:bg-bg-elevated text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-2 disabled:opacity-50"
                                                         >
                                                             {sttTestStatus === 'testing' ? (
-                                                                <><RefreshCw size={12} className="animate-spin" /> Testing...</>
+                                                                <><RefreshCw size={12} className="animate-spin" /> Проверка...</>
                                                             ) : sttTestStatus === 'success' ? (
-                                                                <><Check size={12} className="text-green-500" /> Connected</>
+                                                                <><Check size={12} className="text-green-500" /> Подключено</>
                                                             ) : (
-                                                                <>Test Connection</>
+                                                                <>Проверить подключение</>
                                                             )}
                                                         </button>
                                                         <button type="button"
@@ -2905,7 +2905,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                 }
                                                             }}
                                                             className="text-xs text-text-tertiary hover:text-text-primary flex items-center gap-1 transition-colors ml-1"
-                                                            title="Get API Key"
+                                                            title="Получить API-ключ"
                                                         >
                                                             <ExternalLink size={12} />
                                                         </button>
@@ -2934,7 +2934,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     toJSON: () => ({})
                                                 }))}
                                                 onChange={handleGroupChange}
-                                                placeholder="Select Language"
+                                                placeholder="Выберите язык"
                                             />
 
                                             {/* Variant/Accent Selector (Conditional) */}
@@ -2946,7 +2946,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         value={recognitionLanguage}
                                                         options={currentGroupVariants}
                                                         onChange={handleLanguageChange}
-                                                        placeholder="Select Region"
+                                                        placeholder="Выберите регион"
                                                     />
                                                 </div>
                                             )}
@@ -2960,10 +2960,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                 const label = Object.values(availableLanguages).find((l: any) =>
                                                                     l.bcp47 === autoDetectedLanguage || l.iso639 === autoDetectedLanguage
                                                                 )?.label as string | undefined;
-                                                                return `Auto mode — detected: ${label ?? autoDetectedLanguage}`;
+                                                                return `Авто режим — обнаружено: ${label ?? autoDetectedLanguage}`;
                                                               })()
-                                                            : 'Auto mode — language will be detected from the first few seconds of audio.'
-                                                        : 'Select the primary language being spoken in the meeting.'
+                                                            : 'Авто режим — язык будет определен по первым секундам аудио.'
+                                                        : 'Выберите основной язык, на котором говорят на встрече.'
                                                     }
                                                 </p>
                                             </div>
@@ -2974,8 +2974,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
                                     {/* ── Audio Configuration Section ── */}
                                     <div>
-                                        <h3 className="text-lg font-bold text-text-primary mb-1">Audio Configuration</h3>
-                                        <p className="text-xs text-text-secondary mb-5">Manage input and output devices.</p>
+                                        <h3 className="text-lg font-bold text-text-primary mb-1">Настройка аудио</h3>
+                                        <p className="text-xs text-text-secondary mb-5">Управляйте устройствами ввода и вывода.</p>
 
                                         {/* Device-fallback banner: shown when main process couldn't
                                             open the selected device and silently used the default. */}
@@ -2984,9 +2984,9 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 <AlertCircle size={14} className="text-amber-400 shrink-0 mt-0.5" />
                                                 <div className="min-w-0 flex-1">
                                                     <p className="text-xs text-amber-200/90 leading-snug">
-                                                        Selected {deviceFallbackNotice.kind === 'input' ? 'microphone' : 'output device'}
-                                                        {deviceFallbackNotice.requested ? ` "${deviceFallbackNotice.requested}"` : ''} couldn't be opened
-                                                        — using <span className="font-medium">{deviceFallbackNotice.actual ?? 'no device'}</span> instead.
+                                                        Не удалось открыть выбранное {deviceFallbackNotice.kind === 'input' ? 'устройство ввода' : 'устройство вывода'}
+                                                        {deviceFallbackNotice.requested ? ` "${deviceFallbackNotice.requested}"` : ''}
+                                                        — используется <span className="font-medium">{deviceFallbackNotice.actual ?? 'устройство не найдено'}</span>.
                                                     </p>
                                                     {deviceFallbackNotice.reason && (
                                                         <p className="text-[11px] text-amber-200/60 mt-1 font-mono break-all">{deviceFallbackNotice.reason}</p>
@@ -3006,14 +3006,14 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     }}
                                                     className="shrink-0 text-[11px] font-medium text-amber-400 hover:text-amber-300 transition-colors px-2 py-0.5 rounded-md bg-amber-500/15 hover:bg-amber-500/25"
                                                 >
-                                                    Reset
+                                                    {t('settings.audio.resetDeviceSelection')}
                                                 </button>
                                             </div>
                                         )}
 
                                         <div className="space-y-4">
                                             <CustomSelect
-                                                label="Input Device"
+                                                label={t('settings.audio.inputDevice')}
                                                 icon={<Mic size={16} />}
                                                 value={selectedInput}
                                                 options={inputDevices}
@@ -3021,12 +3021,12 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     setSelectedInput(id);
                                                     localStorage.setItem('preferredInputDeviceId', id);
                                                 }}
-                                                placeholder="Default Microphone"
+                                                placeholder={t('settings.audio.defaultMicrophone')}
                                             />
 
                                             <div>
                                                 <div className="flex justify-between text-xs text-text-secondary mb-2 px-1">
-                                                    <span>Input Level</span>
+                                                    <span>{t('settings.audio.inputLevel')}</span>
                                                 </div>
                                                 <div className="h-1.5 bg-bg-input rounded-full overflow-hidden">
                                                     <div
@@ -3038,7 +3038,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
                                             <div>
                                                 <div className="flex justify-between text-xs text-text-secondary mb-2 px-1">
-                                                    <span>System Audio Level</span>
+                                                    <span>{t('settings.audio.systemAudioLevel')}</span>
                                                     {systemAudioTestError && (
                                                         <span className="text-amber-400 truncate max-w-[240px]" title={systemAudioTestError}>
                                                             {systemAudioTestError}
@@ -3056,7 +3056,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             <div className="h-px bg-border-subtle my-2" />
 
                                             <CustomSelect
-                                                label="Output Device"
+                                                label={t('settings.audio.outputDevice')}
                                                 icon={<Speaker size={16} />}
                                                 value={selectedOutput}
                                                 options={outputDevices}
@@ -3064,7 +3064,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     setSelectedOutput(id);
                                                     localStorage.setItem('preferredOutputDeviceId', id);
                                                 }}
-                                                placeholder="Default Speakers"
+                                                placeholder={t('settings.audio.defaultSpeakers')}
                                             />
 
                                             <div className="flex justify-end">
@@ -3110,7 +3110,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     }}
                                                     className="text-xs bg-bg-input hover:bg-bg-elevated text-text-primary px-3 py-1.5 rounded-md transition-colors flex items-center gap-2"
                                                 >
-                                                    <Speaker size={12} /> Test Sound
+                                                    <Speaker size={12} /> Проверить звук
                                                 </button>
                                             </div>
 
@@ -3131,11 +3131,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                 </div>
                                                                 <div>
                                                                     <div className="flex items-center gap-2 mb-0.5">
-                                                                        <h3 className="text-sm font-bold text-text-primary">SCK Backend</h3>
-                                                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-400 uppercase tracking-wide">Alternative</span>
+                                                                        <h3 className="text-sm font-bold text-text-primary">SCK-бэкенд</h3>
+                                                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-400 uppercase tracking-wide">Альтернатива</span>
                                                                     </div>
                                                                     <p className="text-xs text-text-secondary leading-relaxed max-w-[300px]">
-                                                                        Use the ScreenCaptureKit backend. An optimized alternative to CoreAudio if you experience any capture issues.
+                                                                        Использует бэкенд ScreenCaptureKit. Это оптимизированная альтернатива CoreAudio на случай проблем с захватом.
                                                                     </p>
                                                                 </div>
                                                             </div>
@@ -3162,8 +3162,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                             {activeTab === 'calendar' && (
                                 <div className="space-y-6 animated fadeIn h-full">
                                     <div>
-                                        <h3 className="text-lg font-bold text-text-primary mb-2">Visible Calendars</h3>
-                                        <p className="text-xs text-text-secondary mb-4">Upcoming meetings are synchronized from these calendars</p>
+                                        <h3 className="text-lg font-bold text-text-primary mb-2">Видимые календари</h3>
+                                        <p className="text-xs text-text-secondary mb-4">Предстоящие встречи синхронизируются из этих календарей</p>
                                     </div>
 
                                     <div className="bg-bg-card rounded-xl border border-border-subtle overflow-hidden">
@@ -3215,12 +3215,12 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         <div className="space-y-2">
                                                             <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 bg-white/[0.04] ring-1 ring-white/[0.06] text-[9px] font-medium tracking-[0.22em] text-text-secondary uppercase shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                                                                 <span className="w-1 h-1 rounded-full bg-emerald-400/80" />
-                                                                Upcoming
+                                                                Предстоящие
                                                             </span>
                                                             <p className="text-[11px] text-text-tertiary tracking-[0.01em]">
                                                                 {calendarEvents.length > 0
-                                                                    ? `${calendarEvents.length} ${calendarEvents.length === 1 ? 'meeting' : 'meetings'} · next 7 days`
-                                                                    : 'next 7 days from your primary calendar'}
+                                                                    ? `${calendarEvents.length} ${calendarEvents.length === 1 ? 'встреча' : calendarEvents.length < 5 ? 'встречи' : 'встреч'} · следующие 7 дней`
+                                                                    : 'следующие 7 дней из основного календаря'}
                                                             </p>
                                                         </div>
                                                         <button type="button"
@@ -3238,7 +3238,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                 }
                                                             }}
                                                             disabled={isCalendarRefreshing}
-                                                            aria-label="Refresh upcoming events"
+                                                            aria-label="Обновить предстоящие события"
                                                             className="group h-8 w-8 rounded-full bg-white/[0.04] hover:bg-white/[0.08] ring-1 ring-white/[0.07] text-text-secondary hover:text-text-primary transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.92] flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                                                         >
                                                             <RefreshCw
@@ -3256,8 +3256,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                     <div className="mx-auto w-11 h-11 rounded-2xl bg-white/[0.04] ring-1 ring-white/[0.06] flex items-center justify-center mb-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
                                                                         <Calendar size={18} className="text-text-tertiary" strokeWidth={1.5} />
                                                                     </div>
-                                                                    <p className="text-[13px] text-text-primary tracking-[-0.01em]">Nothing scheduled.</p>
-                                                                    <p className="text-[11px] text-text-tertiary mt-1">Your week is clear for now.</p>
+                                                                    <p className="text-[13px] text-text-primary tracking-[-0.01em]">Ничего не запланировано.</p>
+                                                                    <p className="text-[11px] text-text-tertiary mt-1">Неделя пока свободна.</p>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -3286,15 +3286,15 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
                                                                 // Smart relative label
                                                                 let chipLabel: string;
-                                                                if (diffMin <= 0) chipLabel = 'Now';
-                                                                else if (diffMin < 60) chipLabel = `in ${Math.ceil(diffMin)}m`;
+                                                                if (diffMin <= 0) chipLabel = 'Сейчас';
+                                                                else if (diffMin < 60) chipLabel = `через ${Math.ceil(diffMin)} мин`;
                                                                 else if (diffMin < 4 * 60) {
                                                                     const h = Math.floor(diffMin / 60);
                                                                     const m = Math.round(diffMin - h * 60);
-                                                                    chipLabel = m > 0 ? `in ${h}h ${m}m` : `in ${h}h`;
-                                                                } else if (isToday) chipLabel = 'Today';
-                                                                else if (isTomorrow) chipLabel = 'Tomorrow';
-                                                                else chipLabel = start.toLocaleDateString([], { weekday: 'short' });
+                                                                    chipLabel = m > 0 ? `через ${h} ч ${m} мин` : `через ${h} ч`;
+                                                                } else if (isToday) chipLabel = 'Сегодня';
+                                                                else if (isTomorrow) chipLabel = 'Завтра';
+                                                                else chipLabel = start.toLocaleDateString('ru-RU', { weekday: 'short' });
 
                                                                 const timeRange = `${start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} – ${end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
 
@@ -3358,14 +3358,14 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                                     title={ev.link}
                                                                                     className="self-center shrink-0 group/btn inline-flex items-center gap-1.5 rounded-full pl-3 pr-1.5 py-1.5 bg-white/[0.05] hover:bg-white/[0.1] ring-1 ring-white/[0.07] text-text-primary text-[11px] font-medium transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.97] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                                                                                 >
-                                                                                    <span>Join</span>
+                                                                                    <span>Войти</span>
                                                                                     <span className="w-5 h-5 rounded-full bg-white/[0.08] ring-1 ring-white/[0.08] flex items-center justify-center transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover/btn:translate-x-[1px] group-hover/btn:-translate-y-[1px]">
                                                                                         <ExternalLink size={9} strokeWidth={2} />
                                                                                     </span>
                                                                                 </button>
                                                                             ) : (
                                                                                 <span
-                                                                                    aria-label="No meeting link"
+                                                                                    aria-label="Нет ссылки на встречу"
                                                                                     className="self-center shrink-0 inline-flex items-center justify-center w-2 h-2 rounded-full bg-white/[0.08] mr-3"
                                                                                 />
                                                                             )}
@@ -3381,8 +3381,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             <div className="w-full p-6">
                                                 <div className="mb-4">
                                                     <Calendar size={24} className="text-text-tertiary mb-3" />
-                                                    <h4 className="text-sm font-bold text-text-primary mb-1">No calendars</h4>
-                                                    <p className="text-xs text-text-secondary">Get started by connecting a Google account.</p>
+                                                    <h4 className="text-sm font-bold text-text-primary mb-1">Нет календарей</h4>
+                                                    <p className="text-xs text-text-secondary">Начните с подключения Google-аккаунта.</p>
                                                 </div>
 
                                                 <button type="button"
@@ -3411,7 +3411,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z" />
                                                         </g>
                                                     </svg>
-                                                    {isCalendarsLoading ? 'Connecting...' : 'Connect Google'}
+                                                    {isCalendarsLoading ? 'Подключение...' : 'Подключить Google'}
                                                 </button>
                                             </div>
                                         )}

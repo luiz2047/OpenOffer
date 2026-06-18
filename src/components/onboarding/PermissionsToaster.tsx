@@ -355,7 +355,7 @@ export const PermissionsToaster: React.FC<Props> = ({ isOpen, onDismiss }) => {
                 }}
               >
                 {/* Close button in the top-right corner of graphics section */}
-                <button type="button" onClick={handleDismiss} aria-label="Dismiss"
+                <button type="button" onClick={handleDismiss} aria-label="Закрыть"
                   style={{
                     position: 'absolute',
                     top: '16px',

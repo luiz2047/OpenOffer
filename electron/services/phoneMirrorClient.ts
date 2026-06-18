@@ -9,7 +9,7 @@ export const PHONE_MIRROR_HTML = `<!doctype html>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#050706" />
     <meta name="referrer" content="no-referrer" />
-    <title>OpenOffer Mirror</title>
+    <title>OpenOffer Зеркало</title>
     <style>
       :root {
         color-scheme: dark;
@@ -290,44 +290,44 @@ export const PHONE_MIRROR_HTML = `<!doctype html>
     <main class="app">
       <header class="topbar">
         <div class="title">
-          <h1>OpenOffer Mirror</h1>
-          <div class="subtitle" id="subtitle">Connecting</div>
+          <h1>OpenOffer Зеркало</h1>
+          <div class="subtitle" id="subtitle">Подключение</div>
         </div>
         <div class="status" id="status">
           <span class="dot" aria-hidden="true"></span>
-          <span id="statusText">Offline</span>
+          <span id="statusText">Офлайн</span>
         </div>
       </header>
 
       <section class="feed" id="feed" aria-live="polite">
         <div class="empty" id="empty">
-          Waiting for responses from your desktop.<br/>
-          <span style="font-size:12px;opacity:0.6;margin-top:6px;display:block;">Use the actions below or type a message.</span>
+          Ожидаем ответы с desktop.<br/>
+          <span style="font-size:12px;opacity:0.6;margin-top:6px;display:block;">Используйте действия ниже или напишите сообщение.</span>
         </div>
       </section>
 
       <div class="bottom-panel">
         <!-- Quick action shortcuts -->
         <div class="quick-actions" id="quickActions">
-          <button class="qa-btn" data-action="whatToAnswer" type="button">What to Say</button>
-          <button class="qa-btn" data-action="codeHint" type="button">Code Hint</button>
-          <button class="qa-btn" data-action="clarify" type="button">Clarify</button>
-          <button class="qa-btn" data-action="brainstorm" type="button">Brainstorm</button>
-          <button class="qa-btn" data-action="answer" type="button">Answer</button>
-          <button class="qa-btn" data-action="followUp" type="button">Follow Up</button>
-          <button class="qa-btn" data-action="dynamicAction4" type="button">Recap</button>
-          <button class="qa-btn screenshot-btn" id="screenshotBtn" type="button" title="Capture desktop screenshot for AI prompt">📷 Capture</button>
+          <button class="qa-btn" data-action="whatToAnswer" type="button">Что сказать</button>
+          <button class="qa-btn" data-action="codeHint" type="button">Подсказка по коду</button>
+          <button class="qa-btn" data-action="clarify" type="button">Уточнить</button>
+          <button class="qa-btn" data-action="brainstorm" type="button">Идеи</button>
+          <button class="qa-btn" data-action="answer" type="button">Ответить</button>
+          <button class="qa-btn" data-action="followUp" type="button">Доп. вопрос</button>
+          <button class="qa-btn" data-action="dynamicAction4" type="button">Итоги</button>
+          <button class="qa-btn screenshot-btn" id="screenshotBtn" type="button" title="Сделать desktop-скриншот для AI prompt">📷 Захват</button>
         </div>
         <!-- Chat input -->
         <div class="input-row">
-          <input class="chat-input" id="chatInput" type="text" placeholder="Ask anything…" autocomplete="off" autocorrect="off" spellcheck="false" />
-          <button class="send-btn" id="sendBtn" type="button" aria-label="Send">↑</button>
+          <input class="chat-input" id="chatInput" type="text" placeholder="Спросите что угодно…" autocomplete="off" autocorrect="off" spellcheck="false" />
+          <button class="send-btn" id="sendBtn" type="button" aria-label="Отправить">↑</button>
         </div>
         <!-- Utility buttons -->
         <div class="util-row">
-          <button class="util-btn" id="clearButton" type="button">Clear</button>
-          <button class="util-btn" id="copyButton" type="button">Copy</button>
-          <button class="util-btn" id="scrollButton" type="button">Bottom</button>
+          <button class="util-btn" id="clearButton" type="button">Очистить</button>
+          <button class="util-btn" id="copyButton" type="button">Копировать</button>
+          <button class="util-btn" id="scrollButton" type="button">Вниз</button>
         </div>
       </div>
 
@@ -567,8 +567,8 @@ export const PHONE_MIRROR_HTML = `<!doctype html>
               const langLabel = f.lang ? esc(f.lang) : 'code';
               const body = f.open ? esc(f.code) : highlightCode(f.code, f.lang);
               const trailing = f.open
-                ? '<span class="codeblock-copy" aria-hidden="true">Streaming…</span>'
-                : '<button type="button" class="codeblock-copy">Copy</button>';
+                ? '<span class="codeblock-copy" aria-hidden="true">Стриминг…</span>'
+                : '<button type="button" class="codeblock-copy">Копировать</button>';
               out.push(
                 '<div class="codeblock' + (f.open ? ' streaming' : '') + '" data-lang="' + esc(f.lang) + '">' +
                 '<div class="codeblock-head"><span>' + langLabel + '</span>' + trailing + '</div>' +
@@ -619,7 +619,7 @@ export const PHONE_MIRROR_HTML = `<!doctype html>
               try {
                 if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
                 else throw new Error('insecure');
-                btn.textContent = 'Copied'; btn.classList.add('copied');
+                btn.textContent = 'Скопировано'; btn.classList.add('copied');
                 setTimeout(function () { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1100);
               } catch (_) { showToast('Copy blocked'); }
             });
@@ -646,8 +646,8 @@ export const PHONE_MIRROR_HTML = `<!doctype html>
 
         function setConnected(isConnected) {
           status.classList.toggle('connected', isConnected);
-          statusText.textContent = isConnected ? 'Connected' : 'Offline';
-          subtitle.textContent = isConnected ? 'Live mirror active' : 'Reconnecting…';
+          statusText.textContent = isConnected ? 'Подключено' : 'Офлайн';
+          subtitle.textContent = isConnected ? 'Live mirror активен' : 'Переподключение…';
           sendBtn.disabled = !isConnected;
           document.querySelectorAll('.qa-btn').forEach(function (b) { b.disabled = !isConnected; });
         }
@@ -669,7 +669,7 @@ export const PHONE_MIRROR_HTML = `<!doctype html>
         }
 
         function buildCard(m, opts) {
-          // Screenshot-queued notification card (no image — stays on desktop)
+          // Карточка уведомления о поставленном в очередь скриншоте (без изображения — остается на desktop)
           if (m.type === 'screenshot-queued') {
             const card = document.createElement('article');
             card.className = 'card screenshot-card';
@@ -679,7 +679,7 @@ export const PHONE_MIRROR_HTML = `<!doctype html>
             const role = document.createElement('span');
             role.className = 'role';
             const pip = document.createElement('span'); pip.className = 'pip';
-            const lbl = document.createElement('span'); lbl.textContent = '📷 Screenshot queued for AI';
+            const lbl = document.createElement('span'); lbl.textContent = '📷 Скриншот поставлен в очередь для AI';
             role.append(pip, lbl);
             const right = document.createElement('span'); right.textContent = fmtTime(m.createdAt);
             meta.append(role, right);
@@ -697,7 +697,7 @@ export const PHONE_MIRROR_HTML = `<!doctype html>
           role.className = 'role' + (m.role === 'user' ? ' user' : '');
           const pip = document.createElement('span'); pip.className = 'pip';
           const roleLabel = document.createElement('span');
-          roleLabel.textContent = m.role === 'user' ? 'You' : 'Assistant';
+          roleLabel.textContent = m.role === 'user' ? 'Вы' : 'Ассистент';
           role.append(pip, roleLabel);
           // Label tag for shortcut-triggered responses
           const labelTag = document.createElement('span');
@@ -910,7 +910,7 @@ export const PHONE_MIRROR_HTML = `<!doctype html>
           });
         });
 
-        // Screenshot button — triggers a stealth desktop capture queued for AI.
+        // Кнопка скриншота — запускает скрытый desktop-захват и ставит его в очередь для AI.
         // The image stays on the PC; only a confirmation toast appears on the phone.
         document.getElementById('screenshotBtn').addEventListener('click', function () {
           sendCommand({ type: 'screenshot' });
@@ -924,7 +924,7 @@ export const PHONE_MIRROR_HTML = `<!doctype html>
         document.getElementById('copyButton').addEventListener('click', async () => {
           const parts = messages
             .filter(function (m) { return !m.type || m.type !== 'screenshot-queued'; })
-            .map((m) => (m.role === 'user' ? 'You: ' : (m.label ? '[' + m.label + '] ' : '')) + m.content);
+            .map((m) => (m.role === 'user' ? 'Вы: ' : (m.label ? '[' + m.label + '] ' : '')) + m.content);
           if (live && live.content) parts.push(live.content);
           const text = parts.join('\\n\\n');
           if (!text) return;
@@ -937,7 +937,7 @@ export const PHONE_MIRROR_HTML = `<!doctype html>
               document.body.appendChild(ta); ta.select();
               document.execCommand('copy'); document.body.removeChild(ta);
             }
-            showToast('Copied');
+            showToast('Скопировано');
           } catch (e) { showToast('Copy blocked'); }
         });
         document.getElementById('scrollButton').addEventListener('click', () => scrollToLatest(true));

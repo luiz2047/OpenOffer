@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { genMessageId } from '../utils/messageId';
 import openOfferIcon from './icon.png';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
+import { useTranslation } from 'react-i18next';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -185,6 +186,7 @@ const UserMessage: React.FC<{ content: string }> = ({ content }) => (
 );
 
 const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean }> = ({ content, isStreaming }) => {
+    const { t } = useTranslation();
     const [copied, setCopied] = useState(false);
     const isLightTheme = useResolvedTheme() === 'light';
     const cardBgBorderClass = isLightTheme
@@ -217,7 +219,7 @@ const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean }> = (
                             className="flex items-center gap-1.5 text-[11px] text-text-tertiary hover:text-[#4ade80] transition-colors"
                         >
                             {copied ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                            {copied ? 'Copied' : 'Copy'}
+                            {copied ? t('overlay.copied') : t('overlay.copy')}
                         </button>
                     </div>
                 )}
@@ -305,6 +307,7 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
     initialQuery = '',
     // onNewQuery
 }) => {
+    const { t } = useTranslation();
     const [messages, setMessages] = useState<Message[]>([]);
     const [chatState, setChatState] = useState<ChatState>('idle');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -366,30 +369,30 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
     const buildContextString = useCallback((): string => {
         const parts: string[] = [];
 
-        parts.push(`MEETING: ${meetingContext.title}`);
+        parts.push(`${t('interviews.interviewOS')}: ${meetingContext.title}`);
 
         if (meetingContext.summary) {
-            parts.push(`\nSUMMARY:\n${meetingContext.summary}`);
+            parts.push(`\n${t('overlay.copyFullSummary')}:\n${meetingContext.summary}`);
         }
 
         if (meetingContext.keyPoints?.length) {
-            parts.push(`\nKEY POINTS:\n${meetingContext.keyPoints.map(p => `- ${p}`).join('\n')}`);
+            parts.push(`\n${t('overlay.copyFullSummary')} / ${t('overlay.typeKeyPoint')}:\n${meetingContext.keyPoints.map(p => `- ${p}`).join('\n')}`);
         }
 
         if (meetingContext.actionItems?.length) {
-            parts.push(`\nACTION ITEMS:\n${meetingContext.actionItems.map(a => `- ${a}`).join('\n')}`);
+            parts.push(`\n${t('overlay.typeActionItem')}:\n${meetingContext.actionItems.map(a => `- ${a}`).join('\n')}`);
         }
 
         if (meetingContext.transcript?.length) {
             const recentTranscript = meetingContext.transcript.slice(-20);
             const transcriptText = recentTranscript
-                .map(t => `[${t.speaker === 'user' ? 'Me' : 'Them'}]: ${t.text}`)
+                .map(item => `[${item.speaker === 'user' ? t('overlay.me') : t('overlay.them')}]: ${item.text}`)
                 .join('\n');
-            parts.push(`\nRECENT TRANSCRIPT:\n${transcriptText}`);
+            parts.push(`\n${t('overlay.copyFullTranscript')}:\n${transcriptText}`);
         }
 
         return parts.join('\n');
-    }, [meetingContext]);
+    }, [meetingContext, t]);
 
     // Submit question using RAG streaming
     const submitQuestion = useCallback(async (question: string) => {
@@ -454,7 +457,7 @@ const MeetingChatOverlay: React.FC<MeetingChatOverlayProps> = ({
             const errorCleanup = window.electronAPI?.onRAGStreamError((data: { error: string }) => {
                 console.error('[MeetingChat] RAG stream error:', data.error);
                 setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-                setErrorMessage("Couldn't get a response. Please try again.");
+                setErrorMessage(t('overlay.responseTryAgain'));
                 setChatState('error');
                 streamBuffer.reset();
                 tokenCleanup?.();
@@ -511,7 +514,7 @@ ${contextString}`;
                     const oldErrorCleanup = window.electronAPI?.onGeminiStreamError((error: string) => {
                         console.error('[MeetingChat] Gemini stream error (fallback):', error);
                         setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-                        setErrorMessage("Couldn't get a response. Please check your settings.");
+                        setErrorMessage(t('overlay.responseCheckSettings'));
                         setChatState('error');
                         streamBuffer.reset();
                         oldTokenCleanup?.();
@@ -563,7 +566,7 @@ ${contextString}`;
                 const oldErrorCleanup = window.electronAPI?.onGeminiStreamError((error: string) => {
                     console.error('[MeetingChat] Gemini stream error:', error);
                     setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-                    setErrorMessage("Couldn't get a response. Please check your settings.");
+                    setErrorMessage(t('overlay.responseCheckSettings'));
                     setChatState('error');
                     streamBuffer.reset();
                     oldTokenCleanup?.();
@@ -582,10 +585,10 @@ ${contextString}`;
         } catch (error) {
             console.error('[MeetingChat] Error:', error);
             setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-            setErrorMessage("Something went wrong. Please try again.");
+            setErrorMessage(t('overlay.responseSomethingWrong'));
             setChatState('error');
         }
-    }, [chatState, buildContextString, meetingContext]);
+    }, [chatState, buildContextString, meetingContext, t]);
 
     return (
         <AnimatePresence>
@@ -623,8 +626,8 @@ ${contextString}`;
                         {/* Header with close button */}
                         <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle shrink-0">
                             <div className="flex items-center gap-2 text-text-tertiary">
-                                <img src={openOfferIcon} className="w-3.5 h-3.5 force-black-icon opacity-50" alt="logo" />
-                                <span className="text-[13px] font-medium">Search this meeting</span>
+                                <img src={openOfferIcon} className="w-3.5 h-3.5 force-black-icon opacity-50" alt="OpenOffer" />
+                                <span className="text-[13px] font-medium">{t('overlay.askAboutMeeting')}</span>
                             </div>
                             <button
                                 onClick={handleClose}

@@ -2,6 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import openOfferLogo from "../assets/logo.webp";
 import { getModifierSymbol } from "../utils/platformUtils";
+import { useTranslation } from "react-i18next";
 
 const DARK_GLASS = {
   background: "linear-gradient(160deg, rgba(90,90,108,0.88) 0%, rgba(55,55,70,0.93) 50%, rgba(36,36,50,0.97) 100%)",
@@ -11,13 +12,6 @@ const DARK_GLASS = {
 const GLOSS = (
   <div className="absolute inset-x-1 top-0.5 h-[45%] rounded-full bg-gradient-to-b from-white/20 to-white/0 blur-[0.5px] pointer-events-none" />
 );
-
-const hotkeys = [
-  { label: "What should I answer?", icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M2 3.5h5M2 8.5h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> },
-  { label: "Clarify", icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2" /><path d="M6 8V6M6 4h.01" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> },
-  { label: "Follow up questions", icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M10 6H2M7 3l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg> },
-  { label: "Recap", icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M10 6A4 4 0 112 6M10 6l-1.5-1.5M10 6l1.5-1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg> },
-];
 
 interface Props {
   className?: string;
@@ -33,6 +27,13 @@ interface Props {
 }
 
 const NativelyInterfaceCard = ({ className = "", isMobile = false, isStatic = false, hidePill = false, hideMessages = false, dreamyVariant = false, spreadHotkeys = false }: Props) => {
+  const { t } = useTranslation();
+  const hotkeys = [
+    { label: t('interfacePreview.whatShouldIAnswer'), icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M2 3.5h5M2 8.5h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> },
+    { label: t('overlay.clarify'), icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2" /><path d="M6 8V6M6 4h.01" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg> },
+    { label: t('interfacePreview.followUpQuestions'), icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M10 6H2M7 3l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg> },
+    { label: t('overlay.recap'), icon: <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M10 6A4 4 0 112 6M10 6l-1.5-1.5M10 6l1.5-1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg> },
+  ];
   const motionProps = isStatic
     ? {
       initial: { opacity: 0, y: 16 },
@@ -72,7 +73,7 @@ const NativelyInterfaceCard = ({ className = "", isMobile = false, isStatic = fa
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-white/75 text-[12px] font-medium tracking-[0.02em] relative overflow-hidden" style={DARK_GLASS}>
               {GLOSS}
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="opacity-70 relative"><path d="M3 7.5L6 4.5L9 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              <span className="relative">Hide</span>
+              <span className="relative">{t('common.hide')}</span>
             </div>
 
             {/* Stop */}
@@ -111,7 +112,7 @@ const NativelyInterfaceCard = ({ className = "", isMobile = false, isStatic = fa
               <div className="relative px-4 py-2 rounded-full text-white text-[13px] font-semibold shadow-[0_8px_20px_rgba(37,99,235,0.35)] border border-white/20"
                 style={{ background: "linear-gradient(160deg, #5B8EF0 0%, #3B6FE8 50%, #2D5FD4 100%)" }}>
                 <div className="absolute top-0.5 left-2 right-2 h-[45%] rounded-full bg-gradient-to-b from-white/70 to-white/5 blur-[0.5px] pointer-events-none" />
-                <span className="relative drop-shadow-sm">What should I answer?</span>
+                <span className="relative drop-shadow-sm">{t('interfacePreview.whatShouldIAnswer')}</span>
               </div>
             </div>
           )}
@@ -120,7 +121,7 @@ const NativelyInterfaceCard = ({ className = "", isMobile = false, isStatic = fa
           {!hideMessages && (
             <div className="px-4 pb-2">
               <p className="text-white/90 text-[14px] leading-relaxed font-normal whitespace-pre-wrap">
-                Based on the project requirements and current timeline, I've outlined the critical path for the next sprint.
+                {t('interfacePreview.sampleResponse')}
               </p>
             </div>
           )}

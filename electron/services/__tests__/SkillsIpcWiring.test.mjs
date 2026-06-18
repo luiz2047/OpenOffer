@@ -70,13 +70,15 @@ test('electron.d.ts declares SkillSummary and the two skills methods', () => {
 
 test('SkillsSettings renderer guards against a missing bridge instead of silent optional-chain', () => {
   const view = read('src/components/settings/SkillsSettings.tsx');
+  const resources = read('src/i18n/resources.ts');
 
   // The exact regression we are protecting against: a silent `?.skillsRefresh?.()`
   // (and the symmetric `?.skillsOpenFolder?.()`) that resolves to undefined.
   // The fix replaces both with explicit guards.
   assert.match(view, /typeof window\.electronAPI\?\.skillsRefresh\s*!==\s*['"]function['"]/);
   assert.match(view, /typeof window\.electronAPI\?\.skillsOpenFolder\s*!==\s*['"]function['"]/);
-  assert.match(view, /Skills IPC bridge not detected/);
+  assert.match(view, /skills\.ipcMissing/);
+  assert.match(resources, /Skills IPC bridge не найден/);
 
   // After each guard, the call is unconditional (no optional chain on the method).
   assert.match(view, /await window\.electronAPI\.skillsRefresh\(\)/);

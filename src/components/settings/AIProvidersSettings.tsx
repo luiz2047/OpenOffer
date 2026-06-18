@@ -12,7 +12,7 @@ const CODEX_MODEL_REASONING_EFFORTS = ['low', 'medium', 'high', 'xhigh'] as cons
 // (powers of two used across the LiteLLM model registry). '' = Auto: resolve
 // each model's real budget from the proxy's /model/info, fallback 8192.
 const LITELLM_MAX_TOKENS_OPTIONS: ModelOption[] = [
-    { id: '', name: 'Auto (per-model)' },
+    { id: '', name: 'Авто (по модели)' },
     { id: '4096', name: '4,096 (4K)' },
     { id: '8192', name: '8,192 (8K)' },
     { id: '16384', name: '16,384 (16K)' },
@@ -49,12 +49,12 @@ interface AnswerStylePackOption {
 }
 
 const DEFAULT_ANSWER_STYLE_PACKS: AnswerStylePackOption[] = [
-    { id: 'automatic', label: 'Automatic', shortLabel: 'Auto', description: 'Uses the recommended behavior for this model and language.', sample: 'Question-aware defaults.', language: 'any', recommended: true },
-    { id: 'standard', label: 'Standard', shortLabel: 'Standard', description: 'Balanced, speakable answers.', sample: 'Direct answer with natural context.', language: 'any', recommended: false },
-    { id: 'strict', label: 'Strict', shortLabel: 'Strict', description: 'Short, firm answers with no filler.', sample: '2-4 sentences or tight bullets.', language: 'any', recommended: false },
-    { id: 'expanded', label: 'Expanded', shortLabel: 'Expanded', description: 'More complete answers with tradeoffs.', sample: 'Fuller reasoning while staying interview-ready.', language: 'any', recommended: false },
-    { id: 'hint', label: 'Hint mode', shortLabel: 'Hint', description: 'Coaching cues instead of a full script.', sample: 'Structure and key points to emphasize.', language: 'any', recommended: false },
-    { id: 'grounded', label: 'Grounded', shortLabel: 'Grounded', description: 'Conservative about personal facts and metrics.', sample: 'Admits missing context instead of inventing.', language: 'any', recommended: false },
+    { id: 'automatic', label: 'Автоматически', shortLabel: 'Авто', description: 'Использует рекомендованное поведение для этой модели и языка.', sample: 'Настройки по умолчанию с учетом вопроса.', language: 'any', recommended: true },
+    { id: 'standard', label: 'Стандартный', shortLabel: 'Стандарт', description: 'Сбалансированные ответы, которые удобно произносить.', sample: 'Прямой ответ с естественным контекстом.', language: 'any', recommended: false },
+    { id: 'strict', label: 'Строгий', shortLabel: 'Строго', description: 'Короткие уверенные ответы без воды.', sample: '2-4 предложения или плотные буллеты.', language: 'any', recommended: false },
+    { id: 'expanded', label: 'Развернутый', shortLabel: 'Разверн.', description: 'Более полные ответы с компромиссами.', sample: 'Больше рассуждений, но в формате для интервью.', language: 'any', recommended: false },
+    { id: 'hint', label: 'Подсказки', shortLabel: 'Хинт', description: 'Коучинговые подсказки вместо полного скрипта.', sample: 'Структура и ключевые тезисы для ответа.', language: 'any', recommended: false },
+    { id: 'grounded', label: 'Фактический', shortLabel: 'Факты', description: 'Осторожен с личными фактами и метриками.', sample: 'Признает недостающий контекст вместо выдумывания.', language: 'any', recommended: false },
 ];
 
 interface ModelSelectProps {
@@ -65,7 +65,7 @@ interface ModelSelectProps {
     className?: string;
 }
 
-const ModelSelect: React.FC<ModelSelectProps> = ({ value, options, onChange, placeholder = "Select model", className = "" }) => {
+const ModelSelect: React.FC<ModelSelectProps> = ({ value, options, onChange, placeholder = "Выберите модель", className = "" }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -112,7 +112,7 @@ const ModelSelect: React.FC<ModelSelectProps> = ({ value, options, onChange, pla
                             </button>
                         ))}
                         {options.length === 0 && (
-                            <div className="px-3 py-2 text-xs text-gray-500 italic">No models available</div>
+                            <div className="px-3 py-2 text-xs text-gray-500 italic">Нет доступных моделей</div>
                         )}
                     </div>
                 </div>
@@ -148,7 +148,7 @@ const CodexCliModelField: React.FC<{
                     onChange(modelId);
                     onSelect(modelId);
                 }}
-                placeholder="Preset"
+                placeholder="Пресет"
                 className="py-2"
             />
         </div>
@@ -169,7 +169,7 @@ export const AIProvidersSettings: React.FC = () => {
     const [yandexAnswerStyleId, setYandexAnswerStyleId] = useState<string | undefined>(undefined);
     const [yandexRecommendedAnswerStyleId, setYandexRecommendedAnswerStyleId] = useState<string>('automatic');
     const [yandexAnswerStyleLanguage, setYandexAnswerStyleLanguage] = useState<string>('auto');
-    const [yandexAnswerStyleSummary, setYandexAnswerStyleSummary] = useState<string>('Question-aware default behavior');
+    const [yandexAnswerStyleSummary, setYandexAnswerStyleSummary] = useState<string>('Поведение по умолчанию с учетом вопроса');
 
     // --- LiteLLM proxy (OpenAI-compatible gateway: baseURL + optional virtual key) ---
     const [litellmBaseURL, setLitellmBaseURL] = useState('');
@@ -185,7 +185,7 @@ export const AIProvidersSettings: React.FC = () => {
     const [testStatus, setTestStatus] = useState<Record<string, 'idle' | 'testing' | 'success' | 'error'>>({});
     const [testError, setTestError] = useState<Record<string, string>>({});
 
-    // --- Custom Providers ---
+    // --- Пользовательские провайдеры ---
     const [customProviders, setCustomProviders] = useState<CustomProvider[]>([]);
     const [isEditingCustom, setIsEditingCustom] = useState(false);
     const [editingProvider, setEditingProvider] = useState<CustomProvider | null>(null);
@@ -228,7 +228,7 @@ export const AIProvidersSettings: React.FC = () => {
         setYandexAnswerStyleId(answerStyleState.selectedId);
         setYandexRecommendedAnswerStyleId(answerStyleState.recommendedId || 'automatic');
         setYandexAnswerStyleLanguage(answerStyleState.language || 'auto');
-        setYandexAnswerStyleSummary(answerStyleState.automaticSummary || 'Question-aware default behavior');
+        setYandexAnswerStyleSummary(answerStyleState.automaticSummary || 'Поведение по умолчанию с учетом вопроса');
     };
 
     const loadYandexAnswerStyle = async (modelId: string) => {
@@ -538,7 +538,7 @@ export const AIProvidersSettings: React.FC = () => {
     };
 
     const handleRemoveLitellm = async () => {
-        if (!confirm('Are you sure you want to remove the LiteLLM proxy configuration?')) return;
+        if (!confirm('Удалить конфигурацию прокси LiteLLM?')) return;
         try {
             const result = await window.electronAPI.setLitellmConfig({ apiKey: '', baseURL: '' });
             if (result && result.success) {
@@ -548,7 +548,7 @@ export const AIProvidersSettings: React.FC = () => {
                 setLitellmMaxTokens('');
             }
         } catch (e) {
-            console.error('Failed to remove LiteLLM config:', e);
+            console.error('Не удалось удалить конфигурацию LiteLLM:', e);
         }
     };
 
@@ -572,18 +572,18 @@ export const AIProvidersSettings: React.FC = () => {
                 setTimeout(() => setSavedStatus(prev => ({ ...prev, yandex: false })), 2000);
             } else if (result?.error) {
                 setTestStatus(prev => ({ ...prev, yandex: 'error' }));
-                setTestError(prev => ({ ...prev, yandex: result.error || 'Save failed' }));
+                setTestError(prev => ({ ...prev, yandex: result.error || 'Не удалось сохранить' }));
             }
         } catch (e: any) {
             setTestStatus(prev => ({ ...prev, yandex: 'error' }));
-            setTestError(prev => ({ ...prev, yandex: e.message || 'Save failed' }));
+            setTestError(prev => ({ ...prev, yandex: e.message || 'Не удалось сохранить' }));
         } finally {
             setSavingStatus(prev => ({ ...prev, yandex: false }));
         }
     };
 
     const handleRemoveYandex = async () => {
-        if (!confirm('Are you sure you want to remove the Yandex AI Studio configuration?')) return;
+        if (!confirm('Удалить конфигурацию Yandex AI Studio?')) return;
         try {
             const result = await window.electronAPI.removeYandexConfig();
             if (result && result.success) {
@@ -602,7 +602,7 @@ export const AIProvidersSettings: React.FC = () => {
                 }
             }
         } catch (e) {
-            console.error('Failed to remove Yandex config:', e);
+            console.error('Не удалось удалить конфигурацию Yandex:', e);
         }
     };
 
@@ -614,7 +614,7 @@ export const AIProvidersSettings: React.FC = () => {
         });
         if (result && !result.success) {
             setTestStatus(prev => ({ ...prev, yandex: 'error' }));
-            setTestError(prev => ({ ...prev, yandex: result.error || 'Failed to set answer style' }));
+            setTestError(prev => ({ ...prev, yandex: result.error || 'Не удалось задать стиль ответа' }));
             return;
         }
         setYandexAnswerStyleId(result?.selectedId);
@@ -638,16 +638,16 @@ export const AIProvidersSettings: React.FC = () => {
                 setTimeout(() => setTestStatus(prev => ({ ...prev, yandex: 'idle' })), 3000);
             } else {
                 setTestStatus(prev => ({ ...prev, yandex: 'error' }));
-                setTestError(prev => ({ ...prev, yandex: result.error || 'Connection failed' }));
+                setTestError(prev => ({ ...prev, yandex: result.error || 'Подключение не удалось' }));
             }
         } catch (e: any) {
             setTestStatus(prev => ({ ...prev, yandex: 'error' }));
-            setTestError(prev => ({ ...prev, yandex: e.message || 'Connection failed' }));
+            setTestError(prev => ({ ...prev, yandex: e.message || 'Подключение не удалось' }));
         }
     };
 
     const handleRemoveKey = async (provider: string, setter: (val: string) => void) => {
-        if (!confirm(`Are you sure you want to remove the ${provider} API key?`)) return;
+        if (!confirm(`Удалить API-ключ ${provider}?`)) return;
         try {
             let result;
             // @ts-ignore
@@ -686,11 +686,11 @@ export const AIProvidersSettings: React.FC = () => {
                 setTimeout(() => setTestStatus(prev => ({ ...prev, [provider]: 'idle' })), 3000);
             } else {
                 setTestStatus(prev => ({ ...prev, [provider]: 'error' }));
-                setTestError(prev => ({ ...prev, [provider]: result.error || 'Connection failed' }));
+                setTestError(prev => ({ ...prev, [provider]: result.error || 'Подключение не удалось' }));
             }
         } catch (e: any) {
             setTestStatus(prev => ({ ...prev, [provider]: 'error' }));
-            setTestError(prev => ({ ...prev, [provider]: e.message || 'Connection failed' }));
+            setTestError(prev => ({ ...prev, [provider]: e.message || 'Подключение не удалось' }));
         }
     };
 
@@ -731,13 +731,13 @@ export const AIProvidersSettings: React.FC = () => {
     const handleSaveCustom = async () => {
         setCurlError(null);
         if (!customName.trim()) {
-            setCurlError("Provider Name is required.");
+            setCurlError("Укажите имя провайдера.");
             return;
         }
 
         const validation = validateCurl(customCurl);
         if (!validation.isValid) {
-            setCurlError(validation.message || "Invalid cURL command.");
+            setCurlError(validation.message || "Некорректная cURL-команда.");
             return;
         }
 
@@ -768,7 +768,7 @@ export const AIProvidersSettings: React.FC = () => {
     };
 
     const handleDeleteCustom = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this provider?")) return;
+        if (!confirm("Удалить этого провайдера?")) return;
         try {
             // @ts-ignore
             const result = await window.electronAPI.deleteCustomProvider(id);
@@ -778,7 +778,7 @@ export const AIProvidersSettings: React.FC = () => {
                 setCustomProviders(updated);
             }
         } catch (e) {
-            console.error("Failed to delete provider:", e);
+            console.error("Не удалось удалить провайдера:", e);
         }
     };
 
@@ -787,17 +787,17 @@ export const AIProvidersSettings: React.FC = () => {
 
     return (
         <div className="space-y-5 animated fadeIn pb-10">
-            {/* Default Model for Chat */}
+            {/* Модель по умолчанию для чата */}
             <div className="space-y-5">
                 <div>
-                    <h3 className="text-sm font-bold text-text-primary mb-1">Default Model for Chat</h3>
-                    <p className="text-xs text-text-secondary mb-2">Primary model for new chats. Other configured models act as fallbacks.</p>
+                    <h3 className="text-sm font-bold text-text-primary mb-1">Модель по умолчанию для чата</h3>
+                    <p className="text-xs text-text-secondary mb-2">Основная модель для новых чатов. Остальные настроенные модели используются как резервные.</p>
                 </div>
 
                 <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle flex items-center justify-between">
                     <div>
-                        <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-0">Active Model</label>
-                        <p className="text-[10px] text-text-secondary">Applies to new chats instantly.</p>
+                        <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-0">Активная модель</label>
+                        <p className="text-[10px] text-text-secondary">Сразу применяется к новым чатам.</p>
                     </div>
                     <ModelSelect
                         value={defaultModel}
@@ -822,7 +822,7 @@ export const AIProvidersSettings: React.FC = () => {
                                 });
                             }
                             customProviders.forEach(p => opts.push({ id: p.id, name: p.name }));
-                            ollamaModels.forEach(m => opts.push({ id: `ollama-${m}`, name: `${m} (Local)` }));
+                            ollamaModels.forEach(m => opts.push({ id: `ollama-${m}`, name: `${m} (локально)` }));
 
                             if (defaultModel && !opts.find(o => o.id === defaultModel)) {
                                 opts.unshift({ id: defaultModel, name: prettifyModelId(defaultModel) });
@@ -837,25 +837,25 @@ export const AIProvidersSettings: React.FC = () => {
                     />
                 </div>
 
-                {/* Fast Response Mode */}
+                {/* Быстрые ответы */}
                 <div
                     className={`bg-bg-item-surface rounded-xl p-5 border border-border-subtle flex items-center justify-between gap-4 ${!canUseFastMode ? 'opacity-50 grayscale' : ''}`}
-                    title={!canUseFastMode ? "Requires Groq or Codex CLI to be configured" : ""}
+                    title={!canUseFastMode ? "Сначала настройте Groq или Codex CLI" : ""}
                 >
                     <div className="flex-1">
                         <div className="flex items-center gap-2">
-                            <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-0">Fast Response Mode</label>
-                            <span className="bg-orange-500/10 text-orange-500 text-[9px] font-bold px-1.5 py-0.5 rounded border border-orange-500/20">NEW</span>
+                            <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-0">Быстрые ответы</label>
+                            <span className="bg-orange-500/10 text-orange-500 text-[9px] font-bold px-1.5 py-0.5 rounded border border-orange-500/20">НОВОЕ</span>
                         </div>
-                        <p className="text-[10px] text-text-secondary mt-0.5">Super fast responses using the Codex CLI fast model or Groq. Turn this off to use the selected normal model.</p>
+                        <p className="text-[10px] text-text-secondary mt-0.5">Очень быстрые ответы через быструю модель Codex CLI или Groq. Отключите режим, чтобы использовать обычную выбранную модель.</p>
                         {!canUseFastMode && (
-                            <p className="text-[10px] text-orange-500 mt-0.5 font-medium">Requires Groq or Codex CLI to be configured.</p>
+                            <p className="text-[10px] text-orange-500 mt-0.5 font-medium">Требуется настроенный Groq или Codex CLI.</p>
                         )}
                     </div>
                     <div
                         onClick={async () => {
                             if (!canUseFastMode) {
-                                alert("Please configure Groq or Codex CLI first to enable Fast Response Mode.");
+                                alert("Сначала настройте Groq или Codex CLI, чтобы включить быстрые ответы.");
                                 return;
                             }
                             const newState = !fastResponseMode;
@@ -871,11 +871,11 @@ export const AIProvidersSettings: React.FC = () => {
                 </div>
             </div>
 
-            {/* Cloud Providers */}
+            {/* Облачные провайдеры */}
             <div className="space-y-5">
                 <div>
-                    <h3 className="text-sm font-bold text-text-primary mb-1">Cloud Providers</h3>
-                    <p className="text-xs text-text-secondary mb-2">Add API keys to unlock cloud AI models.</p>
+                    <h3 className="text-sm font-bold text-text-primary mb-1">Облачные провайдеры</h3>
+                    <p className="text-xs text-text-secondary mb-2">Добавьте API-ключи, чтобы открыть облачные AI-модели.</p>
                 </div>
 
                 <div className="space-y-4">
@@ -986,35 +986,35 @@ export const AIProvidersSettings: React.FC = () => {
                             <div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <label className="block text-xs font-bold text-text-primary mb-0">Yandex AI Studio</label>
-                                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-border-subtle text-text-secondary">Cloud BYOK</span>
-                                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-border-subtle text-text-secondary">Text only</span>
-                                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-sky-500/20 text-sky-500">Answer styles</span>
-                                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-emerald-500/20 text-emerald-500">Logging off</span>
+                                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-border-subtle text-text-secondary">Свой ключ</span>
+                                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-border-subtle text-text-secondary">Только текст</span>
+                                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-sky-500/20 text-sky-500">Стили ответа</span>
+                                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-emerald-500/20 text-emerald-500">Логи выкл.</span>
                                 </div>
                                 <p className="text-[10px] text-text-secondary mt-1">
-                                    Uses your Yandex AI Studio key and folder ID. Automatic picks the recommended answer behavior for the current model and AI response language.{' '}
-                                    <a href="https://aistudio.yandex.ru/docs/en/ai-studio/quickstart/" target="_blank" rel="noreferrer" className="text-accent-primary hover:underline">Docs</a>
+                                    Использует ваш ключ Yandex AI Studio и ID каталога. Автоматический режим выбирает рекомендованное поведение ответа для текущей модели и языка AI-ответа.{' '}
+                                    <a href="https://aistudio.yandex.ru/docs/ru/ai-studio/quickstart/" target="_blank" rel="noreferrer" className="text-accent-primary hover:underline">Документация</a>
                                 </p>
                             </div>
                             {hasStoredKey.yandex && (
-                                <span className="text-[10px] font-medium text-emerald-500 uppercase tracking-wide shrink-0">Configured</span>
+                                <span className="text-[10px] font-medium text-emerald-500 uppercase tracking-wide shrink-0">Настроено</span>
                             )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <label className="space-y-1 block">
-                                <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">API Key</span>
+                                <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">API-ключ</span>
                                 <input
                                     type="password"
                                     value={yandexApiKey}
                                     onChange={e => setYandexApiKey(e.target.value)}
                                     className="w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-xs text-text-primary font-mono focus:outline-none focus:border-accent-primary"
-                                    placeholder={hasStoredKey.yandex ? '•••••••• (leave blank to keep)' : 'y0_...'}
+                                    placeholder={hasStoredKey.yandex ? '•••••••• (оставьте пустым, чтобы сохранить текущий)' : 'y0_...'}
                                 />
                             </label>
 
                             <label className="space-y-1 block">
-                                <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Folder ID</span>
+                                <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">ID каталога</span>
                                 <input
                                     value={yandexFolderId}
                                     onChange={e => setYandexFolderId(e.target.value)}
@@ -1026,7 +1026,7 @@ export const AIProvidersSettings: React.FC = () => {
 
                         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-3 items-end">
                             <div className="space-y-1 min-w-0">
-                                <span className="block text-[10px] font-medium text-text-secondary uppercase tracking-wide">Model</span>
+                                <span className="block text-[10px] font-medium text-text-secondary uppercase tracking-wide">Модель</span>
                                 <ModelSelect
                                     value={preferredModels.yandex || 'yandex/yandexgpt-5-lite'}
                                     options={STANDARD_CLOUD_MODELS.yandex.ids.map((id, i) => ({ id, name: STANDARD_CLOUD_MODELS.yandex.names[i] }))}
@@ -1042,24 +1042,24 @@ export const AIProvidersSettings: React.FC = () => {
 
                             <div className="space-y-1 min-w-0">
                                 <div className="flex items-center gap-2 min-w-0">
-                                    <span className="block text-[10px] font-medium text-text-secondary uppercase tracking-wide">Answer style</span>
+                                    <span className="block text-[10px] font-medium text-text-secondary uppercase tracking-wide">Стиль ответа</span>
                                     <span className="text-[9px] font-medium px-1.5 py-0.5 rounded border border-emerald-500/20 text-emerald-500 truncate">
-                                        {yandexRecommendedAnswerStyleId === 'automatic' ? 'Auto' : 'Recommended'}
+                                        {yandexRecommendedAnswerStyleId === 'automatic' ? 'Авто' : 'Рекомендовано'}
                                     </span>
                                 </div>
                                 <ModelSelect
                                     value={yandexAnswerStyleId || 'automatic'}
                                     options={yandexStyleOptions.map(style => ({
                                         id: style.id,
-                                        name: `${style.label}${style.recommended ? ' (recommended)' : ''}`,
+                                        name: `${style.label}${style.recommended ? ' (рекомендовано)' : ''}`,
                                     }))}
                                     onChange={handleYandexAnswerStyleChange}
-                                    placeholder="Answer style"
+                                    placeholder="Стиль ответа"
                                     className="py-2"
                                 />
                                 <p className="text-[10px] text-text-secondary">
                                     {selectedYandexAnswerStyle?.id === 'automatic' ? yandexAnswerStyleSummary : (selectedYandexAnswerStyle?.sample || selectedYandexAnswerStyle?.description)}
-                                    <span className="text-text-tertiary"> Language: {yandexAnswerStyleLanguage}</span>
+                                    <span className="text-text-tertiary"> Язык: {yandexAnswerStyleLanguage}</span>
                                 </p>
                             </div>
 
@@ -1068,15 +1068,15 @@ export const AIProvidersSettings: React.FC = () => {
                                 onClick={() => setYandexDisableDataLogging(!yandexDisableDataLogging)}
                                 className="flex items-center justify-between gap-3 min-w-0 w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-xs text-text-primary hover:bg-bg-elevated transition-colors"
                             >
-                                <span>Request data logging</span>
+                                <span>Логирование запросов</span>
                                 <span className={`font-medium ${yandexDisableDataLogging ? 'text-emerald-500' : 'text-amber-500'}`}>
-                                    {yandexDisableDataLogging ? 'Off' : 'On'}
+                                    {yandexDisableDataLogging ? 'Выкл.' : 'Вкл.'}
                                 </span>
                             </button>
                         </div>
 
                         <p className="text-[10px] text-text-secondary">
-                            Sends <span className="font-mono">x-data-logging-enabled: false</span> on connection tests, generation, and streaming when logging is Off.
+                            Отправляет <span className="font-mono">x-data-logging-enabled: false</span> при проверке подключения, генерации и стриминге, когда логирование выключено.
                         </p>
 
                         <div className="flex flex-wrap items-center gap-2">
@@ -1087,7 +1087,7 @@ export const AIProvidersSettings: React.FC = () => {
                                 className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent-primary text-white disabled:opacity-50 transition-opacity flex items-center gap-1.5"
                             >
                                 {savingStatus.yandex ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                                {savingStatus.yandex ? 'Saving...' : savedStatus.yandex ? 'Saved' : 'Save'}
+                                {savingStatus.yandex ? 'Сохранение...' : savedStatus.yandex ? 'Сохранено' : 'Сохранить'}
                             </button>
                             <button
                                 type="button"
@@ -1098,10 +1098,10 @@ export const AIProvidersSettings: React.FC = () => {
                                         'bg-bg-input hover:bg-bg-elevated text-text-primary'
                                     }`}
                             >
-                                {testStatus.yandex === 'testing' ? <><Loader2 size={12} className="animate-spin" /> Testing...</> :
-                                    testStatus.yandex === 'success' ? <><CheckCircle size={12} /> Connected</> :
-                                        testStatus.yandex === 'error' ? <><AlertCircle size={12} /> Error</> :
-                                            <>Test Connection</>}
+                                {testStatus.yandex === 'testing' ? <><Loader2 size={12} className="animate-spin" /> Проверка...</> :
+                                    testStatus.yandex === 'success' ? <><CheckCircle size={12} /> Подключено</> :
+                                        testStatus.yandex === 'error' ? <><AlertCircle size={12} /> Ошибка</> :
+                                            <>Проверить подключение</>}
                             </button>
                             {hasStoredKey.yandex && (
                                 <button
@@ -1110,7 +1110,7 @@ export const AIProvidersSettings: React.FC = () => {
                                     className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border-subtle text-text-secondary hover:text-red-500 transition-colors flex items-center gap-1.5"
                                 >
                                     <Trash2 size={12} />
-                                    Remove
+                                    Удалить
                                 </button>
                             )}
                         </div>
@@ -1127,18 +1127,18 @@ export const AIProvidersSettings: React.FC = () => {
                             <div>
                                 <label className="block text-xs font-bold text-text-primary mb-0">LiteLLM Proxy</label>
                                 <p className="text-[10px] text-text-secondary">
-                                    OpenAI-compatible gateway to 100+ providers. Models auto-discovered from the proxy.{' '}
-                                    <a href="https://docs.litellm.ai/docs/simple_proxy" target="_blank" rel="noreferrer" className="text-accent-primary hover:underline">Docs</a>
+                                    OpenAI-совместимый шлюз к 100+ провайдерам. Модели автоматически обнаруживаются через прокси.{' '}
+                                    <a href="https://docs.litellm.ai/docs/simple_proxy" target="_blank" rel="noreferrer" className="text-accent-primary hover:underline">Документация</a>
                                 </p>
                             </div>
                             {hasStoredKey.litellm && (
-                                <span className="text-[10px] font-medium text-emerald-500 uppercase tracking-wide">Configured</span>
+                                <span className="text-[10px] font-medium text-emerald-500 uppercase tracking-wide">Настроено</span>
                             )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <label className="space-y-1 block">
-                                <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Proxy Base URL</span>
+                                <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Базовый URL прокси</span>
                                 <input
                                     value={litellmBaseURL}
                                     onChange={e => setLitellmBaseURL(e.target.value)}
@@ -1148,28 +1148,28 @@ export const AIProvidersSettings: React.FC = () => {
                             </label>
 
                             <label className="space-y-1 block">
-                                <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Virtual Key (optional)</span>
+                                <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Виртуальный ключ (необязательно)</span>
                                 <input
                                     type="password"
                                     value={litellmApiKey}
                                     onChange={e => setLitellmApiKey(e.target.value)}
                                     className="w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-xs text-text-primary font-mono focus:outline-none focus:border-accent-primary"
-                                    placeholder={hasStoredKey.litellm ? '•••••••• (leave blank to keep)' : 'sk-... (only if proxy requires auth)'}
+                                    placeholder={hasStoredKey.litellm ? '•••••••• (оставьте пустым, чтобы сохранить текущий)' : 'sk-... (если прокси требует авторизацию)'}
                                 />
                             </label>
                         </div>
 
                         <div className="space-y-1">
-                            <span className="block text-[10px] font-medium text-text-secondary uppercase tracking-wide">Max Output Tokens</span>
+                            <span className="block text-[10px] font-medium text-text-secondary uppercase tracking-wide">Макс. токенов ответа</span>
                             <ModelSelect
                                 value={litellmMaxTokens}
                                 options={LITELLM_MAX_TOKENS_OPTIONS}
                                 onChange={setLitellmMaxTokens}
-                                placeholder="Auto (per-model)"
+                                placeholder="Авто (по модели)"
                                 className="py-2"
                             />
                             <p className="text-[10px] text-text-secondary">
-                                Auto reads each model's real output budget from the proxy's <span className="font-mono">/model/info</span> (falls back to 8,192 if unavailable). Pick a fixed value to override.
+                                Авто читает реальный лимит ответа каждой модели из <span className="font-mono">/model/info</span> прокси (если недоступно, используется 8 192). Выберите фиксированное значение, чтобы переопределить.
                             </p>
                         </div>
 
@@ -1180,7 +1180,7 @@ export const AIProvidersSettings: React.FC = () => {
                                 disabled={!litellmBaseURL.trim() || !!savingStatus.litellm}
                                 className="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent-primary text-white disabled:opacity-50 transition-opacity"
                             >
-                                {savingStatus.litellm ? 'Saving…' : savedStatus.litellm ? 'Saved ✓' : 'Save'}
+                                {savingStatus.litellm ? 'Сохранение…' : savedStatus.litellm ? 'Сохранено ✓' : 'Сохранить'}
                             </button>
                             {hasStoredKey.litellm && (
                                 <button
@@ -1188,7 +1188,7 @@ export const AIProvidersSettings: React.FC = () => {
                                     onClick={handleRemoveLitellm}
                                     className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border-subtle text-text-secondary hover:text-text-primary transition-colors"
                                 >
-                                    Remove
+                                    Удалить
                                 </button>
                             )}
                         </div>
@@ -1200,15 +1200,15 @@ export const AIProvidersSettings: React.FC = () => {
             {/* Local (Codex CLI) Provider */}
             <div className="space-y-5">
                 <div>
-                    <h3 className="text-sm font-bold text-text-primary mb-1">Local Provider (Codex CLI)</h3>
-                    <p className="text-xs text-text-secondary">Route text and screenshot responses through a locally authenticated Codex CLI.</p>
+                    <h3 className="text-sm font-bold text-text-primary mb-1">Локальный провайдер (Codex CLI)</h3>
+                    <p className="text-xs text-text-secondary">Отправляйте текстовые ответы и ответы по скриншотам через локально авторизованный Codex CLI.</p>
                 </div>
 
                 <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-4">
                     <div className="flex items-center justify-between">
                         <div>
-                            <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-0">Enable Codex CLI</label>
-                            <p className="text-[10px] text-text-secondary">Adds Codex CLI as a selectable local backend and fallback.</p>
+                            <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-0">Включить Codex CLI</label>
+                            <p className="text-[10px] text-text-secondary">Добавляет Codex CLI как выбираемый локальный бэкенд и резервный вариант.</p>
                         </div>
                         <button
                             type="button"
@@ -1224,7 +1224,7 @@ export const AIProvidersSettings: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <label className="space-y-1">
-                            <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Executable</span>
+                            <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Исполняемый файл</span>
                             <input
                                 value={codexCliConfig.path}
                                 onChange={e => setCodexCliConfig(prev => ({ ...prev, path: e.target.value }))}
@@ -1234,7 +1234,7 @@ export const AIProvidersSettings: React.FC = () => {
                             />
                         </label>
                         <label className="space-y-1">
-                            <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Timeout (ms)</span>
+                            <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Таймаут (мс)</span>
                             <input
                                 type="number"
                                 value={codexCliConfig.timeoutMs}
@@ -1245,7 +1245,7 @@ export const AIProvidersSettings: React.FC = () => {
                             />
                         </label>
                         <CodexCliModelField
-                            label="Normal Model"
+                            label="Обычная модель"
                             value={codexCliConfig.model}
                             placeholder="gpt-5.5"
                             onChange={(model) => setCodexCliConfig(prev => ({ ...prev, model }))}
@@ -1253,7 +1253,7 @@ export const AIProvidersSettings: React.FC = () => {
                             onSave={() => saveCodexCliConfig()}
                         />
                         <CodexCliModelField
-                            label="Fast Model"
+                            label="Быстрая модель"
                             value={codexCliConfig.fastModel}
                             placeholder="gpt-5.3-codex-spark"
                             onChange={(fastModel) => setCodexCliConfig(prev => ({ ...prev, fastModel }))}
@@ -1264,27 +1264,27 @@ export const AIProvidersSettings: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <label className="space-y-1">
-                            <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Service Tier</span>
+                            <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Уровень сервиса</span>
                             <ModelSelect
                                 value={codexCliConfig.serviceTier ?? 'default'}
                                 options={CODEX_SERVICE_TIERS.map(t => ({ id: t, name: t.charAt(0).toUpperCase() + t.slice(1) }))}
                                 onChange={(serviceTier) => saveCodexCliConfig({ ...codexCliConfig, serviceTier: serviceTier as typeof CODEX_SERVICE_TIERS[number] })}
                                 placeholder="default"
                             />
-                            <p className="text-[9px] text-text-tertiary">Use faster service tier if available. Codex Cloud only.</p>
+                            <p className="text-[9px] text-text-tertiary">Используйте более быстрый уровень сервиса, если он доступен. Только Codex Cloud.</p>
                         </label>
                         <label className="space-y-1">
-                            <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Reasoning Effort</span>
+                            <span className="text-[10px] font-medium text-text-secondary uppercase tracking-wide">Усилие рассуждения</span>
                             <ModelSelect
                                 value={codexCliConfig.modelReasoningEffort ?? ''}
                                 options={[
-                                    { id: '', name: 'None' },
+                                    { id: '', name: 'Нет' },
                                     ...CODEX_MODEL_REASONING_EFFORTS.map(e => ({ id: e, name: e.charAt(0).toUpperCase() + e.slice(1) })),
                                 ]}
                                 onChange={(effort) => saveCodexCliConfig({ ...codexCliConfig, modelReasoningEffort: effort || undefined })}
-                                placeholder="None"
+                                placeholder="Нет"
                             />
-                            <p className="text-[9px] text-text-tertiary">How much reasoning effort the model uses. Model-dependent.</p>
+                            <p className="text-[9px] text-text-tertiary">Сколько рассуждения использует модель. Зависит от модели.</p>
                         </label>
                     </div>
 
@@ -1293,7 +1293,7 @@ export const AIProvidersSettings: React.FC = () => {
                             {codexCliStatus === 'success' && (
                                 <div className="flex items-center gap-2 text-xs text-green-400">
                                     <CheckCircle size={14} />
-                                    <span>Codex CLI detected</span>
+                                    <span>Codex CLI найден</span>
                                 </div>
                             )}
                             {codexCliStatus === 'error' && (
@@ -1310,7 +1310,7 @@ export const AIProvidersSettings: React.FC = () => {
                             className="flex items-center gap-2 px-3 py-1.5 bg-bg-input hover:bg-bg-elevated border border-border-subtle rounded-lg text-xs font-medium text-text-primary transition-colors disabled:opacity-60"
                         >
                             {codexCliStatus === 'testing' ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                            Test CLI
+                            Проверить CLI
                         </button>
                     </div>
                 </div>
@@ -1320,8 +1320,8 @@ export const AIProvidersSettings: React.FC = () => {
             <div className="space-y-5">
                 <div className="flex items-center justify-between mb-2">
                     <div>
-                        <h3 className="text-sm font-bold text-text-primary mb-1">Local Models (Ollama)</h3>
-                        <p className="text-xs text-text-secondary">Run open-source models locally.</p>
+                    <h3 className="text-sm font-bold text-text-primary mb-1">Локальные модели (Ollama)</h3>
+                    <p className="text-xs text-text-secondary">Запускайте open-source модели локально.</p>
                     </div>
                     <button
                         onClick={async () => {
@@ -1331,7 +1331,7 @@ export const AIProvidersSettings: React.FC = () => {
                             setTimeout(() => setIsRefreshingOllama(false), 500);
                         }}
                         className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-input transition-colors"
-                        title="Refresh Ollama"
+                        title="Обновить Ollama"
                         disabled={isRefreshingOllama}
                     >
                         <RefreshCw size={18} className={isRefreshingOllama ? "animate-spin" : ""} />
@@ -1341,13 +1341,13 @@ export const AIProvidersSettings: React.FC = () => {
                 <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle">
                     {ollamaStatus === 'checking' && (
                         <div className="flex items-center gap-2 text-xs text-text-secondary">
-                            <span className="animate-spin">⏳</span> Checking for Ollama...
+                            <span className="animate-spin">⏳</span> Проверяем Ollama...
                         </div>
                     )}
 
                     {ollamaStatus === 'fixing' && (
                         <div className="flex items-center gap-2 text-xs text-text-secondary">
-                            <span className="animate-spin">🔧</span> Attempting to auto-fix connection...
+                            <span className="animate-spin">🔧</span> Пытаемся автоматически исправить подключение...
                         </div>
                     )}
 
@@ -1355,17 +1355,17 @@ export const AIProvidersSettings: React.FC = () => {
                         <div className="flex flex-col gap-2">
                             <div className="flex items-center gap-2 text-xs text-red-400">
                                 <AlertCircle size={14} />
-                                <span>Ollama not detected</span>
+                                <span>Ollama не обнаружен</span>
                             </div>
                             <div className="flex items-center gap-2">
                                 <p className="text-xs text-text-secondary">
-                                    Ensure Ollama is running (`ollama serve`).
+                                    Убедитесь, что Ollama запущен (`ollama serve`).
                                 </p>
                                 <button
                                     onClick={handleFixOllama}
                                     className="text-[10px] bg-bg-elevated hover:bg-bg-input px-2 py-1 rounded border border-border-subtle"
                                 >
-                                    Auto-Fix Connection
+                                    Автоисправление
                                 </button>
                             </div>
                         </div>
@@ -1375,14 +1375,14 @@ export const AIProvidersSettings: React.FC = () => {
                         <div className="space-y-3">
                             <div className="flex items-center gap-2 text-xs text-green-400 mb-3">
                                 <CheckCircle size={14} />
-                                <span>Ollama connected</span>
+                                <span>Ollama подключен</span>
                             </div>
 
                             <div className="grid grid-cols-1 gap-2">
                                 {ollamaModels.map(model => (
                                     <div key={model} className="flex items-center justify-between p-2 bg-bg-input rounded-lg border border-border-subtle">
                                         <span className="text-xs text-text-primary font-mono">{model}</span>
-                                        <span className="text-[10px] text-bg-elevated bg-text-secondary px-1.5 py-0.5 rounded-full font-bold">LOCAL</span>
+                                        <span className="text-[10px] text-bg-elevated bg-text-secondary px-1.5 py-0.5 rounded-full font-bold">ЛОКАЛЬНО</span>
                                     </div>
                                 ))}
                             </div>
@@ -1390,50 +1390,50 @@ export const AIProvidersSettings: React.FC = () => {
                     )}
                     {ollamaStatus === 'detected' && ollamaModels.length === 0 && (
                         <div className="text-xs text-text-secondary">
-                            Ollama is running but no models found. Run `ollama pull llama3` to get started.
+                            Ollama запущен, но модели не найдены. Выполните `ollama pull llama3`, чтобы начать.
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Custom Providers */}
+            {/* Пользовательские провайдеры */}
             <div className="space-y-5">
                 <div className="flex items-center justify-between mb-2">
                     <div>
                         <div className="flex items-center gap-2 mb-1">
-                            <h3 className="text-sm font-bold text-text-primary">Custom Providers</h3>
-                            <span className="px-1.5 py-0 rounded-full text-[7px] font-bold bg-yellow-500/10 text-yellow-500 uppercase tracking-widest border border-yellow-500/20 leading-loose mt-0.5">Experimental</span>
+                            <h3 className="text-sm font-bold text-text-primary">Пользовательские провайдеры</h3>
+                            <span className="px-1.5 py-0 rounded-full text-[7px] font-bold bg-yellow-500/10 text-yellow-500 uppercase tracking-widest border border-yellow-500/20 leading-loose mt-0.5">Экспериментально</span>
                         </div>
-                        <p className="text-xs text-text-secondary">Add your own AI endpoints via cURL.</p>
+                        <p className="text-xs text-text-secondary">Добавьте свои AI-эндпоинты через cURL.</p>
                     </div>
                     {!isEditingCustom && (
                         <button
                             onClick={handleNewProvider}
                             className="flex items-center gap-2 px-3 py-1.5 bg-bg-input hover:bg-bg-elevated border border-border-subtle rounded-lg text-xs font-medium text-text-primary transition-colors"
                         >
-                            <Plus size={14} /> Add Provider
+                            <Plus size={14} /> Добавить провайдера
                         </button>
                     )}
                 </div>
 
                 {isEditingCustom ? (
                     <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle animated fadeIn">
-                        <h4 className="text-sm font-bold text-text-primary mb-4">{editingProvider ? 'Edit Provider' : 'New Provider'}</h4>
+                        <h4 className="text-sm font-bold text-text-primary mb-4">{editingProvider ? 'Редактировать провайдера' : 'Новый провайдер'}</h4>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-1">Provider Name</label>
+                                <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-1">Имя провайдера</label>
                                 <input
                                     type="text"
                                     value={customName}
                                     onChange={(e) => setCustomName(e.target.value)}
-                                    placeholder="My Custom LLM"
+                                    placeholder="Мой LLM-провайдер"
                                     className="w-full bg-bg-input border border-border-subtle rounded-lg px-4 py-2.5 text-xs text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-1">cURL Command</label>
+                                <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-1">cURL-команда</label>
                                 <div className="relative">
                                     <textarea
                                         value={customCurl}
@@ -1446,66 +1446,66 @@ export const AIProvidersSettings: React.FC = () => {
 
                             <div>
                                 <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-1">
-                                    Response JSON Path <span className="text-text-tertiary normal-case font-normal">(Optional)</span>
+                                    JSON-путь ответа <span className="text-text-tertiary normal-case font-normal">(необязательно)</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={customResponsePath}
                                     onChange={(e) => setCustomResponsePath(e.target.value)}
-                                    placeholder="e.g. choices[0].message.content"
+                                    placeholder="например choices[0].message.content"
                                     className="w-full bg-bg-input border border-border-subtle rounded-lg px-4 py-2.5 text-xs text-text-primary focus:outline-none focus:border-accent-primary transition-colors font-mono"
                                 />
                                 <p className="text-[10px] text-text-secondary mt-1">
-                                    Dot notation path to the answer text in the JSON response. If empty, the full JSON is returned.
+                                    Путь через точки к тексту ответа в JSON. Если пусто, вернется весь JSON.
                                 </p>
                             </div>
 
                             <div>
                                 <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-1">
-                                    Screenshot / Vision Support
+                                    Поддержка скриншотов / vision
                                 </label>
                                 <select
                                     value={customVision}
                                     onChange={(e) => setCustomVision(e.target.value as 'auto' | 'on' | 'off')}
                                     className="w-full bg-bg-input border border-border-subtle rounded-lg px-4 py-2.5 text-xs text-text-primary focus:outline-none focus:border-accent-primary transition-colors"
                                 >
-                                    <option value="auto">Auto-detect (recommended)</option>
-                                    <option value="on">Always send screenshots</option>
-                                    <option value="off">Never send screenshots (text only)</option>
+                                    <option value="auto">Автоопределение (рекомендовано)</option>
+                                    <option value="on">Всегда отправлять скриншоты</option>
+                                    <option value="off">Никогда не отправлять скриншоты (только текст)</option>
                                 </select>
                                 <p className="text-[10px] text-text-secondary mt-1">
-                                    Auto-detect enables vision when your cURL uses <code className="font-mono">{"{{IMAGE_BASE64}}"}</code> or an OpenAI-style <code className="font-mono">messages</code> body. Choose “Always” only if your endpoint accepts images another way; “Never” keeps this provider out of screenshot analysis.
+                                    Автоопределение включает vision, если cURL использует <code className="font-mono">{"{{IMAGE_BASE64}}"}</code> или тело <code className="font-mono">messages</code> в стиле OpenAI. Выбирайте «Всегда» только если эндпоинт принимает изображения другим способом; «Никогда» исключает провайдера из анализа скриншотов.
                                 </p>
                             </div>
 
                             <div className="bg-bg-elevated/30 rounded-lg overflow-hidden border border-border-subtle mt-4">
                                 <div className="px-4 py-3 bg-bg-elevated/50 border-b border-border-subtle flex items-center justify-between">
                                     <h5 className="block text-xs font-medium text-text-primary uppercase tracking-wide">
-                                        Configuration Guide
+                                        Руководство по настройке
                                     </h5>
                                 </div>
 
                                 <div className="p-4 space-y-4">
                                     <div>
-                                        <p className="text-xs text-text-secondary mb-2 font-medium">Available Variables</p>
+                                        <p className="text-xs text-text-secondary mb-2 font-medium">Доступные переменные</p>
                                         <div className="grid grid-cols-1 gap-2">
                                             <div className="flex items-center gap-2 text-xs">
                                                 <code className="bg-bg-input px-1.5 py-0.5 rounded text-text-primary font-mono border border-border-subtle">{"{{TEXT}}"}</code>
-                                                <span className="text-text-tertiary">Combined System + Context + Message (Recommended)</span>
+                                                <span className="text-text-tertiary">Объединенные System + Context + Message (рекомендовано)</span>
                                             </div>
                                             <div className="flex items-center gap-2 text-xs">
                                                 <code className="bg-bg-input px-1.5 py-0.5 rounded text-text-primary font-mono border border-border-subtle">{"{{IMAGE_BASE64}}"}</code>
-                                                <span className="text-text-tertiary">Screenshot data (if available)</span>
+                                                <span className="text-text-tertiary">Данные скриншота (если доступны)</span>
                                             </div>
                                         </div>
                                     </div>
 
                                     <div>
-                                        <p className="text-xs text-text-secondary mb-2 font-medium">Examples</p>
+                                        <p className="text-xs text-text-secondary mb-2 font-medium">Примеры</p>
                                         <div className="space-y-3">
                                             {/* Ollama Example */}
                                             <div>
-                                                <div className="text-[10px] uppercase tracking-wider text-text-tertiary mb-1.5">Local (Ollama)</div>
+                                                <div className="text-[10px] uppercase tracking-wider text-text-tertiary mb-1.5">Локально (Ollama)</div>
                                                 <div className="bg-bg-input p-2.5 rounded-lg border border-border-subtle overflow-x-auto group relative">
                                                     <code className="font-mono text-[10px] text-text-primary whitespace-pre block">
                                                         curl http://localhost:11434/api/generate -d '{"{"}"model": "llama3", "prompt": "{`{{TEXT}}`}"{"}"}'
@@ -1515,7 +1515,7 @@ export const AIProvidersSettings: React.FC = () => {
 
                                             {/* OpenAI Example */}
                                             <div>
-                                                <div className="text-[10px] uppercase tracking-wider text-text-tertiary mb-1.5">OpenAI Compatible</div>
+                                                <div className="text-[10px] uppercase tracking-wider text-text-tertiary mb-1.5">OpenAI-совместимый</div>
                                                 <div className="bg-bg-input p-2.5 rounded-lg border border-border-subtle overflow-x-auto">
                                                     <code className="font-mono text-[10px] text-text-primary whitespace-pre block">
                                                         {`curl https://api.openai.com/v1/chat/completions \\
@@ -1549,13 +1549,13 @@ export const AIProvidersSettings: React.FC = () => {
                                     onClick={() => setIsEditingCustom(false)}
                                     className="px-4 py-2 rounded-lg text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-bg-input transition-colors"
                                 >
-                                    Cancel
+                                    Отмена
                                 </button>
                                 <button
                                     onClick={handleSaveCustom}
                                     className="px-4 py-2 rounded-lg text-xs font-medium bg-accent-primary text-white hover:bg-accent-secondary transition-colors flex items-center gap-2"
                                 >
-                                    <Save size={14} /> Save Provider
+                                    <Save size={14} /> Сохранить провайдера
                                 </button>
                             </div>
                         </div>
@@ -1564,7 +1564,7 @@ export const AIProvidersSettings: React.FC = () => {
                     <div className="space-y-3">
                         {customProviders.length === 0 ? (
                             <div className="text-center py-8 bg-bg-item-surface rounded-xl border border-border-subtle border-dashed">
-                                <p className="text-xs text-text-tertiary">No custom providers added yet.</p>
+                                <p className="text-xs text-text-tertiary">Пользовательские провайдеры пока не добавлены.</p>
                             </div>
                         ) : (
                             customProviders.map((provider) => (
@@ -1580,7 +1580,7 @@ export const AIProvidersSettings: React.FC = () => {
                                             </p>
                                             {provider.responsePath && (
                                                 <p className="text-[9px] text-text-tertiary font-mono opacity-40 mt-0.5">
-                                                    path: {provider.responsePath}
+                                                    путь: {provider.responsePath}
                                                 </p>
                                             )}
                                         </div>
@@ -1589,14 +1589,14 @@ export const AIProvidersSettings: React.FC = () => {
                                         <button
                                             onClick={() => handleEditProvider(provider)}
                                             className="p-1.5 rounded-lg text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors"
-                                            title="Edit"
+                                            title="Редактировать"
                                         >
                                             <Edit2 size={14} />
                                         </button>
                                         <button
                                             onClick={() => handleDeleteCustom(provider.id)}
                                             className="p-1.5 rounded-lg text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                            title="Delete"
+                                            title="Удалить"
                                         >
                                             <Trash2 size={14} />
                                         </button>
@@ -1607,28 +1607,28 @@ export const AIProvidersSettings: React.FC = () => {
                     </div>
                 )}
 
-            {/* Screen Understanding — vision-first routing */}
+            {/* Понимание экрана — маршрутизация через vision */}
             <div className="space-y-5">
                 <div>
-                    <h3 className="text-sm font-bold text-text-primary mb-1">Screen understanding</h3>
-                    <p className="text-xs text-text-secondary mb-2">Pick how OpenOffer reads what is on your screen. All paths use the vision-capable AI provider directly; OCR is no longer used.</p>
+                    <h3 className="text-sm font-bold text-text-primary mb-1">Понимание экрана</h3>
+                    <p className="text-xs text-text-secondary mb-2">Выберите, как OpenOffer читает содержимое экрана. Все варианты напрямую используют AI-провайдера с vision; OCR больше не применяется.</p>
                 </div>
                 <div className="bg-bg-item-surface rounded-xl p-4 border border-border-subtle flex flex-col gap-2">
                     {([
                         {
                             value: 'vision_first' as const,
-                            label: 'Vision first',
-                            description: 'Recommended. Try every configured vision provider in order; first success wins.',
+                            label: 'Сначала vision',
+                            description: 'Рекомендовано. По очереди пробует всех настроенных vision-провайдеров; используется первый успешный.',
                         },
                         {
                             value: 'vision_only' as const,
-                            label: 'Vision only',
-                            description: 'Stricter. Require a vision-capable provider; never silently drop the screenshot.',
+                            label: 'Только vision',
+                            description: 'Более строгий режим. Требует vision-провайдера и никогда молча не отбрасывает скриншот.',
                         },
                         {
                             value: 'private_vision' as const,
-                            label: 'Private vision (local only)',
-                            description: 'Use a local vision model (Ollama) only. Never call cloud vision. Clear error if no local provider is configured.',
+                            label: 'Приватный vision (только локально)',
+                            description: 'Использует только локальную vision-модель (Ollama). Не вызывает облачный vision. Если локальный провайдер не настроен, показывает явную ошибку.',
                         },
                     ]).map(({ value, label, description }) => {
                         const selected = screenUnderstandingMode === value;
@@ -1655,8 +1655,8 @@ export const AIProvidersSettings: React.FC = () => {
                     })}
                     <div className="flex items-center justify-between pt-2 mt-1 border-t border-border-subtle">
                         <div className="flex flex-col">
-                            <span className="text-xs text-text-primary font-semibold">Technical interview direct vision</span>
-                            <span className="text-[11px] text-text-secondary leading-snug mt-0.5">Use the highest-resolution image profile so code text stays sharp in interview mode.</span>
+                            <span className="text-xs text-text-primary font-semibold">Прямой vision для технических интервью</span>
+                            <span className="text-[11px] text-text-secondary leading-snug mt-0.5">Использует профиль изображения с максимальным разрешением, чтобы текст кода оставался четким в режиме интервью.</span>
                         </div>
                         <div
                             onClick={() => {
@@ -1679,20 +1679,20 @@ export const AIProvidersSettings: React.FC = () => {
                 </div>
             </div>
 
-            {/* Cloud Provider Data Scopes — fail-closed cloud share controls */}
+            {/* Области данных облачных провайдеров */}
             <div className="space-y-5">
                 <div>
-                    <h3 className="text-sm font-bold text-text-primary mb-1">Cloud provider data scopes</h3>
-                    <p className="text-xs text-text-secondary mb-2">Control what data cloud AI providers can access. Disabled types are handled locally for privacy.</p>
+                    <h3 className="text-sm font-bold text-text-primary mb-1">Данные для облачных провайдеров</h3>
+                    <p className="text-xs text-text-secondary mb-2">Управляйте тем, к каким данным могут обращаться облачные AI-провайдеры. Отключенные типы обрабатываются локально для приватности.</p>
                 </div>
                 <div className="bg-bg-item-surface rounded-xl p-4 border border-border-subtle flex flex-col gap-2">
                     {([
-                        { key: 'transcript', label: 'Transcripts' },
-                        { key: 'screenshots', label: 'Screenshots' },
-                        { key: 'reference_files', label: 'Reference files' },
-                        { key: 'profile_history', label: 'Profile history' },
-                        { key: 'embeddings', label: 'Cloud embeddings' },
-                        { key: 'post_call_summary', label: 'Post-call summaries' },
+                        { key: 'transcript', label: 'Транскрипты' },
+                        { key: 'screenshots', label: 'Скриншоты' },
+                        { key: 'reference_files', label: 'Справочные файлы' },
+                        { key: 'profile_history', label: 'История профиля' },
+                        { key: 'embeddings', label: 'Облачные эмбеддинги' },
+                        { key: 'post_call_summary', label: 'Саммари после звонка' },
                     ] as const).map(({ key, label }) => {
                         const allowed = providerDataScopes[key] !== false;
                         return (
@@ -1707,7 +1707,7 @@ export const AIProvidersSettings: React.FC = () => {
                                     className={`w-9 h-5 rounded-full relative transition-colors cursor-pointer ${allowed ? 'bg-emerald-500' : 'bg-bg-toggle-switch border border-border-muted'}`}
                                     role="switch"
                                     aria-checked={allowed}
-                                    aria-label={`Allow ${label} to cloud providers`}
+                                    aria-label={`Разрешить облачным провайдерам: ${label}`}
                                 >
                                     <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${allowed ? 'translate-x-4' : 'translate-x-0'}`} />
                                 </div>
@@ -1716,7 +1716,7 @@ export const AIProvidersSettings: React.FC = () => {
                     })}
                     <div className="flex items-start gap-2 mt-1 pt-3 border-t border-border-subtle">
                         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-tertiary shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
-                        <p className="text-[11px] text-text-tertiary leading-relaxed">When a data type is disabled, OpenOffer falls back to the best available local model to keep that data on-device.</p>
+                        <p className="text-[11px] text-text-tertiary leading-relaxed">Когда тип данных отключен, OpenOffer переключается на лучшую доступную локальную модель, чтобы оставить эти данные на устройстве.</p>
                     </div>
                 </div>
             </div>

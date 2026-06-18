@@ -2,6 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import { CODEX_CLI_MODEL, CODEX_CLI_MODEL_PRESETS, codexCliSelectorId, getCodexCliModelDisplayName, STANDARD_CLOUD_MODELS, prettifyModelId } from '../utils/modelUtils';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
+import { useTranslation } from 'react-i18next';
 
 // Define Model Types
 interface ModelOption {
@@ -14,6 +15,7 @@ interface ModelOption {
 
 
 const ModelSelectorWindow = () => {
+    const { t } = useTranslation();
     const isLight = useResolvedTheme() === 'light';
     const [currentModel, setCurrentModel] = useState<string>(() => localStorage.getItem('cached-current-model') || '');
     const [availableModels, setAvailableModels] = useState<ModelOption[]>(() => {
@@ -167,13 +169,13 @@ const ModelSelectorWindow = () => {
                     {isLoading ? (
                         <div className={`flex items-center justify-center py-4 overlay-text-muted ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                             <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                            <span className="text-xs">Loading models...</span>
+                            <span className="text-xs">{t('modelSelector.loadingModels')}</span>
                         </div>
                     ) : (
                         <div className="flex-1 overflow-y-auto scrollbar-hide flex flex-col gap-0.5">
                             {availableModels.length === 0 ? (
                                 <div className={`px-4 py-3 text-center text-xs overlay-text-muted ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                                    No models connected.<br />Check Settings.
+                                    {t('modelSelector.noModelsConnected')}<br />{t('modelSelector.checkSettings')}
                                 </div>
                             ) : (
                                 availableModels.map((model) => {

@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const spring = { type: "spring" as const, stiffness: 100, damping: 20 };
 
-// ─── Profile Intelligence Apple-style CSS (mirrors ModesSettings GATE_CSS) ────
+// ─── Стили профильного интеллекта в духе Apple (mirrors ModesSettings GATE_CSS) ────
 // Lives at module scope so it's not re-allocated on each render.
 const PI_CSS = `
     .pi-root {
@@ -576,10 +576,10 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                 setHasStoredTavilyKey(false);
                 setTavilyApiKey('');
             } else {
-                alert(res?.error || 'Failed to remove API key');
+                alert(res?.error || 'Не удалось удалить API-ключ');
             }
         } catch (e) {
-            alert('Error removing key');
+            alert('Ошибка удаления ключа');
         }
     };
 
@@ -602,11 +602,11 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                     </div>
                     <div>
                         <div className="flex items-center gap-2.5 mb-1.5">
-                            <h2 className="text-[22px] font-bold text-text-primary leading-none" style={{ letterSpacing: '-0.025em' }}>Profile Intelligence</h2>
-                            <span className="pi-beta-badge">BETA</span>
+                            <h2 className="text-[22px] font-bold text-text-primary leading-none" style={{ letterSpacing: '-0.025em' }}>Профильный интеллект</h2>
+                            <span className="pi-beta-badge">БЕТА</span>
                         </div>
                         <p className="text-[13px] text-text-secondary" style={{ letterSpacing: '-0.005em' }}>
-                            Manage your persona, career history, and active job description
+                            Управляйте персоной, карьерной историей и активным описанием вакансии
                         </p>
                     </div>
                 </div>
@@ -614,7 +614,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                     <button
                         onClick={onClose}
                         className="pi-close-btn"
-                        aria-label="Close"
+                        aria-label="Закрыть"
                     >
                         <X size={18} strokeWidth={2} />
                     </button>
@@ -626,9 +626,9 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                 <div className="max-w-3xl mx-auto p-5 pb-12">
                     <div className="space-y-6">
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, ...spring }} className="mb-4 pt-2">
-                            <h3 className="text-lg font-bold text-text-primary tracking-tight">Professional Identity</h3>
+                            <h3 className="text-lg font-bold text-text-primary tracking-tight">Профессиональная идентичность</h3>
                             <p className="text-[13px] text-text-secondary mt-1">
-                                This engine constructs an intelligent representation of your career history and skills graph.
+                                Этот движок строит интеллектуальное представление вашей карьеры и графа навыков.
                             </p>
                         </motion.div>
 
@@ -646,10 +646,10 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         </div>
                                                         <div>
                                                             <h4 className="text-sm font-bold text-text-primary tracking-tight">
-                                                                {profileData?.identity?.name || 'Identity Node Inactive'}
+                                                                {profileData?.identity?.name || 'Узел идентичности неактивен'}
                                                             </h4>
                                                             <p className="text-xs text-text-secondary mt-0.5 tracking-wide">
-                                                                {profileData?.identity?.email || 'Upload a resume to begin mapping.'}
+                                                                {profileData?.identity?.email || 'Загрузите резюме, чтобы начать построение профиля.'}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -658,22 +658,22 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         {profileStatus.hasProfile && (
                                                             <button
                                                                 onClick={async () => {
-                                                                    if (!confirm('Are you sure you want to delete your mapped persona? This will destroy all structured timeline data.')) return;
+                                                                    if (!confirm('Удалить построенную персону? Это уничтожит все структурированные данные timeline.')) return;
                                                                     try {
                                                                         await window.electronAPI?.profileDelete?.();
                                                                         setProfileStatus({ hasProfile: false, profileMode: false });
                                                                         setProfileData(null);
-                                                                    } catch (e) { console.error('Failed to delete profile:', e); }
+                                                                    } catch (e) { console.error('Не удалось удалить профиль:', e); }
                                                                 }}
                                                                 className="text-[12px] font-medium text-text-tertiary hover:text-red-500 transition-colors px-3 py-1.5 rounded-full hover:bg-red-500/10"
                                                             >
-                                                                Disconnect
+                                                                Отключить
                                                             </button>
                                                         )}
 
                                                         {/* High-fidelity Toggle */}
                                                         <div className="flex items-center gap-2 bg-bg-input px-3 py-1.5 rounded-full border border-border-subtle">
-                                                            <span className="text-xs font-medium text-text-secondary">Persona Engine</span>
+                                                            <span className="text-xs font-medium text-text-secondary">Движок персоны</span>
                                                             <div
                                                                 onClick={async () => {
                                                                     if (!profileStatus.hasProfile) return;
@@ -682,7 +682,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                         await window.electronAPI?.profileSetMode?.(newState);
                                                                         setProfileStatus(prev => ({ ...prev, profileMode: newState }));
                                                                     } catch (e) {
-                                                                        console.error('Failed to toggle profile mode:', e);
+                                                                        console.error('Не удалось переключить режим профиля:', e);
                                                                     }
                                                                 }}
                                                                 className={`w-9 h-5 rounded-full relative transition-colors ${!profileStatus.hasProfile ? 'opacity-40 cursor-not-allowed bg-bg-toggle-switch' : profileStatus.profileMode ? 'bg-accent-primary' : 'bg-bg-toggle-switch border border-border-muted'}`}
@@ -701,7 +701,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         <span className="text-[20px] font-bold text-text-primary tracking-tight leading-none mb-1">{profileData?.experienceCount || 0}</span>
                                                         <div className="flex items-center gap-1.5">
                                                             <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
-                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Experience</span>
+                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Опыт</span>
                                                         </div>
                                                     </div>
 
@@ -711,7 +711,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         <span className="text-[20px] font-bold text-text-primary tracking-tight leading-none mb-1">{profileData?.projectCount || 0}</span>
                                                         <div className="flex items-center gap-1.5">
                                                             <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]" />
-                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Projects</span>
+                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Проекты</span>
                                                         </div>
                                                     </div>
 
@@ -721,7 +721,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         <span className="text-[20px] font-bold text-text-primary tracking-tight leading-none mb-1">{profileData?.nodeCount || 0}</span>
                                                         <div className="flex items-center gap-1.5">
                                                             <div className="w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.4)]" />
-                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Nodes</span>
+                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Узлы</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -734,13 +734,13 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                     // legacy/array shape.
                                                     const raw = profileData?.skills;
                                                     const CATS: { key: string; label: string }[] = [
-                                                        { key: 'languages', label: 'Languages' },
-                                                        { key: 'frameworks', label: 'Frameworks' },
-                                                        { key: 'cloud', label: 'Cloud' },
-                                                        { key: 'databases', label: 'Databases' },
+                                                        { key: 'languages', label: 'Языки' },
+                                                        { key: 'frameworks', label: 'Фреймворки' },
+                                                        { key: 'cloud', label: 'Облако' },
+                                                        { key: 'databases', label: 'Базы данных' },
                                                         { key: 'ml', label: 'AI / ML' },
                                                         { key: 'devops', label: 'DevOps' },
-                                                        { key: 'tools', label: 'Tools' },
+                                                        { key: 'tools', label: 'Инструменты' },
                                                     ];
                                                     const chip = (skill: string, i: number) => (
                                                         <span key={i} className="text-[10px] font-medium text-text-secondary px-2 py-1 rounded-md border border-border-subtle bg-bg-input">
@@ -767,7 +767,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                     if (flat.length === 0) return null;
                                                     return (
                                                         <div className="mt-5">
-                                                            <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-2">Top Skills</div>
+                                                            <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-2">Главные навыки</div>
                                                             <div className="flex flex-wrap gap-1.5">
                                                                 {flat.slice(0, 15).map((s: string, i: number) => chip(s, i))}
                                                             </div>
@@ -788,10 +788,10 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                     </div>
                                                     <div className="min-w-0 flex-1">
                                                         <h4 className="text-[15px] font-bold text-text-primary mb-1 tracking-tight flex items-center flex-wrap gap-1.5">
-                                                            <span>{profileStatus.hasProfile ? 'Overwrite Source Document' : 'Initialize Knowledge Base'}</span>
+                                                            <span>{profileStatus.hasProfile ? 'Заменить исходный документ' : 'Инициализировать базу знаний'}</span>
                                                         </h4>
                                                         <p className="text-xs text-text-secondary leading-relaxed pr-2">
-                                                            Provide a resume file to seed the intelligence engine.
+                                                            Передайте файл резюме, чтобы заполнить движок интеллекта.
                                                         </p>
                                                     </div>
                                                 </div>
@@ -812,10 +812,10 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                 const data = await window.electronAPI?.profileGetProfile?.();
                                                                 if (data) setProfileData(data);
                                                             } else {
-                                                                setProfileError(result?.error || 'Upload failed');
+                                                                setProfileError(result?.error || 'Загрузка не удалась');
                                                             }
                                                         } catch (e: any) {
-                                                            setProfileError(e.message || 'Upload failed');
+                                                            setProfileError(e.message || 'Загрузка не удалась');
                                                         } finally {
                                                             setProfileUploading(false);
                                                         }
@@ -823,7 +823,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                     disabled={profileUploading}
                                                     className={`pi-upload-pill${profileStatus.hasProfile ? ' pi-upload-pill--secondary' : ''}`}
                                                     aria-busy={profileUploading}
-                                                    aria-label={profileUploading ? 'Ingesting resume' : 'Select resume file'}
+                                                    aria-label={profileUploading ? 'Обработка резюме' : 'Выбрать файл резюме'}
                                                 >
                                                     {profileUploading && <span className="pi-upload-pill__fill" aria-hidden="true" />}
                                                     <span className="pi-upload-pill__content">
@@ -832,8 +832,8 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                             : <Upload size={14} strokeWidth={2.5} />}
                                                         <span className="pi-upload-pill__label">
                                                             {profileUploading
-                                                                ? 'Ingesting · Processing structural semantics…'
-                                                                : profileStatus.hasProfile ? 'Replace resume file' : 'Select resume file'}
+                                                                ? 'Обработка · анализ структурной семантики…'
+                                                                : profileStatus.hasProfile ? 'Заменить файл резюме' : 'Выбрать файл резюме'}
                                                         </span>
                                                     </span>
                                                     <span className="pi-upload-pill__ring">
@@ -861,7 +861,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                     </div>
                                                     <div className="min-w-0 flex-1">
                                                         <h4 className="text-[15px] font-bold text-text-primary mb-1 tracking-tight flex items-center flex-wrap gap-1.5">
-                                                            <span>{profileData?.hasActiveJD ? `${profileData.activeJD?.title} @ ${profileData.activeJD?.company}` : 'Upload Job Description'}</span>
+                                                            <span>{profileData?.hasActiveJD ? `${profileData.activeJD?.title} @ ${profileData.activeJD?.company}` : 'Загрузить описание вакансии'}</span>
                                                         </h4>
                                                         {profileData?.hasActiveJD ? (
                                                             <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -876,7 +876,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                             </div>
                                                         ) : (
                                                             <p className="text-xs text-text-secondary leading-relaxed pr-2">
-                                                                Upload a JD to enable persona tuning and company research.
+                                                                Загрузите JD, чтобы включить настройку персоны и исследование компании.
                                                             </p>
                                                         )}
                                                     </div>
@@ -889,7 +889,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                 setCompanyDossier(null);
                                                             }}
                                                             className="shrink-0 mt-0.5 px-2.5 py-2 rounded-full text-xs text-text-tertiary hover:text-red-500 hover:bg-red-500/10 transition-all border border-transparent hover:border-red-500/20"
-                                                            aria-label="Remove job description"
+                                                            aria-label="Удалить описание вакансии"
                                                         >
                                                             <Trash2 size={14} />
                                                         </button>
@@ -910,10 +910,10 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                 const data = await window.electronAPI?.profileGetProfile?.();
                                                                 if (data) setProfileData(data);
                                                             } else {
-                                                                setJdError(result?.error || 'JD upload failed');
+                                                                setJdError(result?.error || 'Загрузка JD не удалась');
                                                             }
                                                         } catch (e: any) {
-                                                            setJdError(e.message || 'JD upload failed');
+                                                            setJdError(e.message || 'Загрузка JD не удалась');
                                                         } finally {
                                                             setJdUploading(false);
                                                         }
@@ -922,7 +922,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                     className={`pi-upload-pill${profileData?.hasActiveJD ? ' pi-upload-pill--secondary' : ''}`}
                                                     data-accent="blue"
                                                     aria-busy={jdUploading}
-                                                    aria-label={jdUploading ? 'Parsing job description' : (profileData?.hasActiveJD ? 'Replace job description' : 'Upload job description')}
+                                                    aria-label={jdUploading ? 'Разбор описания вакансии' : (profileData?.hasActiveJD ? 'Заменить описание вакансии' : 'Загрузить описание вакансии')}
                                                 >
                                                     {jdUploading && <span className="pi-upload-pill__fill" aria-hidden="true" />}
                                                     <span className="pi-upload-pill__content">
@@ -931,8 +931,8 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                             : <Briefcase size={14} strokeWidth={2.5} />}
                                                         <span className="pi-upload-pill__label">
                                                             {jdUploading
-                                                                ? 'Parsing · Decoding JD structure…'
-                                                                : profileData?.hasActiveJD ? 'Replace job description' : 'Upload job description'}
+                                                                ? 'Разбор · декодируем структуру JD…'
+                                                                : profileData?.hasActiveJD ? 'Заменить описание вакансии' : 'Загрузить описание вакансии'}
                                                         </span>
                                                     </span>
                                                     <span className="pi-upload-pill__ring">
@@ -960,15 +960,15 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
-                                                            <h4 className="text-sm font-bold text-text-primary">Custom Context</h4>
+                                                            <h4 className="text-sm font-bold text-text-primary">Пользовательский контекст</h4>
                                                             {customNotesSaved && (
                                                                 <span className="text-[9px] font-bold text-emerald-500 px-1.5 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/20 uppercase tracking-wide flex items-center gap-1">
-                                                                    <Check size={8} /> Saved
+                                                                    <Check size={8} /> Сохранено
                                                                 </span>
                                                             )}
                                                         </div>
                                                         <p className="text-[11px] text-text-secondary mt-0.5">
-                                                            Add any context the AI should know about you — saved across all sessions.
+                                                            Добавьте любой контекст, который AI должен знать о вас — он сохраняется для всех сессий.
                                                         </p>
                                                     </div>
                                                 </div>
@@ -989,13 +989,13 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                 } catch (_) {}
                                                             }, 800);
                                                         }}
-                                                        placeholder={`Examples:\n• Q4 ARR was $2.1M, grew 40% YoY — use when pitching growth story\n• Solved LRU Cache (LeetCode 146) with O(1) get/put using HashMap + doubly linked list\n• I prefer concise, direct answers without filler phrases\n• My target salary is $180k base — don't go below $160k`}
+                                                        placeholder={`Примеры:\n• Q4 ARR был $2.1M, рост 40% YoY — использовать для истории роста\n• Решил LRU Cache (LeetCode 146) с O(1) get/put через HashMap + двусвязный список\n• Предпочитаю краткие прямые ответы без воды\n• Целевая зарплата $180k base — не опускаться ниже $160k`}
                                                         rows={6}
                                                         className="w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2.5 text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary/50 focus:ring-1 focus:ring-accent-primary/20 transition-all resize-none leading-relaxed"
                                                     />
                                                     <div className="flex items-center justify-between px-0.5">
                                                         <p className="text-[10px] text-text-tertiary">
-                                                            Auto-saved · Works with all modes and providers
+                                                            Автосохранение · Работает со всеми режимами и провайдерами
                                                         </p>
                                                         <span className={`text-[10px] tabular-nums ${customNotes.length > 3600 ? 'text-amber-500' : 'text-text-tertiary'}`}>
                                                             {customNotes.length}/4000
@@ -1013,15 +1013,15 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2">
-                                                            <h4 className="text-sm font-bold text-text-primary">AI Persona</h4>
+                                                            <h4 className="text-sm font-bold text-text-primary">AI-персона</h4>
                                                             {personaSaved && (
                                                                 <span className="text-[9px] font-bold text-emerald-500 px-1.5 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/20 uppercase tracking-wide flex items-center gap-1">
-                                                                    <Check size={8} /> Updated
+                                                                    <Check size={8} /> Обновлено
                                                                 </span>
                                                             )}
                                                         </div>
                                                         <p className="text-[11px] text-text-secondary mt-0.5">
-                                                            Set the AI's behavior, tone, and role across providers.
+                                                            Задайте поведение, тон и роль AI для всех провайдеров.
                                                         </p>
                                                     </div>
                                                 </div>
@@ -1043,13 +1043,13 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                             } catch (_) {}
                                                         }, 800);
                                                     }}
-                                                    placeholder="Example: You are a senior hiring manager. Keep answers concise and ask one focused follow-up when needed."
+                                                    placeholder="Пример: вы senior hiring manager. Держите ответы краткими и задавайте один сфокусированный follow-up при необходимости."
                                                     rows={5}
                                                     className="w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2.5 text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary/50 focus:ring-1 focus:ring-accent-primary/20 transition-all resize-none leading-relaxed"
                                                 />
                                                 <div className="flex items-center justify-between px-0.5 mt-3">
                                                     <p className="text-[10px] text-text-tertiary">
-                                                        Auto-saved · Treated as user-provided context
+                                                        Автосохранение · Используется как пользовательский контекст
                                                     </p>
                                                     <span className={`text-[10px] tabular-nums ${persona.length > 3600 ? 'text-amber-500' : 'text-text-tertiary'}`}>
                                                         {persona.length}/4000
@@ -1068,11 +1068,11 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         <div className="flex items-center gap-2">
                                                             <h4 className="text-sm font-bold text-text-primary">Tavily Search API</h4>
                                                             {hasStoredTavilyKey && (
-                                                                <span className="text-[9px] font-bold text-emerald-500 px-1.5 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/20 uppercase tracking-wide">Connected</span>
+                                                                <span className="text-[9px] font-bold text-emerald-500 px-1.5 py-0.5 bg-emerald-500/10 rounded-full border border-emerald-500/20 uppercase tracking-wide">Подключено</span>
                                                             )}
                                                         </div>
                                                         <p className="text-[11px] text-text-secondary mt-0.5">
-                                                            Powers live web search for company research.
+                                                            Включает live web search для исследования компании.
                                                         </p>
                                                     </div>
                                                 </div>
@@ -1080,14 +1080,14 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                 <div className="space-y-3">
                                                     <div>
                                                         <div className="flex justify-between items-center mb-1.5">
-                                                            <label className="text-[10px] font-semibold text-text-secondary uppercase tracking-wide block">API Key</label>
+                                                            <label className="text-[10px] font-semibold text-text-secondary uppercase tracking-wide block">API-ключ</label>
                                                             {hasStoredTavilyKey && (
                                                                 <button
                                                                     onClick={handleRemoveTavilyKey}
                                                                     className="text-[10px] flex items-center gap-1 text-red-400 hover:text-red-300 transition-colors bg-red-500/10 hover:bg-red-500/20 px-1.5 py-0.5 rounded"
-                                                                    title="Remove API Key"
+                                                                    title="Удалить API-ключ"
                                                                 >
-                                                                    <Trash2 size={10} strokeWidth={2} /> Remove
+                                                                    <Trash2 size={10} strokeWidth={2} /> Удалить
                                                                 </button>
                                                             )}
                                                         </div>
@@ -1095,7 +1095,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                             type="password"
                                                             value={tavilyApiKey}
                                                             onChange={(e) => { setTavilyApiKey(e.target.value); setTavilyError(''); }}
-                                                            placeholder={hasStoredTavilyKey ? '••••••••••••' : 'Enter Tavily API key (tvly-...)'}
+                                                            placeholder={hasStoredTavilyKey ? '••••••••••••' : 'Введите API-ключ Tavily (tvly-...)'}
                                                             className="w-full bg-bg-input border border-border-subtle rounded-lg px-3 py-2 text-xs text-text-primary placeholder-text-tertiary focus:outline-none focus:border-accent-primary/50 focus:ring-1 focus:ring-accent-primary/20 transition-all"
                                                         />
                                                     </div>
@@ -1110,13 +1110,13 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                             try {
                                                                 const result = await window.electronAPI?.setTavilyApiKey?.(tavilyApiKey.trim());
                                                                 if (result && !result.success) {
-                                                                    setTavilyError(result.error ?? 'Failed to save API key.');
+                                                                    setTavilyError(result.error ?? 'Не удалось сохранить API-ключ.');
                                                                 } else {
                                                                     setHasStoredTavilyKey(true);
                                                                     setTavilyApiKey('');
                                                                 }
                                                             } catch (e: any) {
-                                                                setTavilyError(e?.message ?? 'Unexpected error saving API key.');
+                                                                setTavilyError(e?.message ?? 'Непредвиденная ошибка при сохранении API-ключа.');
                                                             } finally {
                                                                 setTavilySaving(false);
                                                             }
@@ -1125,14 +1125,14 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         primary={true}
                                                         className="w-full"
                                                     >
-                                                        {tavilySaving ? 'Saving...' : 'Save API Key'}
+                                                        {tavilySaving ? 'Сохранение...' : 'Сохранить API-ключ'}
                                                     </MagneticButton>
                                                 </div>
 
                                                 <div className="mt-3 flex items-start gap-2 px-3 py-2.5 bg-bg-input/50 rounded-lg">
                                                     <Info size={12} className="text-text-tertiary shrink-0 mt-0.5" />
                                                     <p className="text-[10px] text-text-tertiary leading-relaxed">
-                                                        If not provided, LLM general knowledge is used for company research, which may be outdated. Get your free API key at <span className="text-emerald-500/80 hover:text-emerald-400 underline underline-offset-2 cursor-pointer" onClick={() => window.electronAPI?.openExternal?.('https://app.tavily.com/home')}>app.tavily.com</span>. Keys start with <code className="text-emerald-500/80">tvly-</code>.
+                                                        Если ключ не указан, для исследования компании используется общее знание LLM, которое может устареть. Бесплатный API-ключ можно получить на <span className="text-emerald-500/80 hover:text-emerald-400 underline underline-offset-2 cursor-pointer" onClick={() => window.electronAPI?.openExternal?.('https://app.tavily.com/home')}>app.tavily.com</span>. Ключи начинаются с <code className="text-emerald-500/80">tvly-</code>.
                                                     </p>
                                                 </div>
                                             </div>
@@ -1149,12 +1149,12 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         <div>
                                                             <div className="flex items-center gap-2">
                                                                 <h4 className="text-sm font-bold text-text-primary">
-                                                                    Company Intel: <span className="text-purple-400">{profileData.activeJD.company}</span>
+                                                                    Аналитика компании: <span className="text-purple-400">{profileData.activeJD.company}</span>
                                                                 </h4>
-                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full tracking-widest uppercase bg-purple-500/15 text-purple-400 border border-purple-500/25">Beta</span>
+                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full tracking-widest uppercase bg-purple-500/15 text-purple-400 border border-purple-500/25">Бета</span>
                                                             </div>
                                                             <p className="text-[11px] text-text-secondary mt-0.5">
-                                                                {companyDossier ? 'Research complete' : 'Run research to get hiring strategy, salaries & competitors'}
+                                                                {companyDossier ? 'Исследование готово' : 'Запустите исследование, чтобы получить стратегию найма, зарплаты и конкурентов'}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -1172,7 +1172,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                     setCompanySearchQuotaExhausted(true);
                                                                 }
                                                             } catch (e) {
-                                                                console.error('Research failed:', e);
+                                                                console.error('Исследование не удалось:', e);
                                                             } finally {
                                                                 setCompanyResearching(false);
                                                             }
@@ -1180,7 +1180,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         disabled={companyResearching}
                                                     >
                                                         {companyResearching ? <RefreshCw size={14} className="animate-spin" /> : <Search size={14} />}
-                                                        {companyResearching ? 'Researching...' : companyDossier ? 'Refresh' : 'Research Now'}
+                                                        {companyResearching ? 'Исследуем...' : companyDossier ? 'Обновить' : 'Исследовать'}
                                                     </MagneticButton>
                                                 </div>
 
@@ -1189,7 +1189,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                     <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-amber-500/8 border border-amber-500/20 text-[11px] text-amber-400 leading-relaxed">
                                                         <span className="shrink-0 mt-[1px]">⚠</span>
                                                         <span>
-                                                            Web search credits exhausted — showing AI-only research instead. Add a Tavily key in settings to re-enable live search.
+                                                            Кредиты web search исчерпаны — показываем исследование только через AI. Добавьте ключ Tavily в настройках, чтобы снова включить live search.
                                                         </span>
                                                     </div>
                                                 )}
@@ -1201,7 +1201,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         {/* Hiring Strategy */}
                                                         {companyDossier.hiring_strategy && (
                                                             <div>
-                                                                <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-1">Hiring Strategy</div>
+                                                                <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-1">Стратегия найма</div>
                                                                 <p className="text-xs text-text-secondary leading-relaxed bg-bg-input p-3 rounded-lg">{companyDossier.hiring_strategy}</p>
                                                             </div>
                                                         )}
@@ -1210,7 +1210,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         {companyDossier.interview_focus && (
                                                             <div>
                                                                 <div className="flex items-center gap-2 mb-1">
-                                                                    <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide">Interview Focus</div>
+                                                                    <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide">Фокус интервью</div>
                                                                     {companyDossier.interview_difficulty && (
                                                                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
                                                                             companyDossier.interview_difficulty === 'easy' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
@@ -1229,7 +1229,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         {/* Salary Estimates */}
                                                         {companyDossier.salary_estimates?.length > 0 && (
                                                             <div>
-                                                                <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-1">Salary Estimates</div>
+                                                                <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-1">Оценки зарплаты</div>
                                                                 <div className="space-y-2 bg-bg-input p-3 rounded-lg">
                                                                     {companyDossier.salary_estimates.map((s: any, i: number) => (
                                                                         <div key={i} className="flex items-center justify-between pb-2 mb-2 border-b border-border-subtle last:border-0 last:pb-0 last:mb-0">
@@ -1252,7 +1252,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         {companyDossier.culture_ratings && typeof companyDossier.culture_ratings === 'object' &&
                                                           Object.values(companyDossier.culture_ratings).some(v => typeof v === 'number' && (v as number) > 0) && (
                                                             <div>
-                                                                <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-2">Work Culture</div>
+                                                                <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-2">Рабочая культура</div>
                                                                 <div className="bg-bg-input p-3 rounded-lg">
                                                                     {/* Overall score hero */}
                                                                     <div className="flex items-center justify-between mb-3 pb-3 border-b border-border-subtle">
@@ -1277,11 +1277,11 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                     {/* Sub-ratings grid */}
                                                                     <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                                                                         {[
-                                                                            { label: 'Work-Life Balance', key: 'work_life_balance' },
-                                                                            { label: 'Career Growth', key: 'career_growth' },
-                                                                            { label: 'Compensation', key: 'compensation' },
-                                                                            { label: 'Management', key: 'management' },
-                                                                            { label: 'Diversity & Inclusion', key: 'diversity' },
+                                                                            { label: 'Work-life balance', key: 'work_life_balance' },
+                                                                            { label: 'Карьерный рост', key: 'career_growth' },
+                                                                            { label: 'Компенсация', key: 'compensation' },
+                                                                            { label: 'Менеджмент', key: 'management' },
+                                                                            { label: 'Diversity & inclusion', key: 'diversity' },
                                                                         ].map(({ label, key }) => {
                                                                             const raw = (companyDossier.culture_ratings as any)[key];
                                                                             const val: number = typeof raw === 'number' ? raw : 0;
@@ -1303,7 +1303,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         {/* Employee Reviews */}
                                                         {companyDossier.employee_reviews?.length > 0 && (
                                                             <div>
-                                                                <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-2">Employee Reviews</div>
+                                                                <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-2">Отзывы сотрудников</div>
                                                                 <div className="space-y-2">
                                                                     {companyDossier.employee_reviews.map((r: any, i: number) => (
                                                                         <div key={i} className="bg-bg-input p-3 rounded-lg">
@@ -1327,7 +1327,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                             <div>
                                                                 <div className="flex items-center gap-1.5 mb-2">
                                                                     <AlertCircle size={11} className="text-orange-400" />
-                                                                    <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide">Common Complaints</div>
+                                                                    <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide">Частые жалобы</div>
                                                                 </div>
                                                                 <div className="space-y-2">
                                                                     {companyDossier.critics.map((c: any, i: number) => (
@@ -1354,7 +1354,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                             <div>
                                                                 <div className="flex items-center gap-1.5 mb-2">
                                                                     <Gift size={11} className="text-emerald-400" />
-                                                                    <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide">Benefits & Perks</div>
+                                                                    <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide">Бенефиты и привилегии</div>
                                                                 </div>
                                                                 <div className="flex flex-wrap gap-1.5">
                                                                     {companyDossier.benefits.map((b: string, i: number) => (
@@ -1367,7 +1367,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         {/* Core Values */}
                                                         {companyDossier.core_values?.length > 0 && (
                                                             <div>
-                                                                <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-2">Core Values</div>
+                                                                <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-2">Ключевые ценности</div>
                                                                 <div className="flex flex-wrap gap-1.5">
                                                                     {companyDossier.core_values.map((v: string, i: number) => (
                                                                         <span key={i} className="text-[11px] text-purple-400/90 px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/20">{v}</span>
@@ -1379,7 +1379,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         {/* Recent News */}
                                                         {companyDossier.recent_news && (
                                                             <div>
-                                                                <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-1">Recent News</div>
+                                                                <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-1">Свежие новости</div>
                                                                 <p className="text-xs text-text-secondary leading-relaxed bg-bg-input p-3 rounded-lg">{companyDossier.recent_news}</p>
                                                             </div>
                                                         )}
@@ -1387,7 +1387,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         {/* Competitors */}
                                                         {companyDossier.competitors?.length > 0 && (
                                                             <div>
-                                                                <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-2">Competitors</div>
+                                                                <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-2">Конкуренты</div>
                                                                 <div className="flex flex-wrap gap-2">
                                                                     {companyDossier.competitors.map((c: string, i: number) => (
                                                                         <span key={i} className="text-[11px] text-text-secondary px-2.5 py-1 rounded-full bg-bg-input flex items-center gap-1.5">
@@ -1409,7 +1409,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         <div className="mt-4 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-purple-500/5 border border-purple-500/15">
                                                             <span className="text-purple-400/70 mt-px shrink-0">⚠</span>
                                                             <p className="text-[10px] text-text-tertiary leading-relaxed">
-                                                                <span className="font-semibold text-purple-400/80">Beta feature.</span> Company research is AI-generated and may contain inaccuracies. Verify salary figures and hiring details independently before use.
+                                                                <span className="font-semibold text-purple-400/80">Бета-функция.</span> Исследование компании сгенерировано AI и может содержать неточности. Перед использованием проверяйте зарплатные вилки и детали найма самостоятельно.
                                                             </p>
                                                         </div>
                                                     </div>
@@ -1437,9 +1437,9 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                 )}
                                                             </div>
                                                             <div>
-                                                                <h3 className="text-[13px] font-bold text-text-primary tracking-tight">Negotiation Script</h3>
+                                                                <h3 className="text-[13px] font-bold text-text-primary tracking-tight">Скрипт переговоров</h3>
                                                                 <p className="text-[10px] text-text-tertiary mt-0.5 tracking-wide uppercase">
-                                                                    {negotiationScript ? `Tailored for ${profileData?.activeJD?.company || 'this role'}` : 'AI-powered salary coaching'}
+                                                                    {negotiationScript ? `Адаптировано под ${profileData?.activeJD?.company || 'эту роль'}` : 'AI-коучинг по зарплатным переговорам'}
                                                                 </p>
                                                             </div>
                                                         </div>
@@ -1454,13 +1454,13 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                             if (result?.success && result.script) {
                                                                                 setNegotiationScript(result.script);
                                                                             } else {
-                                                                                setNegotiationError(result?.error || 'Failed to regenerate');
+                                                                                setNegotiationError(result?.error || 'Не удалось перегенерировать');
                                                                             }
-                                                                        } catch { setNegotiationError('Generation failed'); }
+                                                                        } catch { setNegotiationError('Генерация не удалась'); }
                                                                         finally { setNegotiationGenerating(false); }
                                                                     }}
                                                                     disabled={negotiationGenerating}
-                                                                    title="Regenerate script"
+                                                                    title="Перегенерировать скрипт"
                                                                     className="w-7 h-7 rounded-lg flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-bg-input transition-all border border-border-subtle"
                                                                 >
                                                                     <RefreshCw size={12} className={negotiationGenerating ? 'animate-spin' : ''} />
@@ -1476,9 +1476,9 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                             if (result?.success && result.script) {
                                                                                 setNegotiationScript(result.script);
                                                                             } else {
-                                                                                setNegotiationError(result?.error || 'Failed to generate');
+                                                                                setNegotiationError(result?.error || 'Не удалось сгенерировать');
                                                                             }
-                                                                        } catch { setNegotiationError('Generation failed'); }
+                                                                        } catch { setNegotiationError('Генерация не удалась'); }
                                                                         finally { setNegotiationGenerating(false); }
                                                                     }}
                                                                     disabled={negotiationGenerating}
@@ -1486,7 +1486,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                     style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(6,182,212,0.15) 100%)', border: '1px solid rgba(16,185,129,0.3)', color: '#34d399' }}
                                                                 >
                                                                     {negotiationGenerating ? <RefreshCw size={11} className="animate-spin" /> : <Sparkles size={11} />}
-                                                                    {negotiationGenerating ? 'Generating…' : 'Generate Script'}
+                                                                    {negotiationGenerating ? 'Генерация…' : 'Сгенерировать скрипт'}
                                                                 </MagneticButton>
                                                             )}
                                                         </div>
@@ -1506,8 +1506,8 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                 <Briefcase size={20} className="text-emerald-500/50" />
                                                             </div>
                                                             <div className="text-center">
-                                                                <p className="text-[12px] font-medium text-text-secondary">No script yet</p>
-                                                                <p className="text-[10px] text-text-tertiary mt-0.5">Generate a personalized opening, justification &amp; counter-offer</p>
+                                                                <p className="text-[12px] font-medium text-text-secondary">Скрипта пока нет</p>
+                                                                <p className="text-[10px] text-text-tertiary mt-0.5">Сгенерируйте персональное вступление, обоснование и counter-offer</p>
                                                             </div>
                                                         </div>
                                                     )}
@@ -1536,14 +1536,14 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                             {negotiationScript.salary_range && (
                                                                 <div className="rounded-xl p-4 flex items-center justify-between" style={{ background: 'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(6,182,212,0.06) 100%)', border: '1px solid rgba(16,185,129,0.18)' }}>
                                                                     <div>
-                                                                        <div className="text-[9px] font-bold uppercase tracking-widest text-emerald-500/70 mb-1">Target Compensation</div>
+                                                                        <div className="text-[9px] font-bold uppercase tracking-widest text-emerald-500/70 mb-1">Целевая компенсация</div>
                                                                         <div className="text-xl font-bold tracking-tight" style={{ color: '#34d399' }}>
                                                                             {negotiationScript.salary_range.currency} {negotiationScript.salary_range.min.toLocaleString()}
                                                                             <span className="text-text-tertiary font-normal mx-2">–</span>
                                                                             {negotiationScript.salary_range.max.toLocaleString()}
                                                                         </div>
                                                                         {negotiationScript.sources?.length > 0 && (
-                                                                            <div className="text-[9px] text-text-tertiary mt-1">{negotiationScript.sources.length} market source{negotiationScript.sources.length > 1 ? 's' : ''}</div>
+                                                                            <div className="text-[9px] text-text-tertiary mt-1">{negotiationScript.sources.length} рыночн. источн.</div>
                                                                         )}
                                                                     </div>
                                                                     <span className={`text-[9px] font-bold px-2 py-1 rounded-full tracking-wide ${
@@ -1560,8 +1560,8 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                             {[
                                                                 {
                                                                     step: '01',
-                                                                    label: 'Opening',
-                                                                    sublabel: 'When asked about salary expectations',
+                                                                    label: 'Вступление',
+                                                                    sublabel: 'Когда спрашивают о зарплатных ожиданиях',
                                                                     content: negotiationScript.opening_line,
                                                                     accent: '#10b981',
                                                                     accentBg: 'rgba(16,185,129,0.07)',
@@ -1570,8 +1570,8 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                 },
                                                                 {
                                                                     step: '02',
-                                                                    label: 'Justify Your Ask',
-                                                                    sublabel: 'Link your track record to the number',
+                                                                    label: 'Обосновать запрос',
+                                                                    sublabel: 'Свяжите свой опыт с цифрой',
                                                                     content: negotiationScript.justification,
                                                                     accent: '#60a5fa',
                                                                     accentBg: 'rgba(96,165,250,0.07)',
@@ -1580,8 +1580,8 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                 },
                                                                 {
                                                                     step: '03',
-                                                                    label: 'Counter & Hold',
-                                                                    sublabel: 'If they come back lower',
+                                                                    label: 'Counter-offer и удержание',
+                                                                    sublabel: 'Если они возвращаются с меньшей суммой',
                                                                     content: negotiationScript.counter_offer_fallback,
                                                                     accent: '#fb923c',
                                                                     accentBg: 'rgba(251,146,60,0.07)',
@@ -1592,16 +1592,16 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                 <div key={s.step} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${s.accentBorder}`, background: s.accentBg }}>
                                                                     <div className="flex items-center justify-between px-3.5 pt-3 pb-2">
                                                                         <div className="flex items-center gap-2">
-                                                                            <span className="text-[10px] font-black tracking-widest" style={{ color: s.accent, opacity: 0.6 }}>STEP {s.step}</span>
+                                                                            <span className="text-[10px] font-black tracking-widest" style={{ color: s.accent, opacity: 0.6 }}>ШАГ {s.step}</span>
                                                                             <span className="text-[11px] font-bold text-text-primary">{s.label}</span>
                                                                         </div>
                                                                         <button
                                                                             onClick={() => navigator.clipboard?.writeText(s.content)}
-                                                                            title="Copy to clipboard"
+                                                                            title="Скопировать в буфер"
                                                                             className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-medium transition-all hover:bg-bg-input text-text-tertiary hover:text-text-secondary"
                                                                         >
                                                                             <Check size={9} />
-                                                                            Copy
+                                                                            Копировать
                                                                         </button>
                                                                     </div>
                                                                     <p className="text-[10px] text-text-tertiary px-3.5 pb-2 -mt-1 tracking-wide">{s.sublabel}</p>

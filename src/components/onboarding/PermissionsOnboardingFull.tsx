@@ -12,6 +12,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { X, Monitor, Mic, Lightbulb, Check, AlertCircle, ArrowRight, Lock } from 'lucide-react';
 import openOfferIcon from '../../../assets/icon.png';
+import { useTranslation } from 'react-i18next';
 
 const STORAGE_KEY  = 'natively_perms_shown_v1';
 
@@ -193,6 +194,7 @@ function PermRow({
 
 // ─── Main PermissionsOnboardingFull Component ───────────────────
 export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }) => {
+  const { t } = useTranslation();
   const [platform,   setPlatform]   = useState<string>('darwin');
   const [micStatus,  setMicStatus]  = useState<PermStatus>('loading');
   const [scrStatus,  setScrStatus]  = useState<PermStatus>('loading');
@@ -266,20 +268,20 @@ export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }
   const getButtonConfig = () => {
     if (platform === 'darwin' && scrStatus !== 'granted') {
       return {
-        label: 'Open screen settings',
+        label: t('onboarding.openScreenSettings'),
         action: openScreenSettings,
         active: true,
       };
     }
     if (micStatus !== 'granted') {
       return {
-        label: requesting ? 'Requesting access…' : 'Request microphone access',
+        label: requesting ? t('onboarding.requestingAccess') : t('onboarding.requestMicrophoneAccess'),
         action: handleMicRequest,
         active: !requesting,
       };
     }
     return {
-      label: 'All set — continue',
+      label: t('onboarding.allSetContinue'),
       action: handleDismiss,
       active: true,
     };
@@ -343,7 +345,7 @@ export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }
             <motion.div variants={itemVariants} style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
               <button 
                 onClick={handleDismiss} 
-                aria-label="Skip for now"
+                aria-label={t('onboarding.skipForNow')}
                 style={{
                   background: 'none',
                   border: 'none',
@@ -359,7 +361,7 @@ export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }
                 onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.backgroundColor = '#F4F5F7'; }}
                 onMouseLeave={e => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.backgroundColor = 'transparent'; }}
               >
-                Skip for now
+                {t('onboarding.skipForNow')}
               </button>
             </motion.div>
 
@@ -377,7 +379,7 @@ export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }
                   fontFamily: "'Inter', sans-serif",
                 }}
               >
-                Let's get you set up
+                {t('onboarding.setupTitle')}
               </motion.h2>
               <motion.p
                 variants={itemVariants}
@@ -389,7 +391,7 @@ export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }
                   fontFamily: "'Inter', sans-serif",
                 }}
               >
-                Allow OpenOffer the following system accesses to enable local recording, real-time assist tools, and seamless audio transcriptions.
+                {t('onboarding.setupDescription')}
               </motion.p>
 
               {/* High-Fidelity Permission list items */}
@@ -398,8 +400,8 @@ export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }
                 {/* Item 1: Assist Toggle */}
                 <PermRow
                   icon={Lightbulb}
-                  label="Allow OpenOffer to assist"
-                  description="OpenOffer can prompt you to start taking notes when you join a meeting."
+                  label={t('onboarding.assistTitle')}
+                  description={t('onboarding.assistDescription')}
                   checked={assistActive}
                   onToggle={() => setAssistActive(!assistActive)}
                   hasBadge={true}
@@ -408,8 +410,8 @@ export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }
                 {/* Item 2: Microphone Permission */}
                 <PermRow
                   icon={Mic}
-                  label="Allow OpenOffer to hear you"
-                  description="OpenOffer needs to capture your voice to transcribe your meetings in real-time."
+                  label={t('onboarding.hearTitle')}
+                  description={t('onboarding.hearDescription')}
                   checked={micStatus === 'granted'}
                   onToggle={micStatus !== 'granted' ? handleMicRequest : () => {}}
                   hasBadge={true}
@@ -418,8 +420,8 @@ export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }
                 {/* Item 3: Screen Capture Permission */}
                 <PermRow
                   icon={Monitor}
-                  label="Allow OpenOffer to see your screen"
-                  description="OpenOffer can answer questions about what you're viewing."
+                  label={t('onboarding.seeTitle')}
+                  description={t('onboarding.seeDescription')}
                   checked={scrStatus === 'granted'}
                   onToggle={openScreenSettings}
                 />
@@ -580,7 +582,7 @@ export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }
                     lineHeight: 1.35,
                     fontFamily: "'Inter', sans-serif",
                   }}>
-                    "OpenOffer" would like to record this computer's screen and audio.
+                    {t('onboarding.systemDialogRequest')}
                   </div>
                   <div style={{
                     fontSize: '10px',
@@ -588,7 +590,7 @@ export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }
                     lineHeight: 1.4,
                     fontFamily: "'Inter', sans-serif",
                   }}>
-                    Grant access to this application in Privacy & Security settings, located in System Settings.
+                    {t('onboarding.systemDialogDescription')}
                   </div>
                 </div>
               </div>
@@ -612,7 +614,7 @@ export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }
                   onMouseEnter={e => e.currentTarget.style.backgroundColor = '#E5E7EB'}
                   onMouseLeave={e => e.currentTarget.style.backgroundColor = '#F3F4F6'}
                 >
-                  Open System Settings
+                  {t('onboarding.openSystemSettings')}
                 </button>
                 <button
                   onClick={handleDismiss}
@@ -631,7 +633,7 @@ export const PermissionsOnboardingFull: React.FC<Props> = ({ isOpen, onDismiss }
                   onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
                   onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                 >
-                  Deny
+                  {t('onboarding.deny')}
                 </button>
               </div>
             </div>

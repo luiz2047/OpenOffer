@@ -58,19 +58,19 @@ test('Yandex requests keep folder URI expansion and data logging header in runti
   assert.doesNotMatch(settings, /gpt:\/\//);
 });
 
-test('Yandex settings and model selector surface user-facing answer styles', () => {
+test('Yandex settings and model selector surface localized user-facing answer styles', () => {
   const settings = fs.readFileSync(path.join(repoRoot, 'src/components/settings/AIProvidersSettings.tsx'), 'utf8');
   const modelSelector = fs.readFileSync(path.join(repoRoot, 'src/components/ui/ModelSelector.tsx'), 'utf8');
   const preload = fs.readFileSync(path.join(repoRoot, 'electron/preload.ts'), 'utf8');
 
-  assert.match(settings, /Answer styles/);
-  assert.match(settings, /Answer style/);
+  assert.match(settings, /Стили ответа/);
+  assert.match(settings, /Стиль ответа/);
   assert.match(settings, /getAnswerStylePacks/);
   assert.match(settings, /setAnswerStylePack/);
   assert.doesNotMatch(settings, /RU prompt pack/);
   assert.doesNotMatch(settings, /Prompt pack/);
   assert.doesNotMatch(settings, /lg:min-w-\[210px\]/);
-  assert.match(modelSelector, /Answer style/);
+  assert.match(modelSelector, /modelSelectorInline\.answerStyle/);
   assert.match(modelSelector, /getAnswerStylePacks/);
   assert.match(modelSelector, /setAnswerStylePack/);
   assert.doesNotMatch(modelSelector, /currentModel\.startsWith\('yandex\/'\)\s*&&\s*\(/);

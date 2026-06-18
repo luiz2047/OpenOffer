@@ -220,7 +220,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
     }, [selectedMeeting, isGlobalChatOpen, onPageChange]);
 
     if (!window.electronAPI) {
-        return <div className="text-white p-10">Error: Electron API not initialized. Check preload script.</div>;
+        return <div className="text-white p-10">Ошибка: Electron API не инициализирован. Проверьте preload-скрипт.</div>;
     }
 
     const handleOpenMeeting = async (meeting: Meeting) => {

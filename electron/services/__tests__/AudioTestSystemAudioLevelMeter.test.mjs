@@ -33,11 +33,13 @@ const mainPath = path.join(root, 'electron/main.ts');
 const preloadPath = path.join(root, 'electron/preload.ts');
 const dtsPath = path.join(root, 'src/types/electron.d.ts');
 const overlayPath = path.join(root, 'src/components/SettingsOverlay.tsx');
+const resourcesPath = path.join(root, 'src/i18n/resources.ts');
 
 const mainSrc = fs.readFileSync(mainPath, 'utf8');
 const preloadSrc = fs.readFileSync(preloadPath, 'utf8');
 const dtsSrc = fs.readFileSync(dtsPath, 'utf8');
 const overlaySrc = fs.readFileSync(overlayPath, 'utf8');
+const resourcesSrc = fs.readFileSync(resourcesPath, 'utf8');
 
 // Balanced-brace extractor for a function body. Walks forward from the
 // opening `{`, honoring //, /* */, and string literals. Mirrors the
@@ -223,10 +225,10 @@ describe('UX4: audio test probes system audio in parallel with the mic', () => {
     );
   });
 
-  it('9. SettingsOverlay.tsx renders the literal "System Audio Level" label', () => {
+  it('9. SettingsOverlay.tsx renders the localized system audio level label', () => {
     assert.ok(
-      overlaySrc.includes('System Audio Level'),
-      'BUG (UX4 REGRESSION): SettingsOverlay.tsx no longer renders the literal "System Audio Level" label next to the level bar. Without this label users cannot distinguish the system meter from the mic meter — the entire point of the UX4 fix is to surface system-audio health PARALLEL to mic health.',
+      overlaySrc.includes('settings.audio.systemAudioLevel') && resourcesSrc.includes('Уровень системного аудио'),
+      'BUG (UX4 REGRESSION): SettingsOverlay.tsx no longer renders the localized System Audio Level label next to the level bar. Without this label users cannot distinguish the system meter from the mic meter — the entire point of the UX4 fix is to surface system-audio health PARALLEL to mic health.',
     );
   });
 

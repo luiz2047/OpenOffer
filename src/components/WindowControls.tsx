@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Minus, X } from 'lucide-react';
 import { isMac } from '../utils/platformUtils';
+import { useTranslation } from 'react-i18next';
 
 /**
  * WindowControls — Custom minimize / maximize / close buttons.
@@ -14,6 +15,7 @@ const WindowControls: React.FC = () => {
   if (isMac) return null;
 
   // Hooks — only reachable on Windows / Linux
+  const { t } = useTranslation();
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
@@ -43,14 +45,14 @@ const WindowControls: React.FC = () => {
       <button
         onClick={handleMinimize}
         className="flex items-center justify-center w-[46px] h-full border-0 bg-transparent text-text-secondary hover:text-text-primary hover:bg-white/10 transition-colors duration-100"
-        title="Minimize"
+        title={t('windowControls.minimize')}
       >
         <Minus size={16} strokeWidth={1.5} />
       </button>
       <button
         onClick={handleMaximize}
         className="flex items-center justify-center w-[46px] h-full border-0 bg-transparent text-text-secondary hover:text-text-primary hover:bg-white/10 transition-colors duration-100"
-        title={isMaximized ? 'Restore' : 'Maximize'}
+        title={isMaximized ? t('windowControls.restore') : t('windowControls.maximize')}
       >
         {isMaximized ? (
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -66,7 +68,7 @@ const WindowControls: React.FC = () => {
       <button
         onClick={handleClose}
         className="flex items-center justify-center w-[46px] h-full border-0 bg-transparent text-text-secondary hover:text-white hover:bg-red-500 transition-colors duration-100"
-        title="Close"
+        title={t('common.close')}
       >
         <X size={16} strokeWidth={1.5} />
       </button>
