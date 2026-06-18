@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import nativelyLogo from "../assets/logo.webp";
+import openOfferLogo from "../assets/logo.webp";
 import { getModifierSymbol } from "../utils/platformUtils";
 
 const DARK_GLASS = {
@@ -65,7 +65,7 @@ const NativelyInterfaceCard = ({ className = "", isMobile = false, isStatic = fa
             {/* Logo */}
             <div className="w-8 h-8 rounded-full flex items-center justify-center relative overflow-hidden" style={DARK_GLASS}>
               {GLOSS}
-              <img src={nativelyLogo} alt="OpenOffer" className="w-[28px] h-[28px] object-contain relative" draggable={false} />
+              <img src={openOfferLogo} alt="OpenOffer" className="w-[28px] h-[28px] object-contain relative" draggable={false} />
             </div>
 
             {/* Hide */}

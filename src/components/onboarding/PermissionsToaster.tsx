@@ -11,7 +11,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { X, Monitor, Mic, Settings } from 'lucide-react';
-import nativelyIcon from '../../../assets/icon.png';
+import openOfferIcon from '../../../assets/icon.png';
 import { useResolvedTheme } from '../../hooks/useResolvedTheme';
 
 const STORAGE_KEY  = 'natively_perms_shown_v1';
@@ -87,7 +87,7 @@ export const PermissionsToaster: React.FC<Props> = ({ isOpen, onDismiss }) => {
     step1BoxShadow: isLight 
       ? '0 16px 36px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.04)' 
       : '0 24px 50px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.1)',
-    step1NativelyShadow: isLight ? '0 4px 10px rgba(0,0,0,0.12)' : '0 4px 12px rgba(0,0,0,0.4)',
+    step1OpenOfferShadow: isLight ? '0 4px 10px rgba(0,0,0,0.12)' : '0 4px 12px rgba(0,0,0,0.4)',
     step1TextPrimary: isLight ? '#1C1C1E' : '#FFFFFF',
     step1TextMuted: isLight ? 'rgba(0,0,0,0.48)' : 'rgba(255,255,255,0.4)',
     step1BtnBg: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.08)',
@@ -220,7 +220,7 @@ export const PermissionsToaster: React.FC<Props> = ({ isOpen, onDismiss }) => {
                 {/* Header row */}
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: '24px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <img src={nativelyIcon} alt="OpenOffer" style={{ width: '18px', height: '18px', borderRadius: '4px', flexShrink: 0 }} />
+                    <img src={openOfferIcon} alt="OpenOffer" style={{ width: '18px', height: '18px', borderRadius: '4px', flexShrink: 0 }} />
                     <span style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: t3 }}>
                       Permissions
                     </span>
@@ -384,7 +384,7 @@ export const PermissionsToaster: React.FC<Props> = ({ isOpen, onDismiss }) => {
                           transition={{ repeat: Infinity, duration: 2.8, ease: "easeInOut" }}
                           style={{ width: '32px', height: '32px', flexShrink: 0 }}
                         >
-                          <img src={nativelyIcon} alt="OpenOffer" style={{ width: '32px', height: '32px', borderRadius: '7px', boxShadow: colors.step1NativelyShadow }} />
+                          <img src={openOfferIcon} alt="OpenOffer" style={{ width: '32px', height: '32px', borderRadius: '7px', boxShadow: colors.step1OpenOfferShadow }} />
                         </motion.div>
                         
                         {/* Prompt Text */}
@@ -441,7 +441,7 @@ export const PermissionsToaster: React.FC<Props> = ({ isOpen, onDismiss }) => {
                     >
                       {/* Left app icon well */}
                       <div style={{ width: '22px', height: '22px', borderRadius: '5px', background: colors.step2IconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: colors.step2IconBorder }}>
-                        <img src={nativelyIcon} alt="OpenOffer" style={{ width: '14px', height: '14px', borderRadius: '3px' }} />
+                        <img src={openOfferIcon} alt="OpenOffer" style={{ width: '14px', height: '14px', borderRadius: '3px' }} />
                       </div>
                       {/* Label */}
                       <span style={{ fontSize: '10px', fontWeight: 550, color: colors.step2Text, flex: 1, letterSpacing: '-0.01em' }}>

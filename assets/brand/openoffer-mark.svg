@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="OpenOffer logo mark">
+  <defs>
+    <linearGradient id="openoffer-ring" x1="182" y1="182" x2="842" y2="842" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5EEAD4"/>
+      <stop offset="0.48" stop-color="#F8FAFC"/>
+      <stop offset="1" stop-color="#A78BFA"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="#0B1020"/>
+  <circle
+    cx="512"
+    cy="512"
+    r="330"
+    fill="none"
+    stroke="url(#openoffer-ring)"
+    stroke-width="78"
+    stroke-linecap="round"
+    stroke-dasharray="1540 285"
+    transform="rotate(-34 512 512)"
+  />
+  <path
+    d="M368 350 L632 350 C682 350 716 384 716 434 L716 514"
+    fill="none"
+    stroke="#F8FAFC"
+    stroke-width="70"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M656 674 L392 674 C342 674 308 640 308 590 L308 510"
+    fill="none"
+    stroke="#F8FAFC"
+    stroke-width="70"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>
