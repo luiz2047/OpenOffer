@@ -11,6 +11,7 @@ import type {
   InterviewQuestion,
   InterviewQuestionPayload,
   InterviewRetro,
+  InterviewRetroEvaluation,
   InterviewRetroPayload,
   InterviewSourceParseResult,
   InterviewUpdatePatch,
@@ -85,6 +86,14 @@ export const interviewApi = {
     return unwrap(await requireBridge().interviewsGetRetroPrompt(interviewId));
   },
 
+  async getRetroEvaluation(interviewId: string): Promise<InterviewRetroEvaluation | null> {
+    return unwrap(await requireBridge().interviewsGetRetroEvaluation(interviewId));
+  },
+
+  async generateRetroEvaluation(interviewId: string): Promise<InterviewRetroEvaluation> {
+    return unwrap(await requireBridge().interviewsGenerateRetroEvaluation(interviewId));
+  },
+
   async updateRetroPrompt(interviewId: string, payload: RetroPromptActionPayload): Promise<RetroPromptDecision> {
     return unwrap(await requireBridge().interviewsUpdateRetroPrompt(interviewId, payload));
   },
@@ -123,10 +132,10 @@ export const applicationApi = {
     return unwrap(await requireBridge().applicationsGet(id));
   },
 
-  async createFromIntake(intake: ApplicationIntakeResult): Promise<ApplicationCreateFromIntakeResult> {
+  async createFromIntake(intake: ApplicationIntakeResult, options?: { selectedApplicationId?: string | null }): Promise<ApplicationCreateFromIntakeResult> {
     return unwrap(await requireBridge().applicationsCreateFromIntake(
       newOperationId('applications:create-from-intake'),
-      { intake },
+      { intake, selectedApplicationId: options?.selectedApplicationId ?? null },
     ));
   },
 };

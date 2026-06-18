@@ -10,6 +10,7 @@ import type {
   InterviewQuestion,
   InterviewQuestionPayload,
   InterviewRetro,
+  InterviewRetroEvaluation,
   InterviewRetroPayload,
   InterviewSourceParseInput,
   InterviewSourceParseResult,
@@ -47,6 +48,30 @@ interface InterfaceTranslationsSnapshot {
   translationsPath: string;
   locales: InterfaceLocaleOption[];
   resources: Record<string, Record<string, unknown>>;
+}
+
+type AiTask = 'chat' | 'vacancy_intake' | 'scraping' | 'retro' | 'agent_actions';
+type TaskModelMode = 'default' | 'auto' | 'pinned';
+
+interface TaskModelPolicy {
+  version: 1;
+  defaultModelId: string | null;
+  seededFromProviderPreferred?: boolean;
+  tasks: Partial<Record<AiTask, {
+    mode: TaskModelMode;
+    modelId?: string;
+    quality?: 'fast' | 'balanced' | 'quality';
+  }>>;
+  updatedAt: string;
+}
+
+interface TaskModelResolution {
+  task: AiTask;
+  requestedMode: TaskModelMode;
+  resolvedModelId: string | null;
+  availability: 'available' | 'missing_credentials' | 'provider_disabled' | 'model_unavailable';
+  fallbackUsed: boolean;
+  warnings: string[];
 }
 
 // Types for the exposed Electron API
@@ -402,6 +427,9 @@ interface ElectronAPI {
   getDefaultModel: () => Promise<{ model: string }>;
   setModel: (modelId: string) => Promise<{ success: boolean; error?: string }>;
   setDefaultModel: (modelId: string) => Promise<{ success: boolean; error?: string }>;
+  getTaskModelPolicy: () => Promise<TaskModelPolicy>;
+  setTaskModelPolicy: (policy: TaskModelPolicy) => Promise<{ success: boolean; policy?: TaskModelPolicy; error?: string }>;
+  resolveModelForTask: (task: AiTask, options?: { overrideModelId?: string | null }) => Promise<TaskModelResolution>;
   getYandexPromptPacks: () => Promise<{
     selectedId?: string;
     recommendedId: string;
@@ -859,6 +887,8 @@ interface ElectronAPI {
   interviewsCreateCalendarEvent: (interviewId: string, provider: 'google' | 'macos') => Promise<InterviewIpcResult<InterviewDetail>>;
   interviewsGetReadiness: (interviewId: string) => Promise<InterviewIpcResult<ReadinessResult>>;
   interviewsGetRetroPrompt: (interviewId: string) => Promise<InterviewIpcResult<RetroPromptDecision>>;
+  interviewsGetRetroEvaluation: (interviewId: string) => Promise<InterviewIpcResult<InterviewRetroEvaluation | null>>;
+  interviewsGenerateRetroEvaluation: (interviewId: string) => Promise<InterviewIpcResult<InterviewRetroEvaluation>>;
   interviewsUpdateRetroPrompt: (interviewId: string, payload: RetroPromptActionPayload) => Promise<InterviewIpcResult<RetroPromptDecision>>;
   vacancyDossierSave: (interviewId: string, operationId: string, payload: VacancyDossierPayload) => Promise<InterviewIpcResult<VacancyDossier>>;
   prepBriefSave: (interviewId: string, operationId: string, payload: PrepBriefPayload) => Promise<InterviewIpcResult<PrepBrief>>;
@@ -1704,6 +1734,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getDefaultModel: () => ipcRenderer.invoke('get-default-model'),
   setModel: (modelId: string) => ipcRenderer.invoke('set-model', modelId),
   setDefaultModel: (modelId: string) => ipcRenderer.invoke('set-default-model', modelId),
+  getTaskModelPolicy: () => ipcRenderer.invoke('get-task-model-policy'),
+  setTaskModelPolicy: (policy: TaskModelPolicy) => ipcRenderer.invoke('set-task-model-policy', policy),
+  resolveModelForTask: (task: AiTask, options?: { overrideModelId?: string | null }) =>
+    ipcRenderer.invoke('resolve-model-for-task', task, options),
   getAnswerStylePacks: (scope?: { provider?: string; modelId?: string }) => ipcRenderer.invoke('get-answer-style-packs', scope),
   setAnswerStylePack: (styleId?: string, scope?: { provider?: string; modelId?: string }) => ipcRenderer.invoke('set-answer-style-pack', styleId, scope),
   getYandexPromptPacks: () => ipcRenderer.invoke('get-yandex-prompt-packs'),
@@ -2228,6 +2262,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('interviews:get-readiness', interviewId),
   interviewsGetRetroPrompt: (interviewId: string) =>
     ipcRenderer.invoke('interviews:get-retro-prompt', interviewId),
+  interviewsGetRetroEvaluation: (interviewId: string) =>
+    ipcRenderer.invoke('interviews:get-retro-evaluation', interviewId),
+  interviewsGenerateRetroEvaluation: (interviewId: string) =>
+    ipcRenderer.invoke('interviews:generate-retro-evaluation', interviewId),
   interviewsUpdateRetroPrompt: (interviewId: string, payload: RetroPromptActionPayload) =>
     ipcRenderer.invoke('interviews:update-retro-prompt', interviewId, payload),
   vacancyDossierSave: (interviewId: string, operationId: string, payload: VacancyDossierPayload) =>

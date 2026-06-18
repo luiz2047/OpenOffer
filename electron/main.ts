@@ -1048,14 +1048,39 @@ export class AppState {
         // Join ALL content parts (some callers — e.g. live negotiation coaching —
         // pass [{text: systemPrefix}, {text: prompt}]; reading only [0] dropped the
         // prompt). Single-item callers (extraction, script) are unaffected.
-        const joinContents = (contents: any[]) =>
-          (Array.isArray(contents) ? contents : [contents])
-            .map((c: any) => (typeof c === 'string' ? c : c?.text || ''))
-            .filter(Boolean)
-            .join('\n\n');
-        this.knowledgeOrchestrator.setGenerateContentFn(async (contents: any[]) => {
-          return await llmHelper.generateContentStructured(joinContents(contents));
-        });
+	        const joinContents = (contents: any[]) =>
+	          (Array.isArray(contents) ? contents : [contents])
+	            .map((c: any) => (typeof c === 'string' ? c : c?.text || ''))
+	            .filter(Boolean)
+	            .join('\n\n');
+	        const generateStructuredForTask = async (task: 'scraping', contents: any[], preferFast = false) => {
+	          const prompt = joinContents(contents);
+	          try {
+	            const { CredentialsManager } = require('./services/CredentialsManager');
+	            const { resolveTaskModel } = require('./services/TaskModelPolicy');
+	            const cm = CredentialsManager.getInstance();
+	            const resolution = resolveTaskModel(task, cm.getTaskModelPolicy(), cm.getAllCredentials());
+	            if (
+	              resolution.resolvedModelId
+	              && resolution.availability === 'available'
+	              && typeof llmHelper.generateContentStructuredForModel === 'function'
+	            ) {
+	              return await llmHelper.generateContentStructuredForModel(prompt, {
+	                modelId: resolution.resolvedModelId,
+	                preferFast,
+	              });
+	            }
+	            if (resolution.warnings?.length) {
+	              console.warn(`[AppState] Structured ${task} model policy unavailable: ${resolution.warnings.join(' ')}`);
+	            }
+	          } catch (error: any) {
+	            console.warn(`[AppState] Structured ${task} model policy failed: ${error?.message || error}`);
+	          }
+	          return await llmHelper.generateContentStructured(prompt, { preferFast });
+	        };
+	        this.knowledgeOrchestrator.setGenerateContentFn(async (contents: any[]) => {
+	          return await generateStructuredForTask('scraping', contents);
+	        });
 
         // Low-latency generation for LIVE negotiation coaching (spoken in real
         // time): Flash-first chain so the tactical note appears fast. The AOT

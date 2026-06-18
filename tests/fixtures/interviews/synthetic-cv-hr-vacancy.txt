@@ -1,0 +1,12 @@
+Employer: Orbit Vision Lab
+Meeting organizer: Example Hiring Team
+Role: Senior / Middle+ Machine Learning Engineer (Computer Vision, Python)
+Source URL: https://example.com/vacancy/orbit-vision-ml
+Format: remote, full-time, 5/2, Moscow time overlap
+Interview: 2026-06-10 14:00-15:00 MSK, video link redacted
+Calendar title: ML computer vision interview
+
+Project: production computer-vision services for image and video processing.
+Tasks: develop image/video services, integrate CV models into production, process video streams, prepare datasets, improve detection/tracking algorithms, optimize CPU/GPU pipelines.
+Requirements: Python 3.x, 3+ years computer vision, OpenCV, PyTorch/TensorFlow, NumPy, object detection, tracking, dataset labeling, streaming protocols, async/multithreading, Git.
+Nice to have: ONNX Runtime, TensorRT, OpenVINO, high-load systems.

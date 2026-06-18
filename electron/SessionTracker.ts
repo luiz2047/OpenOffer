@@ -50,6 +50,8 @@ export class SessionTracker {
         title?: string;
         calendarEventId?: string;
         interviewEventId?: string;
+        interviewStageId?: string;
+        applicationId?: string;
         source?: 'manual' | 'calendar';
     } | null = null;
 

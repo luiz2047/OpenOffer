@@ -211,6 +211,7 @@ export interface ApplicationDetail extends ApplicationRecord {
   selectedStageId?: string | null;
   legacyInterviewEventId?: string | null;
   dossier?: VacancyDossier | null;
+  linkedMeetings?: LinkedMeeting[];
 }
 
 export type IntakeClassification =
@@ -220,11 +221,14 @@ export type IntakeClassification =
   | 'calendar_only'
   | 'unknown';
 
+export type ApplicationIntakeTask = 'vacancy_intake' | 'scraping' | 'agent_actions';
+
 export interface ApplicationIntakeInput {
   text: string;
   sourceHint?: 'telegram' | 'hh' | 'getmatch' | 'email' | 'calendar' | 'browser' | 'manual';
   candidateApplicationIds?: string[];
   useAi?: boolean;
+  task?: ApplicationIntakeTask;
 }
 
 export interface ApplicationIntakeResult {
@@ -234,6 +238,7 @@ export interface ApplicationIntakeResult {
     title?: string;
     company?: string;
     roleTitle?: string;
+    description?: string;
     source?: string;
     vacancyUrl?: string;
     compensationText?: string;
@@ -327,6 +332,28 @@ export interface InterviewRetro {
   createdAt: string;
 }
 
+export type RetroEvaluationStatus = 'pending_transcript' | 'generating' | 'ready' | 'failed' | 'skipped';
+
+export interface InterviewRetroEvaluation {
+  id: string;
+  applicationId?: string | null;
+  interviewStageId?: string | null;
+  interviewEventId?: string | null;
+  meetingId: string;
+  status: RetroEvaluationStatus;
+  modelId?: string | null;
+  summary?: string | null;
+  signals: string[];
+  risks: string[];
+  followups: string[];
+  confidence?: number | null;
+  error?: string | null;
+  isActive: boolean;
+  supersededAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface InterviewQuestion {
   id: string;
   interviewEventId: string;
@@ -360,9 +387,21 @@ export interface InterviewDetail extends InterviewEvent {
   dossier?: VacancyDossier | null;
   prep?: PrepBrief | null;
   retros?: InterviewRetro[];
+  retroEvaluation?: InterviewRetroEvaluation | null;
   questions?: InterviewQuestion[];
   contacts?: Array<Contact & { relationship?: string | null }>;
-  linkedMeetings?: Array<{ id: string; title: string; date: string; duration: string }>;
+  linkedMeetings?: LinkedMeeting[];
+}
+
+export interface LinkedMeeting {
+  id: string;
+  title: string;
+  date: string;
+  duration: string;
+  calendarEventId?: string | null;
+  interviewEventId?: string | null;
+  interviewStageId?: string | null;
+  applicationId?: string | null;
 }
 
 export interface ReadinessResult {
