@@ -15,6 +15,8 @@ import { CodexCliService } from './services/CodexCliService';
 import { PhoneMirrorService } from './services/PhoneMirrorService';
 import { SettingsManager } from './services/SettingsManager';
 import { SkillsManager } from './services/SkillsManager';
+import { createBetterSqliteExecutor, InterviewRepository } from './services/interviews/InterviewRepository';
+import { InterviewDomainError, InterviewService, safeInterviewHandle } from './services/interviews/InterviewService';
 
 import { TRIAL_SENTINEL_KEY, DOM_CONTEXT_MAX_CHARS } from './config/constants';
 import { AI_RESPONSE_LANGUAGES, RECOGNITION_LANGUAGES } from './config/languages';
@@ -327,6 +329,19 @@ export function initializeIpcHandlers(appState: AppState): void {
     return true;
   };
 
+  const getInterviewService = (): InterviewService => {
+    const db = DatabaseManager.getInstance().getDb();
+    if (!db) {
+      throw new InterviewDomainError(
+        'local_database_unavailable',
+        'The local interview database is not ready yet.',
+        true,
+        'retry',
+      );
+    }
+    return new InterviewService(new InterviewRepository(createBetterSqliteExecutor(db)));
+  };
+
   // Clears premium-only context when the pro license is lost.
   const clearActiveModeOnLicenseLoss = (): void => {
     try {
@@ -621,29 +636,6 @@ export function initializeIpcHandlers(appState: AppState): void {
       // console.error("Error resetting queues:", error)
       return { success: false, error: error.message };
     }
-  });
-
-  // Donation IPC Handlers
-  safeHandle('get-donation-status', async () => {
-    const { DonationManager } = require('./DonationManager');
-    const manager = DonationManager.getInstance();
-    return {
-      shouldShow: manager.shouldShowToaster(),
-      hasDonated: manager.getDonationState().hasDonated,
-      lifetimeShows: manager.getDonationState().lifetimeShows,
-    };
-  });
-
-  safeHandle('mark-donation-toast-shown', async () => {
-    const { DonationManager } = require('./DonationManager');
-    DonationManager.getInstance().markAsShown();
-    return { success: true };
-  });
-
-  safeHandle('set-donation-complete', async () => {
-    const { DonationManager } = require('./DonationManager');
-    DonationManager.getInstance().setHasDonated(true);
-    return { success: true };
   });
 
   // Generate suggestion from transcript - Natively-style text-only reasoning
@@ -5179,7 +5171,14 @@ export function initializeIpcHandlers(appState: AppState): void {
 
   safeHandle('get-upcoming-events', async () => {
     const { CalendarManager } = require('./services/CalendarManager');
-    return CalendarManager.getInstance().getUpcomingEvents();
+    const { MacCalendarManager } = require('./services/MacCalendarManager');
+    const [googleEvents, macEvents] = await Promise.all([
+      CalendarManager.getInstance().getUpcomingEvents(),
+      MacCalendarManager.getInstance().getUpcomingEvents(),
+    ]);
+    return [...googleEvents, ...macEvents].sort((a: any, b: any) =>
+      new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+    );
   });
 
   safeHandle('calendar-refresh', async () => {
@@ -5973,6 +5972,142 @@ export function initializeIpcHandlers(appState: AppState): void {
       return false;
     }
   });
+
+  // ==========================================
+  // Interview Command Center IPC Handlers
+  // ==========================================
+
+  safeHandle('interviews:list', async (_, input?: unknown) => (
+    safeInterviewHandle(() => getInterviewService().list((input ?? {}) as any))
+  ));
+
+  safeHandle('interviews:get', async (_, input: unknown) => (
+    safeInterviewHandle(() => getInterviewService().get(input as any))
+  ));
+
+  safeHandle('interviews:create', async (_, operationId: string, payload: unknown) => (
+    safeInterviewHandle(() => getInterviewService().create(operationId, payload))
+  ));
+
+  safeHandle('interviews:parse-source-text', async (_, input: unknown) => (
+    safeInterviewHandle(() => getInterviewService().parseSourceText(input))
+  ));
+
+  safeHandle('interviews:update', async (_, id: string, patch: unknown) => (
+    safeInterviewHandle(() => getInterviewService().update(id, patch))
+  ));
+
+  safeHandle('interviews:archive', async (_, id: string) => (
+    safeInterviewHandle(() => getInterviewService().archive(id))
+  ));
+
+  safeHandle('interviews:delete', async (_, id: string, includeLinkedMeetings?: boolean) => (
+    safeInterviewHandle(() => getInterviewService().delete(id, includeLinkedMeetings))
+  ));
+
+  safeHandle('interviews:attach-meeting', async (_, interviewId: string, meetingId: string) => (
+    safeInterviewHandle(() => getInterviewService().attachMeeting(interviewId, meetingId))
+  ));
+
+  safeHandle('interviews:create-calendar-event', async (_, interviewId: string, provider: unknown) => (
+    safeInterviewHandle(async () => {
+      if (provider !== 'google' && provider !== 'macos') {
+        throw new InterviewDomainError('invalid_payload', 'calendar provider is invalid.', false, 'fix_input');
+      }
+      const service = getInterviewService();
+      const detail = service.get({ id: interviewId, include: ['dossier', 'prep'] });
+      if (!detail.startsAt || !detail.endsAt) {
+        throw new InterviewDomainError('invalid_payload', 'Interview must have a start and end time before calendar sync.', false, 'fix_input');
+      }
+      const description = [
+        detail.company ? `Company: ${detail.company}` : null,
+        detail.roleTitle ? `Role: ${detail.roleTitle}` : null,
+        detail.stage ? `Stage: ${detail.stage}` : null,
+        detail.vacancyUrl ? `Vacancy: ${detail.vacancyUrl}` : null,
+        detail.prep?.oneLineGoal ? `Goal: ${detail.prep.oneLineGoal}` : null,
+        detail.dossier?.questionsToAsk?.length ? `Questions:\n${detail.dossier.questionsToAsk.map(item => `- ${item}`).join('\n')}` : null,
+      ].filter(Boolean).join('\n');
+      let event: any;
+      try {
+        event = provider === 'google'
+          ? await require('./services/CalendarManager').CalendarManager.getInstance().createEvent({
+            title: detail.title,
+            startTime: new Date(detail.startsAt).toISOString(),
+            endTime: new Date(detail.endsAt).toISOString(),
+            description,
+            link: detail.meetingUrl ?? undefined,
+            calendarId: 'primary',
+          })
+          : await require('./services/MacCalendarManager').MacCalendarManager.getInstance().createEvent({
+            title: detail.title,
+            startTime: new Date(detail.startsAt).toISOString(),
+            endTime: new Date(detail.endsAt).toISOString(),
+            description,
+            link: detail.meetingUrl ?? undefined,
+            calendarId: 'macos',
+          });
+      } catch (error: any) {
+        throw new InterviewDomainError(
+          'calendar_refresh_failed',
+          error?.message || 'Could not create calendar event.',
+          true,
+          provider === 'google' ? 'connect_calendar' : 'refresh_calendar',
+        );
+      }
+      const snapshot = {
+        provider,
+        calendarId: provider === 'google' ? 'primary' : 'macos',
+        eventId: event.id,
+        title: event.title,
+        startsAt: new Date(event.startTime).getTime(),
+        endsAt: new Date(event.endTime).getTime(),
+        meetingUrl: event.link,
+        attendeeEmails: (event.attendees ?? []).map((attendee: any) => attendee.email).filter(Boolean),
+        attendeeNames: (event.attendees ?? []).map((attendee: any) => attendee.name || attendee.email).filter(Boolean),
+        capturedAt: Date.now(),
+      };
+      return service.update(detail.id, {
+        calendarProvider: provider,
+        calendarId: snapshot.calendarId,
+        calendarEventId: event.id,
+        calendarSnapshot: snapshot,
+        calendarLastSeenAt: Date.now(),
+        calendarSyncStatus: 'linked',
+      });
+    })
+  ));
+
+  safeHandle('interviews:get-readiness', async (_, interviewId: string) => (
+    safeInterviewHandle(() => getInterviewService().getReadiness(interviewId))
+  ));
+
+  safeHandle('interviews:get-retro-prompt', async (_, interviewId: string) => (
+    safeInterviewHandle(() => getInterviewService().getRetroPrompt(interviewId))
+  ));
+
+  safeHandle('interviews:update-retro-prompt', async (_, interviewId: string, payload: unknown) => (
+    safeInterviewHandle(() => getInterviewService().updateRetroPrompt(interviewId, payload as any))
+  ));
+
+  safeHandle('vacancy-dossiers:save', async (_, interviewId: string, operationId: string, payload: unknown) => (
+    safeInterviewHandle(() => getInterviewService().saveDossier(interviewId, operationId, payload))
+  ));
+
+  safeHandle('prep-briefs:save', async (_, interviewId: string, operationId: string, payload: unknown) => (
+    safeInterviewHandle(() => getInterviewService().savePrep(interviewId, operationId, payload))
+  ));
+
+  safeHandle('interview-retros:save', async (_, interviewId: string, operationId: string, payload: unknown) => (
+    safeInterviewHandle(() => getInterviewService().saveRetro(interviewId, operationId, payload))
+  ));
+
+  safeHandle('interview-questions:list', async (_, interviewId?: string) => (
+    safeInterviewHandle(() => getInterviewService().listQuestions(interviewId))
+  ));
+
+  safeHandle('interview-questions:save', async (_, interviewId: string, operationId: string, questions: unknown) => (
+    safeInterviewHandle(() => getInterviewService().saveQuestions(interviewId, operationId, questions))
+  ));
 
   // ==========================================
   // Modes IPC Handlers

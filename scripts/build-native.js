@@ -5,6 +5,7 @@ const path = require('path');
 
 const nativeModulePath = path.join(__dirname, '..', 'native-module');
 const buildAllMacTargets = process.env.NATIVELY_BUILD_ALL_MAC_ARCHES === '1';
+const rustToolchainBinPath = getRustToolchainBinPath();
 
 function verifyArtifacts(expectedArtifacts) {
   const missing = expectedArtifacts.filter((file) => !fs.existsSync(path.join(nativeModulePath, file)));
@@ -19,9 +20,28 @@ function verifyArtifacts(expectedArtifacts) {
   }
 }
 
+function getRustToolchainBinPath() {
+  try {
+    const cargoPath = execSync('rustup which cargo', { encoding: 'utf8' }).trim();
+    const binPath = path.dirname(cargoPath);
+    if (fs.existsSync(path.join(binPath, 'cargo'))) return binPath;
+  } catch {}
+  return null;
+}
+
+function buildCommandEnv(extraEnv = {}) {
+  return {
+    ...process.env,
+    PATH: rustToolchainBinPath
+      ? `${rustToolchainBinPath}${path.delimiter}${process.env.PATH || ''}`
+      : process.env.PATH,
+    ...extraEnv,
+  };
+}
+
 function runCommand(command, extraEnv = {}) {
   console.log(`> ${command}`);
-  execSync(command, { stdio: 'inherit', cwd: nativeModulePath, env: { ...process.env, ...extraEnv } });
+  execSync(command, { stdio: 'inherit', cwd: nativeModulePath, env: buildCommandEnv(extraEnv) });
 }
 
 // Resolve the actual clang runtime lib path (Xcode version changes across machines).

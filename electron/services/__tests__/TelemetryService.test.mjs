@@ -77,6 +77,32 @@ test('transcript, reference, prompt, and screenshot-like fields are removed or r
   assert.doesNotMatch(JSON.stringify(sanitized), /raw transcript|customer private|private-shot/);
 });
 
+test('interview prep, salary, vacancy, retro, and question canaries are removed from telemetry', () => {
+  const canaries = {
+    interviewPrep: 'INTERVIEW_PREP_CANARY prepare Redis and Postgres tradeoffs',
+    salary: 'SALARY_CANARY 500000 RUB base compensation',
+    vacancyText: 'VACANCY_CANARY private HH vacancy body',
+    retroNote: 'RETRO_CANARY weak Kubernetes answer',
+    questionText: 'QUESTION_CANARY explain transaction isolation',
+  };
+  const sanitized = sanitizeTelemetryProperties({
+    ...canaries,
+    nested: {
+      prepBrief: canaries.interviewPrep,
+      compensation: canaries.salary,
+      interviewQuestion: canaries.questionText,
+    },
+    safeCount: 5,
+  });
+
+  const serialized = JSON.stringify(sanitized);
+  assert.equal(sanitized.safeCount, 5);
+  for (const canary of Object.values(canaries)) {
+    assert.doesNotMatch(serialized, new RegExp(canary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+  assert.match(serialized, /\[REMOVED\]|\[REDACTED\]/);
+});
+
 test('dynamic action lifecycle event payload contains no evidence text', () => {
   const dir = makeTempDir();
   const filePath = path.join(dir, 'telemetry.jsonl');

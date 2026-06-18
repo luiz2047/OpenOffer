@@ -9,13 +9,12 @@ import SettingsOverlay from "./components/SettingsOverlay"
 import StartupSequence from "./components/StartupSequence"
 import { AnimatePresence, motion } from "framer-motion"
 import UpdateBanner from "./components/UpdateBanner"
-import { SupportToaster } from "./components/SupportToaster"
 import { PermissionsToaster }   from "./components/onboarding/PermissionsToaster"
 import { AlertCircle, RefreshCw } from "lucide-react"
 import { clampOverlayOpacity, OVERLAY_OPACITY_DEFAULT, getDefaultOverlayOpacity } from "./lib/overlayAppearance"
 import { getMeetingInterfaceTheme, type MeetingInterfaceTheme } from './lib/meetingInterfaceTheme'
 import { isMac } from "./utils/platformUtils"
-import { trackAppOpen, markToasterAsShown } from "./lib/toasterGating"
+import { trackAppOpen } from "./lib/toasterGating"
 import {
   JDAwarenessToaster,
   ProfileFeatureToaster,
@@ -26,6 +25,13 @@ import { analytics } from "./lib/analytics/analytics.service"
 import { ErrorBoundary } from "./components/ErrorBoundary"
 import ModesSettings from "./components/settings/ModesSettings"
 import { ProfileIntelligenceSettings } from "./components/ProfileIntelligenceSettings"
+
+interface StartMeetingMetadata {
+  title?: string;
+  calendarEventId?: string;
+  interviewEventId?: string;
+  source?: 'manual' | 'calendar';
+}
 
 const queryClient = new QueryClient()
 
@@ -376,7 +382,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleStartMeeting = async () => {
+  const handleStartMeeting = async (metadata: StartMeetingMetadata = {}) => {
     try {
       localStorage.setItem('natively_last_meeting_start', Date.now().toString());
       const inputDeviceId = localStorage.getItem('preferredInputDeviceId');
@@ -401,6 +407,7 @@ const App: React.FC = () => {
 
       const meetingRetention = await window.electronAPI.getMeetingRetention?.().catch(() => 'forever');
       const result = await window.electronAPI.startMeeting({
+        ...metadata,
         audio: { inputDeviceId, outputDeviceId },
         doNotPersist: meetingRetention === 'never'
       });
@@ -728,7 +735,6 @@ const App: React.FC = () => {
       </AnimatePresence>
 
       <UpdateBanner />
-      <SupportToaster />
 
 
 

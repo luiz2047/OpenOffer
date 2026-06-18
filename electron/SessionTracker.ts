@@ -49,6 +49,7 @@ export class SessionTracker {
     private currentMeetingMetadata: {
         title?: string;
         calendarEventId?: string;
+        interviewEventId?: string;
         source?: 'manual' | 'calendar';
     } | null = null;
 
@@ -158,6 +159,7 @@ export class SessionTracker {
         this.codingQuestionSource = null;
         this.codingQuestionSetAt = null;
         this.recentInterviewerBuffer = [];
+        this.currentMeetingMetadata = null;
     }
 
     /**

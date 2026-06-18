@@ -5,5 +5,5 @@
  */
 
 export const EXTERNAL_URLS = {
-    project: 'https://github.com/evinjohn/OpenOffer',
+    project: 'https://github.com/luiz2047/openoffer',
 } as const;

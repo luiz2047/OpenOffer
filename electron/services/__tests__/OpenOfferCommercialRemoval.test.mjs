@@ -70,6 +70,9 @@ describe('OpenOffer commercial-path removal', () => {
       'licenseCheckPremiumAsync',
       'licenseDeactivate',
       'licenseGetHardwareId',
+      'getDonationStatus',
+      'markDonationToastShown',
+      'setDonationComplete',
     ]) {
       assert.equal(combined.includes(needle), false, `renderer contract still exposes ${needle}`);
     }
@@ -82,13 +85,19 @@ describe('OpenOffer commercial-path removal', () => {
       'src/components/trial/TrialPromoToaster.tsx',
       'src/components/settings/NativelyApiSettings.tsx',
       'src/components/settings/NativelyProSettings.tsx',
+      'src/components/SupportToaster.tsx',
+      'electron/DonationManager.ts',
+      'src/assets/evin.png',
     ]) {
       assert.equal(fs.existsSync(path.join(root, relPath)), false, `${relPath} should be absent`);
     }
   });
 
-  test('live renderer surfaces do not expose removed hosted provider or trial CTAs', () => {
+  test('live renderer surfaces do not expose removed hosted provider, trial, donation, or creator CTAs', () => {
     const liveRenderer = [
+      'src/App.tsx',
+      'src/components/AboutSection.tsx',
+      'src/components/FeatureSpotlight.tsx',
       'src/components/SettingsOverlay.tsx',
       'src/components/settings/Sidebar.tsx',
       'src/components/settings/AIProvidersSettings.tsx',
@@ -103,9 +112,34 @@ describe('OpenOffer commercial-path removal', () => {
       'Start free trial',
       'checkout.dodopayments',
       'hasNativelyKey',
+      'buymeacoffee',
+      'Fund development',
+      'Support Development',
+      'Support Project',
+      'Support the Builder',
+      'Evin John',
+      'evinjohn',
+      'Creator</span>',
+      'Creator"',
+      'creator promotion',
+      'fundraising',
+      'Pro Intelligence',
+      'Contact Me',
+      'mailto:evinjohn',
     ]) {
       assert.equal(liveRenderer.includes(needle), false, `live renderer still exposes ${needle}`);
     }
+  });
+
+  test('main process no longer registers donation IPC handlers', () => {
+    for (const channel of [
+      'get-donation-status',
+      'mark-donation-toast-shown',
+      'set-donation-complete',
+    ]) {
+      assert.equal(ipcSource.includes(channel), false, `main process still registers ${channel}`);
+    }
+    assert.equal(ipcSource.includes('DonationManager'), false, 'main process still imports DonationManager');
   });
 
   test('runtime provider registries cannot route to removed hosted provider', async () => {

@@ -1,4 +1,25 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type {
+  InterviewCreatePayload,
+  InterviewDetail,
+  InterviewIpcResult,
+  InterviewListInput,
+  InterviewListItem,
+  InterviewQuestion,
+  InterviewQuestionPayload,
+  InterviewRetro,
+  InterviewRetroPayload,
+  InterviewSourceParseInput,
+  InterviewSourceParseResult,
+  InterviewUpdatePatch,
+  PrepBrief,
+  PrepBriefPayload,
+  ReadinessResult,
+  RetroPromptActionPayload,
+  RetroPromptDecision,
+  VacancyDossier,
+  VacancyDossierPayload,
+} from '../src/types/interviews';
 
 // Types for the exposed Electron API
 interface ElectronAPI {
@@ -502,7 +523,7 @@ interface ElectronAPI {
       startTime: string;
       endTime: string;
       link?: string;
-      source: 'google';
+      source: 'google' | 'macos';
     }>
   >;
   calendarRefresh: () => Promise<{ success: boolean; error?: string }>;
@@ -594,15 +615,6 @@ interface ElectronAPI {
   onStealthKeyCaptured: (
     cb: (ev: { keyCode: number; chars: string; flags: number; isKeyDown: boolean }) => void,
   ) => () => void;
-
-  // Donation API
-  getDonationStatus: () => Promise<{
-    shouldShow: boolean;
-    hasDonated: boolean;
-    lifetimeShows: number;
-  }>;
-  markDonationToastShown: () => Promise<{ success: boolean }>;
-  setDonationComplete: () => Promise<{ success: boolean }>;
 
   // Profile Engine API
   profileUploadResume: (filePath: string) => Promise<{ success: boolean; error?: string }>;
@@ -796,6 +808,25 @@ interface ElectronAPI {
   ) => Promise<{ success: boolean; error?: string }>;
   modesDeleteNoteSection: (id: string) => Promise<{ success: boolean; error?: string }>;
   modesRemoveAllNoteSections: (modeId: string) => Promise<{ success: boolean; error?: string }>;
+
+  // Interviews API
+  interviewsList: (input?: InterviewListInput) => Promise<InterviewIpcResult<InterviewListItem[]>>;
+  interviewsGet: (input: { id: string; include?: Array<'dossier' | 'prep' | 'retros' | 'questions' | 'contacts' | 'meetings'> }) => Promise<InterviewIpcResult<InterviewDetail>>;
+  interviewsCreate: (operationId: string, payload: InterviewCreatePayload) => Promise<InterviewIpcResult<InterviewDetail>>;
+  interviewsParseSourceText: (input: InterviewSourceParseInput | string) => Promise<InterviewIpcResult<InterviewSourceParseResult>>;
+  interviewsUpdate: (id: string, patch: InterviewUpdatePatch) => Promise<InterviewIpcResult<InterviewDetail>>;
+  interviewsArchive: (id: string) => Promise<InterviewIpcResult<{ archived: boolean }>>;
+  interviewsDelete: (id: string, includeLinkedMeetings?: boolean) => Promise<InterviewIpcResult<{ deleted: boolean }>>;
+  interviewsAttachMeeting: (interviewId: string, meetingId: string) => Promise<InterviewIpcResult<{ attached: boolean }>>;
+  interviewsCreateCalendarEvent: (interviewId: string, provider: 'google' | 'macos') => Promise<InterviewIpcResult<InterviewDetail>>;
+  interviewsGetReadiness: (interviewId: string) => Promise<InterviewIpcResult<ReadinessResult>>;
+  interviewsGetRetroPrompt: (interviewId: string) => Promise<InterviewIpcResult<RetroPromptDecision>>;
+  interviewsUpdateRetroPrompt: (interviewId: string, payload: RetroPromptActionPayload) => Promise<InterviewIpcResult<RetroPromptDecision>>;
+  vacancyDossierSave: (interviewId: string, operationId: string, payload: VacancyDossierPayload) => Promise<InterviewIpcResult<VacancyDossier>>;
+  prepBriefSave: (interviewId: string, operationId: string, payload: PrepBriefPayload) => Promise<InterviewIpcResult<PrepBrief>>;
+  interviewRetroSave: (interviewId: string, operationId: string, payload: InterviewRetroPayload) => Promise<InterviewIpcResult<InterviewRetro>>;
+  interviewQuestionsList: (interviewId?: string) => Promise<InterviewIpcResult<InterviewQuestion[]>>;
+  interviewQuestionsSave: (interviewId: string, operationId: string, questions: InterviewQuestionPayload[]) => Promise<InterviewIpcResult<InterviewQuestion[]>>;
 
   // Meeting interface theme — cross-window propagation. The settings window
   // writes the new theme to localStorage and calls `setMeetingInterfaceTheme`,
@@ -1936,11 +1967,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     };
   },
 
-  // Donation API
-  getDonationStatus: () => ipcRenderer.invoke('get-donation-status'),
-  markDonationToastShown: () => ipcRenderer.invoke('mark-donation-toast-shown'),
-  setDonationComplete: () => ipcRenderer.invoke('set-donation-complete'),
-
   // Profile Engine API
   profileUploadResume: (filePath: string) => ipcRenderer.invoke('profile:upload-resume', filePath),
   profileGetStatus: () => ipcRenderer.invoke('profile:get-status'),
@@ -2115,6 +2141,40 @@ contextBridge.exposeInMainWorld('electronAPI', {
   modesDeleteNoteSection: (id: string) => ipcRenderer.invoke('modes:delete-note-section', id),
   modesRemoveAllNoteSections: (modeId: string) =>
     ipcRenderer.invoke('modes:remove-all-note-sections', modeId),
+
+  // Interviews API
+  interviewsList: (input?: InterviewListInput) => ipcRenderer.invoke('interviews:list', input),
+  interviewsGet: (input: { id: string; include?: Array<'dossier' | 'prep' | 'retros' | 'questions' | 'contacts' | 'meetings'> }) =>
+    ipcRenderer.invoke('interviews:get', input),
+  interviewsCreate: (operationId: string, payload: InterviewCreatePayload) =>
+    ipcRenderer.invoke('interviews:create', operationId, payload),
+  interviewsParseSourceText: (input: InterviewSourceParseInput | string) =>
+    ipcRenderer.invoke('interviews:parse-source-text', input),
+  interviewsUpdate: (id: string, patch: InterviewUpdatePatch) =>
+    ipcRenderer.invoke('interviews:update', id, patch),
+  interviewsArchive: (id: string) => ipcRenderer.invoke('interviews:archive', id),
+  interviewsDelete: (id: string, includeLinkedMeetings?: boolean) =>
+    ipcRenderer.invoke('interviews:delete', id, includeLinkedMeetings),
+  interviewsAttachMeeting: (interviewId: string, meetingId: string) =>
+    ipcRenderer.invoke('interviews:attach-meeting', interviewId, meetingId),
+  interviewsCreateCalendarEvent: (interviewId: string, provider: 'google' | 'macos') =>
+    ipcRenderer.invoke('interviews:create-calendar-event', interviewId, provider),
+  interviewsGetReadiness: (interviewId: string) =>
+    ipcRenderer.invoke('interviews:get-readiness', interviewId),
+  interviewsGetRetroPrompt: (interviewId: string) =>
+    ipcRenderer.invoke('interviews:get-retro-prompt', interviewId),
+  interviewsUpdateRetroPrompt: (interviewId: string, payload: RetroPromptActionPayload) =>
+    ipcRenderer.invoke('interviews:update-retro-prompt', interviewId, payload),
+  vacancyDossierSave: (interviewId: string, operationId: string, payload: VacancyDossierPayload) =>
+    ipcRenderer.invoke('vacancy-dossiers:save', interviewId, operationId, payload),
+  prepBriefSave: (interviewId: string, operationId: string, payload: PrepBriefPayload) =>
+    ipcRenderer.invoke('prep-briefs:save', interviewId, operationId, payload),
+  interviewRetroSave: (interviewId: string, operationId: string, payload: InterviewRetroPayload) =>
+    ipcRenderer.invoke('interview-retros:save', interviewId, operationId, payload),
+  interviewQuestionsList: (interviewId?: string) =>
+    ipcRenderer.invoke('interview-questions:list', interviewId),
+  interviewQuestionsSave: (interviewId: string, operationId: string, questions: InterviewQuestionPayload[]) =>
+    ipcRenderer.invoke('interview-questions:save', interviewId, operationId, questions),
 
   // Meeting interface theme — see ElectronAPI interface for rationale.
   setMeetingInterfaceTheme: (theme: string) => {

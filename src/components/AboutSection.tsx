@@ -1,50 +1,14 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
-    Github, Twitter, Shield, Cpu, Database,
-    Heart, Linkedin, Instagram, Mail, MicOff, Star, Bug, Globe, Sparkles, Zap, Camera, LayoutGrid, User, Volume2, Activity, MessageSquare, Link, Smartphone, Calendar, ListTodo, Users, WifiOff
+    Github, Shield, Cpu, Database,
+    Mail, MicOff, Star, Bug, Globe, Zap, LayoutGrid, Volume2, Activity, Users
 } from 'lucide-react';
-import evinProfile from '../assets/evin.png';
-import { useResolvedTheme } from '../hooks/useResolvedTheme';
-import { getPlatformShortcut } from '../utils/platformUtils';
 
 interface AboutSectionProps { }
 
 export const AboutSection: React.FC<AboutSectionProps> = () => {
-    const isLight = useResolvedTheme() === 'light';
-    const donationClickTimeRef = useRef<number | null>(null);
-
-    // Initial check for donation status not needed for visuals anymore (since we removed key input)
-    // but we might want to hide the support button if donated? 
-    // User said "wont show if the user open the donate button" -> this refers to the toaster.
-    // For About section, usually validation/support button stays but maybe changes text?
-    // I'll keep it as is, just the logic change.
-
-    useEffect(() => {
-        const handleFocus = async () => {
-            if (donationClickTimeRef.current) {
-                const elapsed = Date.now() - donationClickTimeRef.current;
-                if (elapsed > 20000) { // 20 seconds
-                    console.log("User returned after >20s. Marking as donated.");
-                    await window.electronAPI?.setDonationComplete();
-                    donationClickTimeRef.current = null; // Reset
-                } else {
-                    console.log("User returned too quickly (<20s). Not confirming donation.");
-                    donationClickTimeRef.current = null;
-                }
-            }
-        };
-
-        window.addEventListener('focus', handleFocus);
-        return () => window.removeEventListener('focus', handleFocus);
-    }, []);
-
     const handleOpenLink = (e: React.MouseEvent<HTMLAnchorElement>, url: string) => {
         e.preventDefault();
-
-        // Special handling for donation link
-        if (url.includes('buymeacoffee.com')) {
-            donationClickTimeRef.current = Date.now();
-        }
 
         // Use backend shell.openExternal
         if (window.electronAPI?.openExternal) {
@@ -226,22 +190,22 @@ export const AboutSection: React.FC<AboutSectionProps> = () => {
                         </a>
                     </div>
 
-                    {/* 1. Founder Profile */}
+                    {/* 1. Project Stewardship */}
                     <div className="bg-bg-item-surface rounded-xl p-5">
                         <div className="flex flex-col gap-4">
                             <div className="flex items-start gap-4">
-                                <div className="w-12 h-12 rounded-full bg-bg-elevated border border-border-subtle flex items-center justify-center overflow-hidden shrink-0">
-                                    <img src={evinProfile} alt="Evin John" className="w-full h-full object-cover" />
+                                <div className="w-12 h-12 rounded-full bg-blue-500/10 border border-border-subtle flex items-center justify-center shrink-0 text-blue-400">
+                                    <Users size={22} />
                                 </div>
                                 <div className="pt-0.5">
                                     <div className="flex items-center gap-2 mb-1">
-                                        <h5 className="text-sm font-bold text-text-primary">Evin John</h5>
-                                        <span className={`text-[10px] font-medium px-1.5 py-[1px] rounded-full ${isLight ? 'bg-amber-100 text-amber-700 border border-amber-300' : 'bg-yellow-400/10 text-yellow-200 border border-yellow-400/5'}`}>Creator</span>
+                                        <h5 className="text-sm font-bold text-text-primary">OpenOffer contributors</h5>
+                                        <span className="text-[10px] font-medium px-1.5 py-[1px] rounded-full bg-blue-500/10 text-blue-200 border border-blue-400/10">Project</span>
                                     </div>
                                     <p className="text-xs text-text-secondary leading-relaxed max-w-lg">
-                                        I build software that stays out of the way.
+                                        OpenOffer is becoming a local-first workspace for job-search context, interview preparation, and career process memory.
                                         <br />
-                                        <span className="font-bold text-text-primary">OpenOffer</span> is made to feel fast, quiet, and respectful of your privacy.
+                                        <span className="font-bold text-text-primary">The app experience stays focused on the user's workflow and preparation context.</span>
                                     </p>
                                 </div>
                             </div>
@@ -253,30 +217,6 @@ export const AboutSection: React.FC<AboutSectionProps> = () => {
                                     title="GitHub"
                                 >
                                     <Github size={18} />
-                                </a>
-                                <a
-                                    href="https://x.com/evinjohnn"
-                                    onClick={(e) => handleOpenLink(e, "https://x.com/evinjohnn")}
-                                    className="text-text-tertiary hover:text-text-primary transition-colors"
-                                    title="Twitter"
-                                >
-                                    <Twitter size={18} />
-                                </a>
-                                <a
-                                    href="https://www.linkedin.com/in/evinjohn"
-                                    onClick={(e) => handleOpenLink(e, "https://www.linkedin.com/in/evinjohn")}
-                                    className="text-text-tertiary hover:text-text-primary transition-colors"
-                                    title="LinkedIn"
-                                >
-                                    <Linkedin size={18} />
-                                </a>
-                                <a
-                                    href="https://www.instagram.com/evinjohnn/"
-                                    onClick={(e) => handleOpenLink(e, "https://www.instagram.com/evinjohnn/")}
-                                    className="text-text-tertiary hover:text-text-primary transition-colors"
-                                    title="Instagram"
-                                >
-                                    <Instagram size={18} />
                                 </a>
                             </div>
                         </div>
@@ -294,7 +234,7 @@ export const AboutSection: React.FC<AboutSectionProps> = () => {
                             </div>
                             <div>
                                 <h5 className="text-sm font-bold text-text-primary">Star on GitHub</h5>
-                                <p className="text-xs text-text-secondary mt-0.5">Love OpenOffer? Support the project by starring the repo.</p>
+                                <p className="text-xs text-text-secondary mt-0.5">Track the repository and review the implementation roadmap.</p>
                             </div>
                         </a>
 
@@ -313,44 +253,24 @@ export const AboutSection: React.FC<AboutSectionProps> = () => {
                         </a>
                     </div>
 
-                    {/* 3. Get in Touch */}
+                    {/* 3. Product Feedback */}
                     <div className="bg-bg-item-surface rounded-xl border border-border-subtle p-5 flex flex-col md:flex-row items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
                             <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 shadow-sm shadow-blue-500/5">
                                 <Mail size={18} className="opacity-80" />
                             </div>
                             <div>
-                                <h5 className="text-sm font-bold text-text-primary">Get in Touch</h5>
-                                <p className="text-xs text-text-secondary mt-0.5">Open for professional collaborations and job offers.</p>
+                                <h5 className="text-sm font-bold text-text-primary">Product Feedback</h5>
+                                <p className="text-xs text-text-secondary mt-0.5">Use GitHub issues for bugs, roadmap feedback, and implementation notes.</p>
                             </div>
                         </div>
                         <a
-                            href="mailto:evinjohnignatious@gmail.com"
-                            onClick={(e) => handleOpenLink(e, "mailto:evinjohnignatious@gmail.com")}
+                            href="https://github.com/luiz2047/openoffer/issues"
+                            onClick={(e) => handleOpenLink(e, "https://github.com/luiz2047/openoffer/issues")}
                             className="whitespace-nowrap px-4 py-2 bg-text-primary hover:bg-white/90 text-bg-main text-xs font-bold rounded-lg transition-all shadow hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2"
                         >
                             <Mail size={14} />
-                            Contact Me
-                        </a>
-                    </div>
-
-                    {/* 4. Support */}
-                    <div className="bg-bg-item-surface rounded-xl border border-border-subtle p-5 flex flex-col md:flex-row items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-full bg-pink-500/10 flex items-center justify-center text-pink-500 shadow-sm shadow-pink-500/5">
-                                <Heart size={18} fill="currentColor" className="opacity-80" />
-                            </div>
-                            <div>
-                                <h5 className="text-sm font-bold text-text-primary">Support Development</h5>
-                                <p className="text-xs text-text-secondary mt-0.5">OpenOffer is independent open-source software.</p>
-                            </div>
-                        </div>
-                        <a
-                            href="https://buymeacoffee.com/evinjohnn"
-                            onClick={(e) => handleOpenLink(e, "https://buymeacoffee.com/evinjohnn")}
-                            className="whitespace-nowrap px-4 py-2 bg-text-primary hover:bg-white/90 text-bg-main text-xs font-bold rounded-lg transition-all shadow hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
-                        >
-                            Support Project
+                            Open Issues
                         </a>
                     </div>
                 </div>

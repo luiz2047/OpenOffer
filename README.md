@@ -45,11 +45,20 @@ OpenOffer takes the opposite starting point:
 - **Career-work focus:** technical interviews, live calls, meeting notes, follow-ups, and preparation contexts are first-class workflows.
 - **No paid OpenOffer gate:** no subscription tier or license check is required by the public build.
 
-OpenOffer v0.1 is not trying to pretend the full job-search operating system already exists. The first credible slice is a local-first desktop assistant for interview and work situations, with a strong technical-interview and local speech-to-text foundation.
+OpenOffer v1.1 adds the first job-search operating-system slice: a local interview command center for tracking active processes, scheduled interviews, prep context, questions, retros, and linked meeting recordings.
 
 ## What Works Today
 
 OpenOffer is an Electron desktop app with live capture, model routing, local storage, and mode-based assistance.
+
+### Interview Command Center
+
+- Open into an Interview OS workspace instead of a product landing page.
+- Track active job-search processes with status, priority, company, role, stage, source, and scheduled time.
+- Keep a vacancy dossier, prep brief, readiness checklist, question bank, and post-interview retro for each process.
+- Create interviews from pasted HH/Getmatch/Telegram/calendar text and keep the original source locally.
+- Link existing meeting recordings to an interview so prep, live context, and follow-up stay together.
+- Create scheduled interview events in Google Calendar or macOS Calendar from OpenOffer when calendar access is configured.
 
 ### Live Interview and Meeting Assistance
 
@@ -129,6 +138,8 @@ Recommended local path:
 4. Add resume, job description, and interview notes as local reference files.
 
 The dedicated local-STT guide is being refreshed for the standalone OpenOffer repo. Until then, treat Local Whisper and GigaSTT as the current local speech-provider paths in the app.
+
+For the shipped interview workspace architecture, see [Interview Command Center](docs/engineering/interview-command-center.md).
 
 ## Quick Start
 

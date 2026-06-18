@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import appIcon from './icon.png';
+import openOfferIcon from './icon.png';
 
 interface StartupSequenceProps {
     onComplete: () => void;
@@ -25,8 +25,8 @@ const StartupSequence: React.FC<StartupSequenceProps> = ({ onComplete }) => {
             />
 
             <motion.img
-                src={appIcon}
-                alt="App Icon"
+                src={openOfferIcon}
+                alt="OpenOffer"
                 className="w-24 h-24 object-contain relative z-10"
                 initial={{
                     opacity: 0,
