@@ -394,6 +394,267 @@ describe('InterviewRepository', () => {
     assert.ok(archived.archivedAt);
   });
 
+  test('updates applications and filters archived rows with legacy compatibility', async () => {
+    const { repo, service } = createStack();
+    const legacyOnly = repo.create({ title: 'Legacy only interview', company: 'OldCo' });
+    const created = service.createApplicationFromIntake('op-direct-app-update', {
+      intake: {
+        classification: 'vacancy_only',
+        confidence: 0.85,
+        application: {
+          title: 'Initial vacancy',
+          company: 'InitialCo',
+          roleTitle: 'ML Engineer',
+          source: 'HH',
+          vacancyUrl: 'https://example.com/initial',
+          requirements: [],
+          risks: [],
+          questionsToAsk: [],
+          rawSourceText: 'Initial raw text',
+        },
+        warnings: [],
+        missingFields: [],
+      },
+    });
+
+    assert.equal(created.application.stages.length, 0, 'application without stages remains valid');
+    const updated = service.updateApplication(created.application.id, {
+      title: 'Updated vacancy',
+      company: 'UpdatedCo',
+      roleTitle: 'Senior ML Engineer',
+      status: 'screening',
+      priority: 'high',
+      source: 'Telegram',
+      sourceUrl: 'https://t.me/recruiter',
+      vacancyUrl: 'https://example.com/updated',
+      compensationText: '500k',
+      locationFormat: 'Remote',
+      nextAction: 'Send availability',
+      nextActionDueAt: 1_800_010_000_000,
+      rawSourceText: 'Updated raw text',
+    });
+
+    assert.equal(updated.company, 'UpdatedCo');
+    assert.equal(updated.priority, 'high');
+    assert.equal(updated.sourceUrl, 'https://t.me/recruiter');
+    assert.equal(updated.stages.length, 0);
+    const legacy = repo.get(created.legacyInterview.id);
+    assert.equal(legacy.title, 'Updated vacancy');
+    assert.equal(legacy.company, 'UpdatedCo');
+    assert.equal(legacy.roleTitle, 'Senior ML Engineer');
+    assert.equal(legacy.status, 'screening');
+    assert.equal(legacy.vacancyUrl, 'https://example.com/updated');
+    assert.equal(repo.get(legacyOnly.id).company, 'OldCo', 'legacy-only interviews are not touched by application updates');
+
+    service.updateApplication(created.application.id, { status: 'archived' });
+    assert.equal(service.listApplications().some(item => item.id === created.application.id), false);
+    assert.equal(service.listApplications({ activeOnly: true }).some(item => item.id === created.application.id), false);
+    assert.equal(service.listApplications({ status: 'archived' }).length, 0, 'archived status filter stays non-archived by default');
+    assert.equal(service.listApplications({ status: 'archived', includeArchived: true })[0].id, created.application.id);
+    assert.equal(repo.get(created.legacyInterview.id).archivedAt !== null, true);
+
+    const restored = service.updateApplication(created.application.id, { status: 'screening' });
+    assert.equal(restored.status, 'screening');
+    assert.equal(restored.archivedAt, null);
+    assert.equal(service.listApplications().some(item => item.id === created.application.id), true);
+    const restoredLegacy = repo.get(created.legacyInterview.id);
+    assert.equal(restoredLegacy.status, 'screening');
+    assert.equal(restoredLegacy.archivedAt, null);
+  });
+
+  test('creates and updates unmapped stages without creating legacy mirrors', () => {
+    const { db, repo, service } = createStack();
+    const created = service.createApplicationFromIntake('op-unmapped-stage-app', {
+      intake: {
+        classification: 'vacancy_only',
+        confidence: 0.8,
+        application: {
+          title: 'Unmapped stage app',
+          company: 'StageCo',
+          requirements: [],
+          risks: [],
+          questionsToAsk: [],
+          rawSourceText: 'Vacancy only',
+        },
+        warnings: [],
+        missingFields: [],
+      },
+    });
+
+    const withStage = service.createStage({
+      applicationId: created.application.id,
+      title: 'Manual technical screen',
+      stageType: 'technical_screen',
+      startsAt: 1_800_020_000_000,
+      endsAt: 1_800_023_600_000,
+      timezone: 'Europe/Moscow',
+      format: 'online',
+      meetingUrl: 'https://meet.example/manual',
+      rawSourceText: 'Manual stage note',
+    });
+    const stage = withStage.stages[0];
+    assert.equal(stage.calendarProvider, 'manual');
+    assert.equal(stage.calendarSyncStatus, 'local_only');
+    assert.equal(stage.legacyInterviewEventId, null);
+    assert.equal(
+      db.prepare('SELECT COUNT(*) AS count FROM legacy_interview_event_map WHERE stage_id = ?').get(stage.id).count,
+      0,
+      'plain stage creation does not create a legacy mirror',
+    );
+
+    const updated = service.updateStage(stage.id, {
+      title: 'Updated technical screen',
+      status: 'scheduled',
+      meetingUrl: 'https://meet.example/updated',
+      calendarProvider: 'google',
+      calendarId: 'primary',
+      calendarEventId: 'evt-unmapped-stage',
+      calendarSyncStatus: 'linked',
+    });
+    assert.equal(updated.stages[0].title, 'Updated technical screen');
+    assert.equal(updated.stages[0].calendarEventId, 'evt-unmapped-stage');
+    assert.equal(
+      db.prepare('SELECT COUNT(*) AS count FROM legacy_interview_event_map WHERE stage_id = ?').get(stage.id).count,
+      0,
+    );
+
+    db.prepare(`
+      INSERT INTO meetings (id, title, created_at, start_time, duration_ms)
+      VALUES ('meeting-unmapped-stage', 'Unmapped stage recording', '2026-06-18T13:00:00.000Z', ?, 1800000)
+    `).run(1_800_020_000_000);
+    assert.equal(repo.attachMeetingToStage(stage.id, 'meeting-unmapped-stage'), true);
+    const meeting = db.prepare(`
+      SELECT interview_event_id, interview_stage_id, application_id
+      FROM meetings
+      WHERE id = 'meeting-unmapped-stage'
+    `).get();
+    assert.equal(meeting.interview_event_id, null);
+    assert.equal(meeting.interview_stage_id, stage.id);
+    assert.equal(meeting.application_id, created.application.id);
+  });
+
+  test('mapped stage updates sync legacy rows transactionally and restore only through explicit action', async () => {
+    const { repo, service } = createStack();
+    const created = service.createApplicationFromIntake('op-mapped-stage-sync', {
+      intake: {
+        classification: 'vacancy_with_scheduled_stage',
+        confidence: 0.9,
+        application: {
+          title: 'Mapped app',
+          company: 'MappedCo',
+          roleTitle: 'Staff Engineer',
+          requirements: [],
+          risks: [],
+          questionsToAsk: [],
+          rawSourceText: 'Mapped raw',
+        },
+        stage: {
+          title: 'Recruiter screen',
+          stageType: 'recruiter_screen',
+          startsAt: 1_800_030_000_000,
+          endsAt: 1_800_033_600_000,
+          timezone: 'Europe/Moscow',
+          meetingUrl: 'https://meet.example/old',
+          status: 'scheduled',
+        },
+        warnings: [],
+        missingFields: [],
+      },
+    });
+    const stage = created.application.stages[0];
+
+    const synced = service.updateStage(stage.id, {
+      title: 'Hiring manager screen',
+      startsAt: 1_800_040_000_000,
+      endsAt: 1_800_043_600_000,
+      timezone: 'UTC',
+      meetingUrl: 'https://meet.example/new',
+      calendarProvider: 'google',
+      calendarId: 'primary',
+      calendarEventId: 'evt-mapped-stage',
+      calendarSyncStatus: 'linked',
+    });
+    assert.equal(synced.stages[0].calendarEventId, 'evt-mapped-stage');
+    const legacy = repo.get(created.legacyInterview.id);
+    assert.equal(legacy.stage, 'Hiring manager screen');
+    assert.equal(legacy.meetingUrl, 'https://meet.example/new');
+    assert.equal(legacy.startsAt, 1_800_040_000_000);
+    assert.equal(legacy.timezone, 'UTC');
+    assert.equal(legacy.calendarEventId, 'evt-mapped-stage');
+
+    const archived = service.archiveStage(stage.id);
+    assert.equal(archived.stages[0].status, 'archived');
+    assert.ok(archived.stages[0].archivedAt);
+    assert.ok(repo.get(created.legacyInterview.id).archivedAt);
+
+    const accidentalRestore = service.updateStage(stage.id, { status: 'scheduled' });
+    assert.equal(accidentalRestore.stages[0].status, 'scheduled');
+    assert.ok(accidentalRestore.stages[0].archivedAt);
+    assert.ok(repo.get(created.legacyInterview.id).archivedAt);
+
+    const restored = service.restoreStage(stage.id, 'scheduled');
+    assert.equal(restored.stages[0].status, 'scheduled');
+    assert.equal(restored.stages[0].archivedAt, null);
+    assert.equal(repo.get(created.legacyInterview.id).archivedAt, null);
+    assert.equal(repo.get(created.legacyInterview.id).status, 'interviewing');
+
+    const other = service.createStage({
+      applicationId: created.application.id,
+      title: 'Unmapped calendar collision',
+      startsAt: 1_800_050_000_000,
+      endsAt: 1_800_053_600_000,
+    }).stages.find(item => item.title === 'Unmapped calendar collision');
+    const duplicate = await safeInterviewHandle(() => service.updateStage(other.id, {
+      calendarProvider: 'google',
+      calendarId: 'primary',
+      calendarEventId: 'evt-mapped-stage',
+      calendarSyncStatus: 'linked',
+    }));
+    assert.equal(duplicate.ok, false);
+    assert.equal(duplicate.code, 'duplicate_calendar_ref');
+    assert.equal(repo.get(created.legacyInterview.id).calendarEventId, 'evt-mapped-stage');
+  });
+
+  test('calendar provider failure after local stage schedule save preserves the local schedule', async () => {
+    const { service } = createStack();
+    const created = service.createApplicationFromIntake('op-provider-failure-app', {
+      intake: {
+        classification: 'vacancy_only',
+        confidence: 0.8,
+        application: {
+          title: 'Provider failure app',
+          requirements: [],
+          risks: [],
+          questionsToAsk: [],
+          rawSourceText: 'Provider failure raw',
+        },
+        warnings: [],
+        missingFields: [],
+      },
+    });
+    const withStage = service.createStage({
+      applicationId: created.application.id,
+      title: 'Manual local meeting',
+      startsAt: 1_800_060_000_000,
+      endsAt: 1_800_063_600_000,
+      timezone: 'Europe/Moscow',
+      meetingUrl: 'https://meet.example/local-first',
+    });
+    const stage = withStage.stages[0];
+    const failed = await safeInterviewHandle(() => {
+      throw new InterviewDomainError('calendar_refresh_failed', 'Provider unavailable.', true, 'connect_calendar');
+    });
+    assert.equal(failed.ok, false);
+    assert.equal(failed.code, 'calendar_refresh_failed');
+    const afterFailure = service.getApplication(created.application.id).stages[0];
+    assert.equal(afterFailure.startsAt, 1_800_060_000_000);
+    assert.equal(afterFailure.endsAt, 1_800_063_600_000);
+    assert.equal(afterFailure.meetingUrl, 'https://meet.example/local-first');
+    assert.equal(afterFailure.calendarProvider, 'manual');
+    assert.equal(afterFailure.calendarSyncStatus, 'local_only');
+    assert.equal(afterFailure.calendarEventId, null);
+  });
+
   test('filters lists by status and time range, archives rows, and can delete linked meetings', () => {
     const { db, repo } = createStack();
     const now = 1_800_000_000_000;
@@ -534,6 +795,31 @@ describe('InterviewService', () => {
           missingFields: [],
         },
       }),
+      error => error instanceof InterviewDomainError && error.code === 'invalid_payload',
+    );
+    const app = service.createApplicationFromIntake('op-invalid-stage-range-app', {
+      intake: {
+        classification: 'vacancy_only',
+        confidence: 0.8,
+        application: {
+          title: 'Stage range app',
+          requirements: [],
+          risks: [],
+          questionsToAsk: [],
+          rawSourceText: 'raw',
+        },
+        warnings: [],
+        missingFields: [],
+      },
+    });
+    const stage = service.createStage({
+      applicationId: app.application.id,
+      title: 'Range stage',
+      startsAt: 1_800_000_000_000,
+      endsAt: 1_800_003_600_000,
+    }).stages[0];
+    assert.throws(
+      () => service.updateStage(stage.id, { endsAt: 1_799_999_999_999 }),
       error => error instanceof InterviewDomainError && error.code === 'invalid_payload',
     );
     assert.throws(

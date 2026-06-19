@@ -5,6 +5,9 @@ import type {
   ApplicationIntakeInput,
   ApplicationIntakeResult,
   ApplicationIntakeTask,
+  ApplicationListInput,
+  ApplicationStatus,
+  ApplicationUpdatePatch,
   InterviewCreatePayload,
   InterviewDetail,
   InterviewErrorAction,
@@ -19,6 +22,9 @@ import type {
   InterviewRetroEvaluation,
   InterviewRetroPayload,
   InterviewSourceParseResult,
+  InterviewStageCreatePayload,
+  InterviewStageStatus,
+  InterviewStageUpdatePatch,
   InterviewStageType,
   InterviewUpdatePatch,
   PrepBrief,
@@ -35,6 +41,7 @@ import { parseInterviewSourceText } from './parser';
 import type { AiTask, TaskModelResolution } from '../TaskModelPolicy';
 
 const VALID_STATUSES = new Set(['active', 'applied', 'screening', 'interviewing', 'offer', 'rejected', 'withdrawn', 'archived']);
+const VALID_APPLICATION_STATUSES = new Set(['lead_found', 'applied', 'screening', 'interviewing', 'offer', 'rejected', 'withdrawn', 'archived']);
 const VALID_PRIORITIES = new Set(['low', 'normal', 'high']);
 const VALID_CALENDAR_PROVIDERS = new Set(['google', 'macos', 'manual']);
 const VALID_CALENDAR_SYNC_STATUSES = new Set(['local_only', 'linked', 'changed', 'missing', 'calendar_disabled', 'refresh_error']);
@@ -42,6 +49,7 @@ const VALID_INTAKE_CLASSIFICATIONS = new Set(['vacancy_only', 'vacancy_with_sche
 const VALID_APPLICATION_INTAKE_TASKS = new Set(['vacancy_intake', 'scraping', 'agent_actions']);
 const VALID_STAGE_TYPES = new Set(['recruiter_screen', 'technical_screen', 'system_design', 'leadership', 'final', 'offer_security', 'custom']);
 const VALID_STAGE_STATUSES = new Set(['draft', 'scheduled', 'done', 'waiting_feedback', 'passed', 'rejected', 'canceled', 'archived']);
+const VALID_STAGE_FORMATS = new Set(['online', 'onsite', 'phone', 'async', 'unknown']);
 
 export type InterviewModelResolver = (task: AiTask) => TaskModelResolution;
 export type InterviewStructuredGenerator = (prompt: string, options?: { modelId?: string | null; task?: AiTask }) => Promise<string>;
@@ -73,7 +81,7 @@ export function interviewFailure(error: unknown): InterviewIpcResult<never> {
     };
   }
   const message = String((error as any)?.message || error || '');
-  if (/UNIQUE constraint failed: interview_events\.calendar_provider|uq_interview_events_calendar_ref/i.test(message)) {
+  if (/UNIQUE constraint failed: (interview_events|interview_stages)\.calendar_provider|uq_interview_(events|stages)_calendar_ref/i.test(message)) {
     return {
       ok: false,
       code: 'duplicate_calendar_ref',
@@ -290,6 +298,143 @@ function normalizeUpdatePatch(patch: any): InterviewUpdatePatch {
     }
     out.calendarSyncStatus = patch.calendarSyncStatus;
   }
+  return out;
+}
+
+function assertTimeRange(startsAt: number | null | undefined, endsAt: number | null | undefined): void {
+  if (startsAt !== null && startsAt !== undefined && endsAt !== null && endsAt !== undefined && endsAt <= startsAt) {
+    throw new InterviewDomainError('invalid_payload', 'endsAt must be after startsAt.', false, 'fix_input');
+  }
+}
+
+function normalizeApplicationListInput(input: any): ApplicationListInput {
+  const out: ApplicationListInput = {};
+  if (!input || typeof input !== 'object') return out;
+  if ('includeArchived' in input) out.includeArchived = Boolean(input.includeArchived);
+  if ('activeOnly' in input) out.activeOnly = Boolean(input.activeOnly);
+  if ('limit' in input && input.limit !== undefined && input.limit !== null) {
+    if (typeof input.limit !== 'number' || !Number.isInteger(input.limit) || input.limit < 1) {
+      throw new InterviewDomainError('invalid_payload', 'limit is invalid.', false, 'fix_input');
+    }
+    out.limit = input.limit;
+  }
+  if ('offset' in input && input.offset !== undefined && input.offset !== null) {
+    if (typeof input.offset !== 'number' || !Number.isInteger(input.offset) || input.offset < 0) {
+      throw new InterviewDomainError('invalid_payload', 'offset is invalid.', false, 'fix_input');
+    }
+    out.offset = input.offset;
+  }
+  if ('status' in input && input.status !== undefined && input.status !== null) {
+    const statuses = Array.isArray(input.status) ? input.status : [input.status];
+    for (const status of statuses) {
+      if (!VALID_APPLICATION_STATUSES.has(status)) {
+        throw new InterviewDomainError('invalid_payload', 'application status is invalid.', false, 'fix_input');
+      }
+    }
+    out.status = Array.isArray(input.status) ? statuses as ApplicationStatus[] : statuses[0] as ApplicationStatus;
+  }
+  return out;
+}
+
+function normalizeApplicationUpdatePatch(patch: any): ApplicationUpdatePatch {
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+    throw new InterviewDomainError('invalid_payload', 'application patch is invalid.', false, 'fix_input');
+  }
+  const out: ApplicationUpdatePatch = {};
+  if ('title' in patch) out.title = text(patch.title, 'title', 180, true) as string;
+  if ('company' in patch) out.company = text(patch.company, 'company', 120);
+  if ('roleTitle' in patch) out.roleTitle = text(patch.roleTitle, 'roleTitle', 120);
+  if ('status' in patch) {
+    if (!VALID_APPLICATION_STATUSES.has(patch.status)) throw new InterviewDomainError('invalid_payload', 'application status is invalid.', false, 'fix_input');
+    out.status = patch.status;
+  }
+  if ('priority' in patch) {
+    if (!VALID_PRIORITIES.has(patch.priority)) throw new InterviewDomainError('invalid_payload', 'priority is invalid.', false, 'fix_input');
+    out.priority = patch.priority;
+  }
+  if ('source' in patch) out.source = text(patch.source, 'source', 120);
+  if ('sourceUrl' in patch) out.sourceUrl = optionalUrl(patch.sourceUrl, 'sourceUrl');
+  if ('vacancyUrl' in patch) out.vacancyUrl = optionalUrl(patch.vacancyUrl, 'vacancyUrl');
+  if ('compensationText' in patch) out.compensationText = text(patch.compensationText, 'compensationText', 2000);
+  if ('locationFormat' in patch) out.locationFormat = text(patch.locationFormat, 'locationFormat', 240);
+  if ('nextAction' in patch) out.nextAction = text(patch.nextAction, 'nextAction', 1000);
+  if ('nextActionDueAt' in patch) out.nextActionDueAt = optionalEpoch(patch.nextActionDueAt, 'nextActionDueAt');
+  if ('rawSourceText' in patch) out.rawSourceText = text(patch.rawSourceText, 'rawSourceText', 50000);
+  return out;
+}
+
+function normalizeStageCreatePayload(payload: any): InterviewStageCreatePayload {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new InterviewDomainError('invalid_payload', 'stage payload is invalid.', false, 'fix_input');
+  }
+  const calendarProvider = payload.calendarProvider ?? null;
+  const calendarSyncStatus = payload.calendarSyncStatus ?? 'local_only';
+  if (calendarProvider !== null && calendarProvider !== undefined && !VALID_CALENDAR_PROVIDERS.has(calendarProvider)) {
+    throw new InterviewDomainError('invalid_payload', 'calendarProvider is invalid.', false, 'fix_input');
+  }
+  if (!VALID_CALENDAR_SYNC_STATUSES.has(calendarSyncStatus)) {
+    throw new InterviewDomainError('invalid_payload', 'calendarSyncStatus is invalid.', false, 'fix_input');
+  }
+  const startsAt = optionalEpoch(payload.startsAt, 'startsAt');
+  const endsAt = optionalEpoch(payload.endsAt, 'endsAt');
+  assertTimeRange(startsAt, endsAt);
+  const format = payload.format ?? null;
+  if (format !== null && format !== undefined && !VALID_STAGE_FORMATS.has(format)) {
+    throw new InterviewDomainError('invalid_payload', 'format is invalid.', false, 'fix_input');
+  }
+  return {
+    applicationId: assertId(payload.applicationId, 'applicationId'),
+    stageType: enumText(payload.stageType, VALID_STAGE_TYPES, 'stageType', 'custom'),
+    title: text(payload.title, 'title', 180, true) as string,
+    status: enumText(payload.status, VALID_STAGE_STATUSES, 'status', startsAt ? 'scheduled' : 'draft'),
+    startsAt,
+    endsAt,
+    timezone: text(payload.timezone, 'timezone', 120),
+    format,
+    meetingUrl: optionalUrl(payload.meetingUrl, 'meetingUrl'),
+    calendarProvider,
+    calendarSyncStatus,
+    rawSourceText: text(payload.rawSourceText, 'rawSourceText', 50000),
+  };
+}
+
+function normalizeStageUpdatePatch(patch: any): InterviewStageUpdatePatch {
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+    throw new InterviewDomainError('invalid_payload', 'stage patch is invalid.', false, 'fix_input');
+  }
+  const out: InterviewStageUpdatePatch = {};
+  if ('stageType' in patch) out.stageType = enumText(patch.stageType, VALID_STAGE_TYPES, 'stageType');
+  if ('title' in patch) out.title = text(patch.title, 'title', 180, true) as string;
+  if ('status' in patch) out.status = enumText(patch.status, VALID_STAGE_STATUSES, 'status');
+  if ('startsAt' in patch) out.startsAt = optionalEpoch(patch.startsAt, 'startsAt');
+  if ('endsAt' in patch) out.endsAt = optionalEpoch(patch.endsAt, 'endsAt');
+  assertTimeRange(out.startsAt, out.endsAt);
+  if ('timezone' in patch) out.timezone = text(patch.timezone, 'timezone', 120);
+  if ('format' in patch) {
+    if (patch.format !== null && patch.format !== undefined && !VALID_STAGE_FORMATS.has(patch.format)) {
+      throw new InterviewDomainError('invalid_payload', 'format is invalid.', false, 'fix_input');
+    }
+    out.format = patch.format ?? null;
+  }
+  if ('meetingUrl' in patch) out.meetingUrl = optionalUrl(patch.meetingUrl, 'meetingUrl');
+  if ('calendarProvider' in patch) {
+    if (patch.calendarProvider !== null && patch.calendarProvider !== undefined && !VALID_CALENDAR_PROVIDERS.has(patch.calendarProvider)) {
+      throw new InterviewDomainError('invalid_payload', 'calendarProvider is invalid.', false, 'fix_input');
+    }
+    out.calendarProvider = patch.calendarProvider ?? null;
+  }
+  if ('calendarId' in patch) out.calendarId = text(patch.calendarId, 'calendarId', 512);
+  if ('calendarEventId' in patch) out.calendarEventId = text(patch.calendarEventId, 'calendarEventId', 512);
+  if ('calendarSnapshot' in patch) out.calendarSnapshot = optionalObject(patch.calendarSnapshot, 'calendarSnapshot');
+  if ('calendarLastSeenAt' in patch) out.calendarLastSeenAt = optionalEpoch(patch.calendarLastSeenAt, 'calendarLastSeenAt');
+  if ('calendarMissingSince' in patch) out.calendarMissingSince = optionalEpoch(patch.calendarMissingSince, 'calendarMissingSince');
+  if ('calendarSyncStatus' in patch) {
+    if (!VALID_CALENDAR_SYNC_STATUSES.has(patch.calendarSyncStatus)) {
+      throw new InterviewDomainError('invalid_payload', 'calendarSyncStatus is invalid.', false, 'fix_input');
+    }
+    out.calendarSyncStatus = patch.calendarSyncStatus;
+  }
+  if ('rawSourceText' in patch) out.rawSourceText = text(patch.rawSourceText, 'rawSourceText', 50000);
   return out;
 }
 
@@ -974,8 +1119,8 @@ export class InterviewService {
     return attachCalendarProposal(deterministic);
   }
 
-  listApplications(): ApplicationDetail[] {
-    return this.repo.listApplications();
+  listApplications(input: unknown = {}): ApplicationDetail[] {
+    return this.repo.listApplications(normalizeApplicationListInput(input));
   }
 
   getApplication(id: string): ApplicationDetail {
@@ -992,6 +1137,51 @@ export class InterviewService {
       operationId,
       input?.selectedApplicationId ? assertId(input.selectedApplicationId, 'selectedApplicationId') : undefined,
     );
+  }
+
+  updateApplication(id: string, patch: unknown): ApplicationDetail {
+    const detail = this.repo.updateApplication(
+      assertId(id, 'applicationId'),
+      normalizeApplicationUpdatePatch(patch),
+    );
+    if (!detail) throw new InterviewDomainError('not_found', 'Application not found.', false, 'none');
+    return detail;
+  }
+
+  createStage(payload: unknown): ApplicationDetail {
+    const detail = this.repo.createStage(normalizeStageCreatePayload(payload));
+    if (!detail) throw new InterviewDomainError('not_found', 'Application not found.', false, 'none');
+    return detail;
+  }
+
+  updateStage(id: string, patch: unknown): ApplicationDetail {
+    const stageId = assertId(id, 'stageId');
+    const normalized = normalizeStageUpdatePatch(patch);
+    const existing = this.repo.getStage(stageId);
+    if (!existing) throw new InterviewDomainError('not_found', 'Stage not found.', false, 'none');
+    const startsAt = Object.prototype.hasOwnProperty.call(normalized, 'startsAt') ? normalized.startsAt : existing.startsAt;
+    const endsAt = Object.prototype.hasOwnProperty.call(normalized, 'endsAt') ? normalized.endsAt : existing.endsAt;
+    assertTimeRange(startsAt, endsAt);
+    const detail = this.repo.updateStage(stageId, normalized);
+    if (!detail) throw new InterviewDomainError('not_found', 'Stage not found.', false, 'none');
+    return detail;
+  }
+
+  archiveStage(id: string): ApplicationDetail {
+    const detail = this.repo.archiveStage(assertId(id, 'stageId'));
+    if (!detail) throw new InterviewDomainError('not_found', 'Stage not found.', false, 'none');
+    return detail;
+  }
+
+  restoreStage(id: string, status: unknown = 'scheduled'): ApplicationDetail {
+    const stageId = assertId(id, 'stageId');
+    const nextStatus = enumText<InterviewStageStatus>(status, VALID_STAGE_STATUSES, 'stageStatus');
+    if (nextStatus === 'archived') {
+      throw new InterviewDomainError('invalid_payload', 'Restore status must be active.', false, 'fix_input');
+    }
+    const detail = this.repo.restoreStage(stageId, nextStatus);
+    if (!detail) throw new InterviewDomainError('not_found', 'Stage not found.', false, 'none');
+    return detail;
   }
 
   update(id: string, patch: unknown): InterviewDetail {
@@ -1026,6 +1216,12 @@ export class InterviewService {
 
   attachMeeting(interviewId: string, meetingId: string): { attached: boolean } {
     const attached = this.repo.attachMeeting(assertId(interviewId, 'interviewId'), assertId(meetingId, 'meetingId'));
+    if (!attached) throw new InterviewDomainError('meeting_attach_failed', 'Could not attach that meeting.', true, 'manual_attach');
+    return { attached };
+  }
+
+  attachMeetingToStage(stageId: string, meetingId: string): { attached: boolean } {
+    const attached = this.repo.attachMeetingToStage(assertId(stageId, 'stageId'), assertId(meetingId, 'meetingId'));
     if (!attached) throw new InterviewDomainError('meeting_attach_failed', 'Could not attach that meeting.', true, 'manual_attach');
     return { attached };
   }

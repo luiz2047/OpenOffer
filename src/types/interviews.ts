@@ -190,7 +190,7 @@ export interface InterviewStage {
   startsAt?: number | null;
   endsAt?: number | null;
   timezone?: string | null;
-  format?: 'online' | 'onsite' | 'phone' | 'async' | 'unknown' | null;
+  format?: InterviewStageFormat | null;
   meetingUrl?: string | null;
   calendarProvider?: CalendarProvider | null;
   calendarId?: string | null;
@@ -283,6 +283,75 @@ export interface ApplicationCreateFromIntakePayload {
 export interface ApplicationCreateFromIntakeResult {
   application: ApplicationDetail;
   legacyInterview?: InterviewDetail | null;
+}
+
+export interface ApplicationListInput {
+  status?: ApplicationStatus | ApplicationStatus[];
+  includeArchived?: boolean;
+  activeOnly?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ApplicationUpdatePatch {
+  title?: string;
+  company?: string | null;
+  roleTitle?: string | null;
+  status?: ApplicationStatus;
+  priority?: InterviewPriority;
+  source?: string | null;
+  sourceUrl?: string | null;
+  vacancyUrl?: string | null;
+  compensationText?: string | null;
+  locationFormat?: string | null;
+  nextAction?: string | null;
+  nextActionDueAt?: number | null;
+  rawSourceText?: string | null;
+}
+
+export type InterviewStageFormat = 'online' | 'onsite' | 'phone' | 'async' | 'unknown';
+
+export interface InterviewStageCreatePayload {
+  applicationId: string;
+  stageType?: InterviewStageType;
+  title: string;
+  status?: InterviewStageStatus;
+  startsAt?: number | null;
+  endsAt?: number | null;
+  timezone?: string | null;
+  format?: InterviewStageFormat | null;
+  meetingUrl?: string | null;
+  calendarProvider?: CalendarProvider | null;
+  calendarSyncStatus?: CalendarSyncStatus;
+  rawSourceText?: string | null;
+}
+
+export interface InterviewStageUpdatePatch {
+  stageType?: InterviewStageType;
+  title?: string;
+  status?: InterviewStageStatus;
+  startsAt?: number | null;
+  endsAt?: number | null;
+  timezone?: string | null;
+  format?: InterviewStageFormat | null;
+  meetingUrl?: string | null;
+  calendarProvider?: CalendarProvider | null;
+  calendarId?: string | null;
+  calendarEventId?: string | null;
+  calendarSnapshot?: CalendarSnapshot | null;
+  calendarLastSeenAt?: number | null;
+  calendarMissingSince?: number | null;
+  calendarSyncStatus?: CalendarSyncStatus;
+  rawSourceText?: string | null;
+}
+
+export interface InterviewStageArchiveResult {
+  archived: boolean;
+  application: ApplicationDetail;
+}
+
+export interface InterviewStageCalendarEventPayload {
+  provider: Extract<CalendarProvider, 'google' | 'macos'>;
 }
 
 export interface VacancyDossier {

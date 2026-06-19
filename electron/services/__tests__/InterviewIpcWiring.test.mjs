@@ -17,7 +17,14 @@ const channels = [
   ['applicationIntakeParse', 'application-intake:parse'],
   ['applicationsList', 'applications:list'],
   ['applicationsGet', 'applications:get'],
+  ['applicationsUpdate', 'applications:update'],
   ['applicationsCreateFromIntake', 'applications:create-from-intake'],
+  ['interviewStagesCreate', 'interview-stages:create'],
+  ['interviewStagesUpdate', 'interview-stages:update'],
+  ['interviewStagesArchive', 'interview-stages:archive'],
+  ['interviewStagesRestore', 'interview-stages:restore'],
+  ['interviewStagesAttachMeeting', 'interview-stages:attach-meeting'],
+  ['interviewStagesCreateCalendarEvent', 'interview-stages:create-calendar-event'],
   ['interviewsUpdate', 'interviews:update'],
   ['interviewsArchive', 'interviews:archive'],
   ['interviewsDelete', 'interviews:delete'],
@@ -86,8 +93,15 @@ test('renderer electron.d.ts declares typed interview methods and shared result 
   assert.match(types, /interviewsCreate:\s*\(operationId: string, payload: InterviewCreatePayload\) => Promise<InterviewIpcResult<InterviewDetail>>/);
   assert.match(types, /interviewsParseSourceText:\s*\(input: InterviewSourceParseInput \| string\) => Promise<InterviewIpcResult<InterviewSourceParseResult>>/);
   assert.match(types, /applicationIntakeParse:\s*\(input: ApplicationIntakeInput \| string\) => Promise<InterviewIpcResult<ApplicationIntakeResult>>/);
-  assert.match(types, /applicationsList:\s*\(\) => Promise<InterviewIpcResult<ApplicationDetail\[\]>>/);
+  assert.match(types, /applicationsList:\s*\(input\?: ApplicationListInput\) => Promise<InterviewIpcResult<ApplicationDetail\[\]>>/);
+  assert.match(types, /applicationsUpdate:\s*\(id: string, patch: ApplicationUpdatePatch\) => Promise<InterviewIpcResult<ApplicationDetail>>/);
   assert.match(types, /applicationsCreateFromIntake:\s*\(operationId: string, payload: ApplicationCreateFromIntakePayload\) => Promise<InterviewIpcResult<ApplicationCreateFromIntakeResult>>/);
+  assert.match(types, /interviewStagesCreate:\s*\(payload: InterviewStageCreatePayload\) => Promise<InterviewIpcResult<ApplicationDetail>>/);
+  assert.match(types, /interviewStagesUpdate:\s*\(id: string, patch: InterviewStageUpdatePatch\) => Promise<InterviewIpcResult<ApplicationDetail>>/);
+  assert.match(types, /interviewStagesArchive:\s*\(id: string\) => Promise<InterviewIpcResult<ApplicationDetail>>/);
+  assert.match(types, /interviewStagesRestore:\s*\(id: string, status\?: InterviewStageUpdatePatch\[['"]status['"]\]\) => Promise<InterviewIpcResult<ApplicationDetail>>/);
+  assert.match(types, /interviewStagesAttachMeeting:\s*\(id: string, meetingId: string\) => Promise<InterviewIpcResult<\{ attached: boolean \}>>/);
+  assert.match(types, /interviewStagesCreateCalendarEvent:\s*\(id: string, provider: InterviewStageCalendarEventPayload\[['"]provider['"]\]\) => Promise<InterviewIpcResult<ApplicationDetail>>/);
   assert.match(types, /interviewsCreateCalendarEvent:\s*\(interviewId: string, provider: ['"]google['"] \| ['"]macos['"]\) => Promise<InterviewIpcResult<InterviewDetail>>/);
   assert.match(types, /vacancyDossierSave:\s*\(interviewId: string, operationId: string, payload: VacancyDossierPayload\) => Promise<InterviewIpcResult<VacancyDossier>>/);
   assert.match(types, /interviewsUpdateRetroPrompt:\s*\(interviewId: string, payload: RetroPromptActionPayload\) => Promise<InterviewIpcResult<RetroPromptDecision>>/);

@@ -3,10 +3,14 @@ import type {
   ApplicationCreateFromIntakeResult,
   ApplicationDetail,
   ApplicationIntakeResult,
+  ApplicationListInput,
   ApplicationStatus,
+  ApplicationUpdatePatch,
   InterviewStage,
+  InterviewStageCreatePayload,
   InterviewStageStatus,
   InterviewStageType,
+  InterviewStageUpdatePatch,
   InterviewCreatePayload,
   InterviewDetail,
   InterviewEvent,
@@ -205,6 +209,18 @@ function applicationStatusFromIntake(intake: ApplicationIntakeResult): Applicati
 
 function applicationStatusFromInterviewStatus(status: InterviewEvent['status']): ApplicationStatus {
   return status === 'active' ? 'lead_found' : status;
+}
+
+function interviewStatusFromApplicationStatus(status: ApplicationStatus): InterviewEvent['status'] {
+  return status === 'lead_found' ? 'active' : status;
+}
+
+function interviewStatusFromStageStatus(status: InterviewStageStatus): InterviewEvent['status'] {
+  if (status === 'archived') return 'archived';
+  if (status === 'rejected') return 'rejected';
+  if (status === 'canceled') return 'withdrawn';
+  if (status === 'passed') return 'offer';
+  return 'interviewing';
 }
 
 function stageStatusFromIntake(intake: ApplicationIntakeResult): InterviewStageStatus {
@@ -486,7 +502,28 @@ export class InterviewRepository {
     });
   }
 
-  listApplications(): ApplicationDetail[] {
+  listApplications(input: ApplicationListInput = {}): ApplicationDetail[] {
+    const where: string[] = [];
+    const params: any[] = [];
+    const includeArchived = Boolean(input.includeArchived);
+
+    if (!includeArchived) {
+      where.push('a.archived_at IS NULL');
+    }
+    if (input.activeOnly) {
+      where.push("a.status NOT IN ('rejected', 'withdrawn', 'archived')");
+      if (!includeArchived) where.push('a.archived_at IS NULL');
+    }
+    if (input.status) {
+      const statuses = Array.isArray(input.status) ? input.status : [input.status];
+      where.push(`a.status IN (${statuses.map(() => '?').join(', ')})`);
+      params.push(...statuses);
+    }
+
+    const limit = Math.min(Math.max(input.limit ?? 200, 1), 500);
+    const offset = Math.max(input.offset ?? 0, 0);
+    params.push(limit, offset);
+
     const rows = this.db.prepare(`
       SELECT a.*, (
         SELECT s.id
@@ -499,10 +536,10 @@ export class InterviewRepository {
         LIMIT 1
       ) AS selected_stage_id
       FROM applications a
-      WHERE a.archived_at IS NULL
+      ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY a.updated_at DESC
-      LIMIT 200
-    `).all<any>();
+      LIMIT ? OFFSET ?
+    `).all<any>(...params);
     return rows.map(row => {
       const application = applicationFromRow(row);
       application.stages = this.listStages(application.id);
@@ -550,10 +587,248 @@ export class InterviewRepository {
       FROM interview_stages
       WHERE application_id = ?
       ORDER BY
+        CASE WHEN archived_at IS NULL THEN 0 ELSE 1 END,
         CASE WHEN starts_at IS NULL THEN 1 ELSE 0 END,
         starts_at ASC,
+        archived_at DESC,
         updated_at DESC
     `).all<any>(applicationId).map(stageFromRow);
+  }
+
+  getStage(id: string): InterviewStage | null {
+    const row = this.db.prepare('SELECT * FROM interview_stages WHERE id = ?').get<any>(id);
+    return row ? stageFromRow(row) : null;
+  }
+
+  updateApplication(id: string, patch: ApplicationUpdatePatch): ApplicationDetail | null {
+    return this.db.transaction(() => {
+      const existing = this.db.prepare('SELECT * FROM applications WHERE id = ?').get<any>(id);
+      if (!existing) return null;
+
+      const columns: Record<string, unknown> = {};
+      const map: Array<[keyof ApplicationUpdatePatch, string]> = [
+        ['title', 'title'],
+        ['company', 'company'],
+        ['roleTitle', 'role_title'],
+        ['status', 'status'],
+        ['priority', 'priority'],
+        ['source', 'source'],
+        ['sourceUrl', 'source_url'],
+        ['vacancyUrl', 'vacancy_url'],
+        ['compensationText', 'compensation_text'],
+        ['locationFormat', 'location_format'],
+        ['nextAction', 'next_action'],
+        ['nextActionDueAt', 'next_action_due_at'],
+        ['rawSourceText', 'raw_source_text'],
+      ];
+      for (const [key, column] of map) {
+        if (Object.prototype.hasOwnProperty.call(patch, key)) {
+          columns[column] = (patch as any)[key] ?? null;
+        }
+      }
+      const timestamp = nowIso();
+      if (Object.prototype.hasOwnProperty.call(patch, 'status')) {
+        columns.archived_at = patch.status === 'archived' ? existing.archived_at ?? timestamp : null;
+      }
+      columns.updated_at = timestamp;
+      const names = Object.keys(columns);
+      this.db.prepare(`
+        UPDATE applications
+        SET ${names.map(name => `${name} = ?`).join(', ')}
+        WHERE id = ?
+      `).run(...names.map(name => columns[name]), id);
+
+      const legacyRows = this.db.prepare(`
+        SELECT e.id, e.archived_at, a.legacy_interview_event_id
+        FROM legacy_interview_event_map map
+        JOIN interview_events e ON e.id = map.legacy_interview_event_id
+        JOIN applications a ON a.id = map.application_id
+        WHERE map.application_id = ?
+      `).all<any>(id);
+      for (const legacy of legacyRows) {
+        const legacyColumns: Record<string, unknown> = {};
+        if (Object.prototype.hasOwnProperty.call(patch, 'company')) legacyColumns.company = patch.company ?? null;
+        if (Object.prototype.hasOwnProperty.call(patch, 'roleTitle')) legacyColumns.role_title = patch.roleTitle ?? null;
+        if (Object.prototype.hasOwnProperty.call(patch, 'source')) legacyColumns.source = patch.source ?? null;
+        if (Object.prototype.hasOwnProperty.call(patch, 'vacancyUrl')) legacyColumns.vacancy_url = patch.vacancyUrl ?? null;
+        if (Object.prototype.hasOwnProperty.call(patch, 'rawSourceText')) legacyColumns.raw_source_text = patch.rawSourceText ?? null;
+        if (Object.prototype.hasOwnProperty.call(patch, 'title') && legacy.id === legacy.legacy_interview_event_id) {
+          legacyColumns.title = patch.title ?? null;
+        }
+        if (Object.prototype.hasOwnProperty.call(patch, 'status')) {
+          legacyColumns.status = interviewStatusFromApplicationStatus(patch.status as ApplicationStatus);
+          legacyColumns.archived_at = patch.status === 'archived' ? legacy.archived_at ?? timestamp : null;
+        }
+        const legacyNames = Object.keys(legacyColumns);
+        if (legacyNames.length > 0) {
+          legacyColumns.updated_at = timestamp;
+          const finalNames = Object.keys(legacyColumns);
+          this.db.prepare(`
+            UPDATE interview_events
+            SET ${finalNames.map(name => `${name} = ?`).join(', ')}
+            WHERE id = ?
+          `).run(...finalNames.map(name => legacyColumns[name]), legacy.id);
+        }
+      }
+
+      return this.getApplication(id);
+    });
+  }
+
+  createStage(payload: InterviewStageCreatePayload): ApplicationDetail | null {
+    return this.db.transaction(() => {
+      const application = this.db.prepare('SELECT id FROM applications WHERE id = ?').get<any>(payload.applicationId);
+      if (!application) return null;
+      const timestamp = nowIso();
+      const id = newId('stage');
+      const hasLocalMeeting = Boolean(payload.startsAt || payload.endsAt || payload.meetingUrl);
+      this.db.prepare(`
+        INSERT INTO interview_stages (
+          id, application_id, stage_type, title, status, starts_at, ends_at, timezone,
+          format, meeting_url, calendar_provider, calendar_sync_status, raw_source_text,
+          created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        id,
+        payload.applicationId,
+        payload.stageType ?? 'custom',
+        payload.title,
+        payload.status ?? (payload.startsAt ? 'scheduled' : 'draft'),
+        payload.startsAt ?? null,
+        payload.endsAt ?? null,
+        payload.timezone ?? null,
+        payload.format ?? null,
+        payload.meetingUrl ?? null,
+        payload.calendarProvider ?? (hasLocalMeeting ? 'manual' : null),
+        payload.calendarSyncStatus ?? 'local_only',
+        payload.rawSourceText ?? null,
+        timestamp,
+        timestamp,
+      );
+      this.db.prepare('UPDATE applications SET updated_at = ? WHERE id = ?').run(timestamp, payload.applicationId);
+      return this.getApplication(payload.applicationId);
+    });
+  }
+
+  updateStage(id: string, patch: InterviewStageUpdatePatch): ApplicationDetail | null {
+    return this.db.transaction(() => {
+      const existing = this.db.prepare('SELECT * FROM interview_stages WHERE id = ?').get<any>(id);
+      if (!existing) return null;
+      const columns: Record<string, unknown> = {};
+      const map: Array<[keyof InterviewStageUpdatePatch, string]> = [
+        ['stageType', 'stage_type'],
+        ['title', 'title'],
+        ['status', 'status'],
+        ['startsAt', 'starts_at'],
+        ['endsAt', 'ends_at'],
+        ['timezone', 'timezone'],
+        ['format', 'format'],
+        ['meetingUrl', 'meeting_url'],
+        ['calendarProvider', 'calendar_provider'],
+        ['calendarId', 'calendar_id'],
+        ['calendarEventId', 'calendar_event_id'],
+        ['calendarLastSeenAt', 'calendar_last_seen_at'],
+        ['calendarMissingSince', 'calendar_missing_since'],
+        ['calendarSyncStatus', 'calendar_sync_status'],
+        ['rawSourceText', 'raw_source_text'],
+      ];
+      for (const [key, column] of map) {
+        if (Object.prototype.hasOwnProperty.call(patch, key)) {
+          columns[column] = (patch as any)[key] ?? null;
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(patch, 'calendarSnapshot')) {
+        columns.calendar_snapshot_json = patch.calendarSnapshot ? JSON.stringify(patch.calendarSnapshot) : null;
+      }
+      const timestamp = nowIso();
+      if (patch.status === 'archived') {
+        columns.archived_at = existing.archived_at ?? timestamp;
+      }
+      columns.updated_at = timestamp;
+      const names = Object.keys(columns);
+      if (names.length > 0) {
+        this.db.prepare(`
+          UPDATE interview_stages
+          SET ${names.map(name => `${name} = ?`).join(', ')}
+          WHERE id = ?
+        `).run(...names.map(name => columns[name]), id);
+      }
+      this.syncStageLegacy(id, patch, timestamp);
+      this.db.prepare('UPDATE applications SET updated_at = ? WHERE id = ?').run(timestamp, existing.application_id);
+      return this.getApplication(existing.application_id);
+    });
+  }
+
+  archiveStage(id: string): ApplicationDetail | null {
+    return this.updateStage(id, { status: 'archived' });
+  }
+
+  restoreStage(id: string, status: Exclude<InterviewStageStatus, 'archived'> = 'scheduled'): ApplicationDetail | null {
+    return this.db.transaction(() => {
+      const existing = this.db.prepare('SELECT * FROM interview_stages WHERE id = ?').get<any>(id);
+      if (!existing) return null;
+      const timestamp = nowIso();
+      this.db.prepare(`
+        UPDATE interview_stages
+        SET status = ?, archived_at = NULL, updated_at = ?
+        WHERE id = ?
+      `).run(status, timestamp, id);
+      this.syncStageLegacy(id, { status }, timestamp, { restoreArchived: true });
+      this.db.prepare('UPDATE applications SET updated_at = ? WHERE id = ?').run(timestamp, existing.application_id);
+      return this.getApplication(existing.application_id);
+    });
+  }
+
+  private syncStageLegacy(
+    stageId: string,
+    patch: InterviewStageUpdatePatch,
+    timestamp: string,
+    options: { restoreArchived?: boolean } = {},
+  ): void {
+    const map = this.db.prepare(`
+      SELECT map.legacy_interview_event_id, event.archived_at
+      FROM legacy_interview_event_map map
+      JOIN interview_events event ON event.id = map.legacy_interview_event_id
+      WHERE map.stage_id = ?
+    `).get<{ legacy_interview_event_id?: string | null; archived_at?: string | null }>(stageId);
+    if (!map?.legacy_interview_event_id) return;
+    const columns: Record<string, unknown> = {};
+    if (Object.prototype.hasOwnProperty.call(patch, 'title')) columns.stage = patch.title ?? null;
+    if (Object.prototype.hasOwnProperty.call(patch, 'meetingUrl')) columns.meeting_url = patch.meetingUrl ?? null;
+    if (Object.prototype.hasOwnProperty.call(patch, 'startsAt')) columns.starts_at = patch.startsAt ?? null;
+    if (Object.prototype.hasOwnProperty.call(patch, 'endsAt')) columns.ends_at = patch.endsAt ?? null;
+    if (Object.prototype.hasOwnProperty.call(patch, 'timezone')) columns.timezone = patch.timezone ?? null;
+    if (Object.prototype.hasOwnProperty.call(patch, 'rawSourceText')) columns.raw_source_text = patch.rawSourceText ?? null;
+    if (Object.prototype.hasOwnProperty.call(patch, 'calendarProvider')) columns.calendar_provider = patch.calendarProvider ?? null;
+    if (Object.prototype.hasOwnProperty.call(patch, 'calendarId')) columns.calendar_id = patch.calendarId ?? null;
+    if (Object.prototype.hasOwnProperty.call(patch, 'calendarEventId')) columns.calendar_event_id = patch.calendarEventId ?? null;
+    if (Object.prototype.hasOwnProperty.call(patch, 'calendarSnapshot')) {
+      columns.calendar_snapshot_json = patch.calendarSnapshot ? JSON.stringify(patch.calendarSnapshot) : null;
+    }
+    if (Object.prototype.hasOwnProperty.call(patch, 'calendarLastSeenAt')) columns.calendar_last_seen_at = patch.calendarLastSeenAt ?? null;
+    if (Object.prototype.hasOwnProperty.call(patch, 'calendarMissingSince')) columns.calendar_missing_since = patch.calendarMissingSince ?? null;
+    if (Object.prototype.hasOwnProperty.call(patch, 'calendarSyncStatus')) columns.calendar_sync_status = patch.calendarSyncStatus ?? null;
+    if (Object.prototype.hasOwnProperty.call(patch, 'status')) {
+      columns.status = interviewStatusFromStageStatus(patch.status as InterviewStageStatus);
+      if (patch.status === 'archived') {
+        columns.archived_at = map.archived_at ?? timestamp;
+      } else if (options.restoreArchived) {
+        columns.archived_at = null;
+      }
+    }
+    for (const key of Object.keys(columns)) {
+      if (columns[key] === undefined) delete columns[key];
+    }
+    const names = Object.keys(columns);
+    if (names.length === 0) return;
+    columns.updated_at = timestamp;
+    const finalNames = Object.keys(columns);
+    this.db.prepare(`
+      UPDATE interview_events
+      SET ${finalNames.map(name => `${name} = ?`).join(', ')}
+      WHERE id = ?
+    `).run(...finalNames.map(name => columns[name]), map.legacy_interview_event_id);
   }
 
   createApplicationFromIntake(
@@ -939,6 +1214,35 @@ export class InterviewRepository {
             application_id = COALESCE(?, application_id)
         WHERE id = ?
       `).run(interviewId, map?.stage_id ?? null, map?.application_id ?? null, meetingId);
+      return result.changes > 0;
+    });
+  }
+
+  attachMeetingToStage(stageId: string, meetingId: string): boolean {
+    return this.db.transaction(() => {
+      const stage = this.db.prepare(`
+        SELECT stage.id, stage.application_id, stage.legacy_interview_event_id, event.archived_at AS legacy_archived_at
+        FROM interview_stages stage
+        LEFT JOIN interview_events event ON event.id = stage.legacy_interview_event_id
+        WHERE stage.id = ?
+          AND stage.archived_at IS NULL
+      `).get<{
+        id: string;
+        application_id: string;
+        legacy_interview_event_id?: string | null;
+        legacy_archived_at?: string | null;
+      }>(stageId);
+      if (!stage) return false;
+      const legacyInterviewId = stage.legacy_interview_event_id && !stage.legacy_archived_at
+        ? stage.legacy_interview_event_id
+        : null;
+      const result = this.db.prepare(`
+        UPDATE meetings
+        SET interview_event_id = ?,
+            interview_stage_id = ?,
+            application_id = ?
+        WHERE id = ?
+      `).run(legacyInterviewId, stage.id, stage.application_id, meetingId);
       return result.changes > 0;
     });
   }

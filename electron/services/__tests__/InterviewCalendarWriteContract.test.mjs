@@ -53,3 +53,20 @@ test('manual interview creation can push an event to Google or Mac calendar', ()
   assert.match(ui, /const legacyId = result\.legacyInterview\?\.id/);
   assert.match(ui, /interviewApi\.createCalendarEvent\(legacyId, createCalendarProvider\)/);
 });
+
+test('stage calendar creation has a first-class local-first IPC contract', () => {
+  const ipc = read('electron/ipcHandlers.ts');
+  const preload = read('electron/preload.ts');
+  const types = read('src/types/electron.d.ts');
+  const api = read('src/features/interviews/api.ts');
+
+  assert.ok(findSafeHandle(ipc, 'interview-stages:create-calendar-event') >= 0);
+  assert.match(ipc, /service\.updateStage\(stage\.id,[\s\S]{0,500}calendarSyncStatus: ['"]linked['"]/);
+  assert.match(ipc, /CalendarManager'\)\.CalendarManager\.getInstance\(\)\.createEvent/);
+  assert.match(ipc, /MacCalendarManager'\)\.MacCalendarManager\.getInstance\(\)\.createEvent/);
+  assert.match(ipc, /calendar_refresh_failed/);
+  assert.doesNotMatch(ipc, /interview-stages:create-calendar-event[\s\S]{0,2200}archiveStage/);
+  assert.match(preload, /interviewStagesCreateCalendarEvent:\s*\(id: string, provider: InterviewStageCalendarEventPayload\[['"]provider['"]\]\)/);
+  assert.match(types, /interviewStagesCreateCalendarEvent:\s*\(id: string, provider: InterviewStageCalendarEventPayload\[['"]provider['"]\]\)/);
+  assert.match(api, /createCalendarEvent\(id: string, provider: InterviewStageCalendarEventPayload\[['"]provider['"]\]\)/);
+});
