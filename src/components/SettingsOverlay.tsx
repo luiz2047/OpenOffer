@@ -1543,7 +1543,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.2 }}
                     id="settings-backdrop"
-                    className={`fixed inset-0 z-50 flex items-center justify-center p-8 transition-colors duration-150 ${isPreviewingOpacity ? 'bg-transparent backdrop-blur-none' : 'bg-black/60 backdrop-blur-sm'}`}
+                    className={`fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 lg:p-8 transition-colors duration-150 ${isPreviewingOpacity ? 'bg-transparent backdrop-blur-none' : 'bg-black/60 backdrop-blur-sm'}`}
                 >
                     <motion.div
                         id="settings-panel-wrapper"
@@ -1556,81 +1556,81 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                             damping: 32,
                             mass: 1
                         }}
-                        className="bg-bg-elevated w-full max-w-4xl h-[80vh] rounded-2xl border border-border-subtle shadow-2xl overflow-hidden relative"
+                        className="bg-bg-elevated w-full max-w-5xl h-[80vh] min-h-[560px] rounded-2xl border border-border-subtle shadow-2xl overflow-hidden relative"
                     >
                         <div
                             id="settings-panel"
-                            className="flex w-full h-full"
+                            className="flex w-full h-full min-w-0"
                             style={{ visibility: isPreviewingOpacity ? 'hidden' : 'visible' }}
                         >
                         {/* Sidebar */}
-                        <div className="w-64 bg-bg-sidebar flex flex-col border-r border-border-subtle">
+                        <div className="w-56 shrink-0 bg-bg-sidebar flex flex-col border-r border-border-subtle xl:w-64">
                             <div className="p-6">
                                 <h2 className="font-semibold text-gray-400 text-xs uppercase tracking-wider mb-2">{t('settings.sidebar.title')}</h2>
                                 <nav className="space-y-1">
                                     <button type="button"
                                         onClick={() => setActiveTab('general')}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'general' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
+                                        className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'general' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Monitor size={16} /> {t('settings.sidebar.general')}
+                                        <Monitor size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.general')}</span>
                                     </button>
                                     <button type="button"
                                         onClick={() => setActiveTab('ai-providers')}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'ai-providers' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
+                                        className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'ai-providers' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <FlaskConical size={16} /> {t('settings.sidebar.aiProviders')}
+                                        <FlaskConical size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.aiProviders')}</span>
                                     </button>
                                     <button type="button"
                                         onClick={() => setActiveTab('skills')}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'skills' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
+                                        className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'skills' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Sparkles size={16} className={activeTab === 'skills' ? 'text-accent-primary' : 'text-text-secondary'} /> {t('settings.sidebar.skills')}
+                                        <Sparkles size={16} className={`shrink-0 ${activeTab === 'skills' ? 'text-accent-primary' : 'text-text-secondary'}`} /> <span className="min-w-0 truncate">{t('settings.sidebar.skills')}</span>
                                     </button>
                                     <button type="button"
                                         onClick={() => setActiveTab('calendar')}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'calendar' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
+                                        className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'calendar' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Calendar size={16} /> {t('settings.sidebar.calendar')}
+                                        <Calendar size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.calendar')}</span>
                                     </button>
                                     <button type="button"
                                         onClick={() => setActiveTab('audio')}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'audio' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
+                                        className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'audio' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Mic size={16} /> {t('settings.sidebar.audio')}
+                                        <Mic size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.audio')}</span>
                                     </button>
                                     <button type="button"
                                         onClick={() => setActiveTab('keybinds')}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'keybinds' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
+                                        className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'keybinds' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Keyboard size={16} /> {t('settings.sidebar.keybinds')}
+                                        <Keyboard size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.keybinds')}</span>
                                     </button>
 
                                     <button type="button"
                                         onClick={() => setActiveTab('phone-mirror')}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'phone-mirror' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
+                                        className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'phone-mirror' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Smartphone size={16} /> {t('settings.sidebar.phoneMirror')}
+                                        <Smartphone size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.phoneMirror')}</span>
                                     </button>
 
                                     <button type="button"
                                         onClick={() => setActiveTab('intelligence')}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'intelligence' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
+                                        className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'intelligence' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Cpu size={16} className={activeTab === 'intelligence' ? 'text-accent-primary' : ''} /> {t('settings.sidebar.intelligence')}
+                                        <Cpu size={16} className={`shrink-0 ${activeTab === 'intelligence' ? 'text-accent-primary' : ''}`} /> <span className="min-w-0 truncate">{t('settings.sidebar.intelligence')}</span>
                                     </button>
 
                                     <button type="button"
                                         onClick={() => setActiveTab('help')}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-[13px] font-medium transition-colors flex items-center gap-3 ${activeTab === 'help' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
+                                        className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-[13px] font-medium transition-colors flex items-center gap-3 ${activeTab === 'help' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <HelpCircle size={16} /> {t('settings.sidebar.setupHelp')}
+                                        <HelpCircle size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.setupHelp')}</span>
                                     </button>
 
                                     <button type="button"
                                         onClick={() => setActiveTab('about')}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'about' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
+                                        className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'about' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
-                                        <Info size={16} /> {t('settings.sidebar.about')}
+                                        <Info size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.about')}</span>
                                     </button>
                                 </nav>
                             </div>
@@ -1640,16 +1640,16 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                     onClick={() => window.electronAPI.quitApp()}
                                     className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 transition-colors flex items-center gap-3"
                                 >
-                                    <LogOut size={16} /> {t('settings.sidebar.quit')}
+                                    <LogOut size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.quit')}</span>
                                 </button>
                                 <button type="button" onClick={onClose} className="group mt-2 w-full text-left px-3 py-2 rounded-lg text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50 transition-colors flex items-center gap-3">
-                                    <X size={18} className="group-hover:text-red-500 transition-colors" /> {t('common.close')}
+                                    <X size={18} className="shrink-0 transition-colors group-hover:text-red-500" /> <span className="min-w-0 truncate">{t('common.close')}</span>
                                 </button>
                             </div>
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 bg-bg-main overflow-y-auto p-8 relative">
+                        <div className="min-w-0 flex-1 bg-bg-main overflow-y-auto p-5 sm:p-6 lg:p-8 relative">
                             {activeTab === 'general' && (
                                 <div className="space-y-6 animated fadeIn">
                                     <div className="space-y-3.5">
@@ -1916,7 +1916,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
 
                                                 {/* Interface Language */}
-                                                <div className="flex items-center justify-between px-4 py-3 gap-4">
+                                                <div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
                                                     <div className="flex items-center gap-4 min-w-0">
                                                         <div className={`w-10 h-10 bg-bg-item-surface rounded-lg border flex items-center justify-center shrink-0 transition-all duration-200 ${
                                                             interfaceLanguage !== 'system'
@@ -1936,10 +1936,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         </div>
                                                     </div>
 
-                                                    <div className="relative shrink-0" ref={interfaceLanguageDropdownRef}>
+                                                    <div className="relative w-full shrink-0 lg:w-auto" ref={interfaceLanguageDropdownRef}>
                                                         <button type="button"
                                                             onClick={() => setIsInterfaceLanguageDropdownOpen(!isInterfaceLanguageDropdownOpen)}
-                                                            className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 min-w-[130px] justify-between"
+                                                            className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex w-full items-center gap-2 justify-between lg:min-w-[150px]"
                                                         >
                                                             <span className="text-ellipsis overflow-hidden whitespace-nowrap">
                                                                 {interfaceLanguage === 'system'
@@ -1972,7 +1972,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 </div>
 
                                                 {/* Translation Packs */}
-                                                <div className="flex items-start justify-between px-4 py-3 gap-4">
+                                                <div className="flex flex-col gap-3 px-4 py-3 xl:flex-row xl:items-start xl:justify-between">
                                                     <div className="flex items-start gap-4 min-w-0">
                                                         <div className="w-10 h-10 bg-bg-item-surface rounded-lg border border-border-subtle text-text-tertiary flex items-center justify-center shrink-0">
                                                             <Languages size={20} />
@@ -2026,8 +2026,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 </div>
 
                                                 {/* Theme */}
-                                                <div className="flex items-center justify-between px-4 py-3">
-                                                    <div className="flex items-center gap-4">
+                                                <div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+                                                    <div className="flex items-center gap-4 min-w-0">
                                                         <div className={`w-10 h-10 bg-bg-item-surface rounded-lg border flex items-center justify-center shrink-0 transition-all duration-200 ${
                                                             themeMode !== 'system'
                                                                 ? isLight
@@ -2043,10 +2043,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         </div>
                                                     </div>
 
-                                                    <div className="relative" ref={themeDropdownRef}>
+                                                    <div className="relative w-full shrink-0 lg:w-auto" ref={themeDropdownRef}>
                                                         <button type="button"
                                                             onClick={() => setIsThemeDropdownOpen(!isThemeDropdownOpen)}
-                                                            className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 min-w-[110px] justify-between"
+                                                            className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex w-full items-center gap-2 justify-between lg:min-w-[130px]"
                                                         >
                                                             <div className="flex items-center gap-2 overflow-hidden">
                                                                 <span className="text-text-secondary shrink-0">
@@ -2091,8 +2091,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 </div>
 
                                                 {/* Meeting Interface Style */}
-                                                <div className="flex items-center justify-between px-4 py-3">
-                                                    <div className="flex items-center gap-4">
+                                                <div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+                                                    <div className="flex items-center gap-4 min-w-0">
                                                         <div className={`w-10 h-10 bg-bg-item-surface rounded-lg border flex items-center justify-center shrink-0 transition-all duration-200 ${
                                                             (meetingInterfaceTheme === 'liquid-glass' || meetingInterfaceTheme === 'modern')
                                                                 ? isLight
@@ -2102,7 +2102,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         }`}>
                                                             <Layout size={20} />
                                                         </div>
-                                                        <div>
+                                                        <div className="min-w-0">
                                                             <h3 className="text-sm font-bold text-text-primary">{t('settings.general.meetingInterfaceStyleTitle')}</h3>
                                                             <p className="text-xs text-text-secondary mt-0.5">
                                                                 {meetingInterfaceTheme === 'liquid-glass'
@@ -2114,10 +2114,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         </div>
                                                     </div>
 
-                                                    <div className="relative" ref={interfaceThemeDropdownRef}>
+                                                    <div className="relative w-full shrink-0 lg:w-auto" ref={interfaceThemeDropdownRef}>
                                                         <button type="button"
                                                             onClick={() => setIsInterfaceThemeDropdownOpen(!isInterfaceThemeDropdownOpen)}
-                                                            className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 min-w-[110px] justify-between"
+                                                            className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex w-full items-center gap-2 justify-between lg:min-w-[150px]"
                                                         >
                                                             <span className="text-ellipsis overflow-hidden whitespace-nowrap">
                                                                 {meetingInterfaceTheme === 'liquid-glass'
@@ -2154,8 +2154,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 </div>
 
                                                     {/* AI answer locale */}
-                                                <div className="flex items-center justify-between px-4 py-3">
-                                                    <div className="flex items-center gap-4">
+                                                <div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+                                                    <div className="flex items-center gap-4 min-w-0">
                                                         <div className={`w-10 h-10 bg-bg-item-surface rounded-lg border flex items-center justify-center shrink-0 transition-all duration-200 ${
                                                             aiResponseLanguage !== 'auto'
                                                                 ? isLight
@@ -2165,7 +2165,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         }`}>
                                                             <Globe size={20} />
                                                         </div>
-                                                        <div>
+                                                        <div className="min-w-0">
                                                             <h3 className="text-sm font-bold text-text-primary">{t('settings.general.aiResponseLanguageTitle')}</h3>
                                                             <p className="text-xs text-text-secondary mt-0.5">
                                                                 {aiResponseLanguage === 'auto'
@@ -2176,10 +2176,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                         </div>
                                                     </div>
 
-                                                    <div className="relative" ref={aiLangDropdownRef}>
+                                                    <div className="relative w-full shrink-0 lg:w-auto" ref={aiLangDropdownRef}>
                                                         <button type="button"
                                                             onClick={() => setIsAiLangDropdownOpen(!isAiLangDropdownOpen)}
-                                                            className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 min-w-[110px] justify-between"
+                                                            className="bg-bg-component hover:bg-bg-elevated border border-border-subtle text-text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex w-full items-center gap-2 justify-between lg:min-w-[130px]"
                                                         >
                                                             <span className="capitalize text-ellipsis overflow-hidden whitespace-nowrap flex items-center gap-1">
                                                                 {aiResponseLanguage === 'auto' ? 'Auto' : aiResponseLanguage}
@@ -2212,8 +2212,8 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                 </div>
 
                                                 {/* Version */}
-                                                <div className="flex items-start justify-between gap-4 px-4 py-3">
-                                                    <div className="flex items-start gap-4">
+                                                <div className="flex flex-col gap-3 px-4 py-3 lg:flex-row lg:items-start lg:justify-between">
+                                                    <div className="flex items-start gap-4 min-w-0">
                                                         <div className="w-10 h-10 bg-bg-item-surface rounded-lg border border-border-subtle flex items-center justify-center text-text-tertiary shrink-0">
                                                             <BadgeCheck size={20} />
                                                         </div>
@@ -2239,7 +2239,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             }
                                                         }}
                                                         disabled={updateStatus === 'checking'}
-                                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center justify-center gap-2 shrink-0 min-w-[110px] ${
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors flex items-center justify-center gap-2 shrink-0 lg:min-w-[120px] ${
                                                             updateStatus === 'checking'
                                                                 ? 'bg-bg-input text-text-tertiary border-border-subtle cursor-wait'
                                                                 : updateStatus === 'available'
@@ -3211,18 +3211,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     </button>
                                                 </div>
 
-                                                {/* Upcoming section — masterpiece treatment, same parent card backdrop */}
                                                 <div className="relative border-t border-white/[0.05]">
-                                                    {/* Ambient mesh — soft cool radial behind the list, pointer-events-none */}
-                                                    <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                                                        <div className="absolute -top-20 -left-10 w-[260px] h-[260px] bg-blue-500/[0.06] blur-[90px]" />
-                                                        <div className="absolute -bottom-24 right-0 w-[220px] h-[220px] bg-violet-500/[0.04] blur-[80px]" />
-                                                    </div>
-
-                                                    {/* Section header */}
-                                                    <div className="relative px-6 pt-5 pb-3 flex items-end justify-between">
-                                                        <div className="space-y-2">
-                                                            <span className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 bg-white/[0.04] ring-1 ring-white/[0.06] text-[9px] font-medium tracking-[0.22em] text-text-secondary uppercase shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                                                    <div className="relative flex items-end justify-between gap-4 px-6 pt-5 pb-3">
+                                                        <div className="min-w-0 space-y-2">
+                                                            <span className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 bg-white/[0.04] ring-1 ring-white/[0.06] text-[9px] font-medium tracking-[0.18em] text-text-secondary uppercase">
                                                                 <span className="w-1 h-1 rounded-full bg-emerald-400/80" />
                                                                 Предстоящие
                                                             </span>
@@ -3248,26 +3240,23 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             }}
                                                             disabled={isCalendarRefreshing}
                                                             aria-label="Обновить предстоящие события"
-                                                            className="group h-8 w-8 rounded-full bg-white/[0.04] hover:bg-white/[0.08] ring-1 ring-white/[0.07] text-text-secondary hover:text-text-primary transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.92] flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                                                            className="group h-8 w-8 shrink-0 rounded-md bg-white/[0.04] hover:bg-white/[0.08] ring-1 ring-white/[0.07] text-text-secondary hover:text-text-primary transition active:scale-[0.96] flex items-center justify-center"
                                                         >
                                                             <RefreshCw
                                                                 size={12}
-                                                                className={`transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${isCalendarRefreshing ? 'animate-spin' : 'group-hover:rotate-[60deg]'}`}
+                                                                className={`transition-transform ${isCalendarRefreshing ? 'animate-spin' : 'group-hover:rotate-[60deg]'}`}
                                                             />
                                                         </button>
                                                     </div>
 
                                                     {calendarEvents.length === 0 ? (
-                                                        /* Empty state — composed, not a placeholder */
                                                         <div className="relative px-6 pt-2 pb-7">
-                                                            <div className="rounded-[1.25rem] p-[1px] bg-gradient-to-b from-white/[0.06] to-white/[0.02]">
-                                                                <div className="rounded-[calc(1.25rem-1px)] bg-bg-card/50 backdrop-blur-md ring-1 ring-white/[0.04] px-6 py-9 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                                                                    <div className="mx-auto w-11 h-11 rounded-2xl bg-white/[0.04] ring-1 ring-white/[0.06] flex items-center justify-center mb-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                                                            <div className="rounded-xl bg-bg-input/60 ring-1 ring-white/[0.04] px-6 py-9 text-center">
+                                                                    <div className="mx-auto w-11 h-11 rounded-lg bg-white/[0.04] ring-1 ring-white/[0.06] flex items-center justify-center mb-3">
                                                                         <Calendar size={18} className="text-text-tertiary" strokeWidth={1.5} />
                                                                     </div>
                                                                     <p className="text-[13px] text-text-primary tracking-[-0.01em]">Ничего не запланировано.</p>
                                                                     <p className="text-[11px] text-text-tertiary mt-1">Неделя пока свободна.</p>
-                                                                </div>
                                                             </div>
                                                         </div>
                                                     ) : (
@@ -3324,11 +3313,10 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                 return (
                                                                     <li
                                                                         key={ev.id}
-                                                                        className="group/row relative rounded-[1.1rem] p-[1px] bg-gradient-to-b from-white/[0.06] to-white/[0.015] transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] hover:from-white/[0.1] hover:to-white/[0.03]"
+                                                                        className="group/row relative rounded-lg border border-white/[0.05] bg-bg-input/50 transition hover:bg-bg-input"
                                                                     >
-                                                                        <div className="relative rounded-[calc(1.1rem-1px)] bg-bg-card/40 backdrop-blur-md ring-1 ring-white/[0.04] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] flex items-stretch gap-3 pl-3 pr-3 py-3 transition-colors duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover/row:bg-bg-card/60">
-                                                                            {/* Date stub — boarding-pass style */}
-                                                                            <div className="shrink-0 w-12 flex flex-col items-center justify-center rounded-[0.85rem] bg-white/[0.03] ring-1 ring-white/[0.05] py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                                                                        <div className="relative flex items-stretch gap-3 px-3 py-3">
+                                                                            <div className="shrink-0 w-12 flex flex-col items-center justify-center rounded-md bg-white/[0.03] ring-1 ring-white/[0.05] py-1.5">
                                                                                 <span className="text-[9px] font-medium uppercase tracking-[0.16em] text-text-tertiary leading-none">
                                                                                     {monthAbbrev}
                                                                                 </span>
@@ -3337,7 +3325,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                                 </span>
                                                                             </div>
 
-                                                                            {/* Body */}
                                                                             <div className="min-w-0 flex-1 flex flex-col justify-center">
                                                                                 <div className="flex items-center gap-2 mb-1">
                                                                                     <span className={`shrink-0 inline-flex items-center rounded-full px-1.5 py-[1px] text-[9px] font-medium tracking-[0.06em] ring-1 ${chipTone.bg} ${chipTone.text} ${chipTone.ring} tabular-nums`}>
@@ -3349,7 +3336,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                                         </span>
                                                                                     )}
                                                                                 </div>
-                                                                                <h4 className="text-[13.5px] font-medium text-text-primary tracking-[-0.01em] leading-snug truncate [text-wrap:balance]">
+                                                                                <h4 className="truncate text-[13.5px] font-medium leading-snug text-text-primary">
                                                                                     {ev.title}
                                                                                 </h4>
                                                                                 <p className="text-[11px] text-text-tertiary tabular-nums mt-0.5">
@@ -3359,16 +3346,15 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                                                 </p>
                                                                             </div>
 
-                                                                            {/* Trailing action — magnetic button */}
                                                                             {ev.link ? (
                                                                                 <button
                                                                                     type="button"
                                                                                     onClick={() => window.electronAPI?.openExternal(ev.link!)}
                                                                                     title={ev.link}
-                                                                                    className="self-center shrink-0 group/btn inline-flex items-center gap-1.5 rounded-full pl-3 pr-1.5 py-1.5 bg-white/[0.05] hover:bg-white/[0.1] ring-1 ring-white/[0.07] text-text-primary text-[11px] font-medium transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.97] shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+                                                                                    className="self-center shrink-0 group/btn inline-flex items-center gap-1.5 rounded-md pl-3 pr-1.5 py-1.5 bg-white/[0.05] hover:bg-white/[0.1] ring-1 ring-white/[0.07] text-text-primary text-[11px] font-medium transition active:scale-[0.97]"
                                                                                 >
                                                                                     <span>Войти</span>
-                                                                                    <span className="w-5 h-5 rounded-full bg-white/[0.08] ring-1 ring-white/[0.08] flex items-center justify-center transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover/btn:translate-x-[1px] group-hover/btn:-translate-y-[1px]">
+                                                                                    <span className="w-5 h-5 rounded bg-white/[0.08] ring-1 ring-white/[0.08] flex items-center justify-center transition-transform group-hover/btn:translate-x-[1px] group-hover/btn:-translate-y-[1px]">
                                                                                         <ExternalLink size={9} strokeWidth={2} />
                                                                                     </span>
                                                                                 </button>

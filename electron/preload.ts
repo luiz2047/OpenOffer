@@ -1,7 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
   ApplicationCreateFromIntakePayload,
+  ApplicationCreateFromIntakeResult,
+  ApplicationDetail,
+  ApplicationListInput,
+  ApplicationUpdatePatch,
   ApplicationIntakeInput,
+  ApplicationIntakeResult,
   InterviewCreatePayload,
   InterviewDetail,
   InterviewIpcResult,
@@ -14,6 +19,9 @@ import type {
   InterviewRetroPayload,
   InterviewSourceParseInput,
   InterviewSourceParseResult,
+  InterviewStageCalendarEventPayload,
+  InterviewStageCreatePayload,
+  InterviewStageUpdatePatch,
   InterviewUpdatePatch,
   PrepBrief,
   PrepBriefPayload,
@@ -880,6 +888,17 @@ interface ElectronAPI {
   interviewsGet: (input: { id: string; include?: Array<'dossier' | 'prep' | 'retros' | 'questions' | 'contacts' | 'meetings'> }) => Promise<InterviewIpcResult<InterviewDetail>>;
   interviewsCreate: (operationId: string, payload: InterviewCreatePayload) => Promise<InterviewIpcResult<InterviewDetail>>;
   interviewsParseSourceText: (input: InterviewSourceParseInput | string) => Promise<InterviewIpcResult<InterviewSourceParseResult>>;
+  applicationIntakeParse: (input: ApplicationIntakeInput | string) => Promise<InterviewIpcResult<ApplicationIntakeResult>>;
+  applicationsList: (input?: ApplicationListInput) => Promise<InterviewIpcResult<ApplicationDetail[]>>;
+  applicationsGet: (id: string) => Promise<InterviewIpcResult<ApplicationDetail>>;
+  applicationsUpdate: (id: string, patch: ApplicationUpdatePatch) => Promise<InterviewIpcResult<ApplicationDetail>>;
+  applicationsCreateFromIntake: (operationId: string, payload: ApplicationCreateFromIntakePayload) => Promise<InterviewIpcResult<ApplicationCreateFromIntakeResult>>;
+  interviewStagesCreate: (payload: InterviewStageCreatePayload) => Promise<InterviewIpcResult<ApplicationDetail>>;
+  interviewStagesUpdate: (id: string, patch: InterviewStageUpdatePatch) => Promise<InterviewIpcResult<ApplicationDetail>>;
+  interviewStagesArchive: (id: string) => Promise<InterviewIpcResult<ApplicationDetail>>;
+  interviewStagesRestore: (id: string, status?: InterviewStageUpdatePatch['status']) => Promise<InterviewIpcResult<ApplicationDetail>>;
+  interviewStagesAttachMeeting: (id: string, meetingId: string) => Promise<InterviewIpcResult<{ attached: boolean }>>;
+  interviewStagesCreateCalendarEvent: (id: string, provider: InterviewStageCalendarEventPayload['provider']) => Promise<InterviewIpcResult<ApplicationDetail>>;
   interviewsUpdate: (id: string, patch: InterviewUpdatePatch) => Promise<InterviewIpcResult<InterviewDetail>>;
   interviewsArchive: (id: string) => Promise<InterviewIpcResult<{ archived: boolean }>>;
   interviewsDelete: (id: string, includeLinkedMeetings?: boolean) => Promise<InterviewIpcResult<{ deleted: boolean }>>;
@@ -2245,10 +2264,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('interviews:parse-source-text', input),
   applicationIntakeParse: (input: ApplicationIntakeInput | string) =>
     ipcRenderer.invoke('application-intake:parse', input),
-  applicationsList: () => ipcRenderer.invoke('applications:list'),
+  applicationsList: (input?: ApplicationListInput) => ipcRenderer.invoke('applications:list', input),
   applicationsGet: (id: string) => ipcRenderer.invoke('applications:get', id),
+  applicationsUpdate: (id: string, patch: ApplicationUpdatePatch) =>
+    ipcRenderer.invoke('applications:update', id, patch),
   applicationsCreateFromIntake: (operationId: string, payload: ApplicationCreateFromIntakePayload) =>
     ipcRenderer.invoke('applications:create-from-intake', operationId, payload),
+  interviewStagesCreate: (payload: InterviewStageCreatePayload) =>
+    ipcRenderer.invoke('interview-stages:create', payload),
+  interviewStagesUpdate: (id: string, patch: InterviewStageUpdatePatch) =>
+    ipcRenderer.invoke('interview-stages:update', id, patch),
+  interviewStagesArchive: (id: string) => ipcRenderer.invoke('interview-stages:archive', id),
+  interviewStagesRestore: (id: string, status?: InterviewStageUpdatePatch['status']) =>
+    ipcRenderer.invoke('interview-stages:restore', id, status),
+  interviewStagesAttachMeeting: (id: string, meetingId: string) =>
+    ipcRenderer.invoke('interview-stages:attach-meeting', id, meetingId),
+  interviewStagesCreateCalendarEvent: (id: string, provider: InterviewStageCalendarEventPayload['provider']) =>
+    ipcRenderer.invoke('interview-stages:create-calendar-event', id, provider),
   interviewsUpdate: (id: string, patch: InterviewUpdatePatch) =>
     ipcRenderer.invoke('interviews:update', id, patch),
   interviewsArchive: (id: string) => ipcRenderer.invoke('interviews:archive', id),

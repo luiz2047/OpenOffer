@@ -26,9 +26,11 @@ test.describe('Interview Command Center', () => {
       const applications: any[] = [];
       const meetings = [
         { id: 'meeting_1', title: 'Backend interview recording', date: '2026-06-18T10:00:00.000Z', duration: '3600000', summary: '' },
+        { id: 'meeting_2', title: 'Final stage recording', date: '2026-06-19T10:00:00.000Z', duration: '2700000', summary: '' },
       ];
       const fixedNow = '2026-06-18T00:00:00.000Z';
       let lastCreateFromIntakePayload: any = null;
+      let lastStartMeetingPayload: any = null;
 
       function result<T>(data: T) {
         return { ok: true, data };
@@ -105,11 +107,12 @@ test.describe('Interview Command Center', () => {
             format: 'online',
             meetingUrl: row.meetingUrl ?? null,
             calendarSyncStatus: row.calendarSyncStatus ?? 'local_only',
+            calendarEventId: row.calendarEventId ?? null,
             rawSourceText: row.rawSourceText ?? null,
             legacyInterviewEventId: row.id,
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
-            archivedAt: null,
+            archivedAt: row.archivedAt ?? null,
           }))
           .sort((left, right) => (left.startsAt ?? Number.MAX_SAFE_INTEGER) - (right.startsAt ?? Number.MAX_SAFE_INTEGER));
       }
@@ -390,9 +393,112 @@ test.describe('Interview Command Center', () => {
             ? result(application)
             : { ok: false, code: 'not_found', message: 'Application not found.', retryable: false, action: 'none' };
         },
+        applicationsUpdate: async (id: string, patch: any) => {
+          const application = applications.find(row => row.id === id);
+          if (!application) return { ok: false, code: 'not_found', message: 'Application not found.', retryable: false, action: 'none' };
+          Object.assign(application, patch, { updatedAt: fixedNow });
+          const legacy = interviews.find(row => row.id === application.legacyInterviewEventId);
+          if (legacy) {
+            Object.assign(legacy, {
+              title: application.title,
+              company: application.company,
+              roleTitle: application.roleTitle,
+              priority: application.priority,
+              source: application.source,
+              vacancyUrl: application.vacancyUrl,
+              rawSourceText: application.rawSourceText,
+              updatedAt: fixedNow,
+            });
+          }
+          return result(applicationDetail(id));
+        },
         applicationsCreateFromIntake: async (_operationId: string, payload: any) => {
           lastCreateFromIntakePayload = payload;
           return result(createFromIntakePayload(payload));
+        },
+        interviewStagesCreate: async (payload: any) => {
+          const application = applications.find(row => row.id === payload.applicationId);
+          if (!application) return { ok: false, code: 'not_found', message: 'Application not found.', retryable: false, action: 'none' };
+          const legacyId = `interview_${interviews.length + 1}`;
+          const stageId = `stage_${interviews.length + 1}`;
+          interviews.unshift({
+            id: legacyId,
+            title: application.title,
+            company: application.company,
+            roleTitle: application.roleTitle,
+            stage: payload.title,
+            stageType: payload.stageType ?? 'custom',
+            stageStatus: payload.status ?? 'draft',
+            status: 'interviewing',
+            priority: application.priority ?? 'normal',
+            source: application.source ?? 'manual',
+            vacancyUrl: application.vacancyUrl ?? null,
+            meetingUrl: payload.meetingUrl ?? null,
+            calendarSyncStatus: 'local_only',
+            startsAt: payload.startsAt ?? null,
+            endsAt: payload.endsAt ?? null,
+            timezone: payload.timezone ?? 'UTC',
+            rawSourceText: payload.rawSourceText ?? null,
+            applicationId: application.id,
+            selectedStageId: stageId,
+            createdAt: fixedNow,
+            updatedAt: fixedNow,
+            dossier: application.dossier,
+            questions: [],
+            retros: [],
+          });
+          application.status = application.status === 'lead_found' ? 'interviewing' : application.status;
+          application.updatedAt = fixedNow;
+          return result(applicationDetail(application.id));
+        },
+        interviewStagesUpdate: async (stageId: string, patch: any) => {
+          const row = interviews.find(item => item.selectedStageId === stageId);
+          if (!row) return { ok: false, code: 'not_found', message: 'Stage not found.', retryable: false, action: 'none' };
+          Object.assign(row, {
+            stage: patch.title ?? row.stage,
+            stageType: patch.stageType ?? row.stageType,
+            stageStatus: patch.status ?? row.stageStatus,
+            startsAt: patch.startsAt ?? row.startsAt,
+            endsAt: patch.endsAt ?? row.endsAt,
+            timezone: patch.timezone ?? row.timezone,
+            meetingUrl: patch.meetingUrl ?? row.meetingUrl,
+            rawSourceText: patch.rawSourceText ?? row.rawSourceText,
+            updatedAt: fixedNow,
+          });
+          return result(applicationDetail(row.applicationId));
+        },
+        interviewStagesArchive: async (stageId: string) => {
+          const row = interviews.find(item => item.selectedStageId === stageId);
+          if (!row) return { ok: false, code: 'not_found', message: 'Stage not found.', retryable: false, action: 'none' };
+          row.stageStatus = 'archived';
+          row.archivedAt = fixedNow;
+          return result(applicationDetail(row.applicationId));
+        },
+        interviewStagesRestore: async (stageId: string, status = 'scheduled') => {
+          const row = interviews.find(item => item.selectedStageId === stageId);
+          if (!row) return { ok: false, code: 'not_found', message: 'Stage not found.', retryable: false, action: 'none' };
+          row.stageStatus = status;
+          row.archivedAt = null;
+          return result(applicationDetail(row.applicationId));
+        },
+        interviewStagesAttachMeeting: async (stageId: string, meetingId: string) => {
+          const row = interviews.find(item => item.selectedStageId === stageId);
+          const meeting = meetings.find(item => item.id === meetingId);
+          if (row && meeting) {
+            Object.assign(meeting, {
+              interviewEventId: row.id,
+              interviewStageId: stageId,
+              applicationId: row.applicationId,
+            });
+          }
+          return result({ attached: true });
+        },
+        interviewStagesCreateCalendarEvent: async (stageId: string, provider: string) => {
+          const row = interviews.find(item => item.selectedStageId === stageId);
+          if (!row) return { ok: false, code: 'not_found', message: 'Stage not found.', retryable: false, action: 'none' };
+          row.calendarSyncStatus = provider;
+          row.calendarEventId = `${provider}_${stageId}`;
+          return result(applicationDetail(row.applicationId));
         },
         vacancyDossierSave: async (id: string, _operationId: string, payload: any) => {
           const row = interviews.find(item => item.id === id);
@@ -444,7 +550,20 @@ test.describe('Interview Command Center', () => {
         }),
         interviewsGetRetroPrompt: async (id: string) => result({ interviewEventId: id, due: false, reason: 'not_ended', state: null }),
         interviewsUpdateRetroPrompt: async (id: string) => result({ interviewEventId: id, due: false, reason: 'dismissed', state: null }),
-        startMeeting: async () => ({ success: true }),
+        startMeeting: async (metadata: any) => {
+          lastStartMeetingPayload = metadata;
+          meetings.unshift({
+            id: `meeting_${meetings.length + 1}`,
+            title: metadata?.title ?? 'Manual recording',
+            date: new Date().toISOString(),
+            duration: '0',
+            summary: '',
+            applicationId: metadata?.applicationId ?? null,
+            interviewStageId: metadata?.interviewStageId ?? null,
+            interviewEventId: metadata?.interviewEventId ?? null,
+          });
+          return { success: true };
+        },
       };
 
       (window as any).__openOfferTestState = {
@@ -453,6 +572,9 @@ test.describe('Interview Command Center', () => {
         meetings,
         get lastCreateFromIntakePayload() {
           return lastCreateFromIntakePayload;
+        },
+        get lastStartMeetingPayload() {
+          return lastStartMeetingPayload;
         },
       };
 
@@ -469,11 +591,12 @@ test.describe('Interview Command Center', () => {
     });
   });
 
-  test('manual process flow covers create, prep, questions, retro, and recording link', async ({ page }) => {
+  test('manual process flow covers vacancy edit, stage edit, recording, archive, and pane resize', async ({ page }) => {
     await gotoApp(page);
 
     const commandCenter = page.getByTestId('interview-command-center');
     await expect(page.getByText('Vacancy OS')).toBeVisible();
+    await expect(page.getByTestId('interview-pane-resize-handle')).toHaveCount(2);
     await expect(commandCenter.getByRole('button', { name: 'Connect' })).toHaveCount(0);
     await expect(commandCenter.getByRole('button', { name: 'Sync not configured' })).toBeVisible();
     await expect(commandCenter.getByText('No events for this day.')).toBeVisible();
@@ -510,54 +633,73 @@ test.describe('Interview Command Center', () => {
     await expect(page.getByText(/characters hidden/)).toBeVisible();
     await page.getByRole('button', { name: 'Show' }).click();
 
+    const applicationFields = page.getByTestId('application-fields-card');
+    await applicationFields.getByRole('textbox', { name: 'Company', exact: true }).fill('Acme Edited');
+    await applicationFields.getByRole('textbox', { name: 'Next action', exact: true }).fill('Send follow-up');
+    await applicationFields.getByRole('button', { name: 'Save' }).click();
+    await expect.poll(async () => page.evaluate(() => (window as any).__openOfferTestState.applications[0].company)).toBe('Acme Edited');
+
     await page.getByRole('button', { name: /^Agent$/ }).click();
     const stageAgentInput = page.locator('textarea[maxlength="50000"]');
     await stageAgentInput.fill('Synthetic stage update for existing saved vacancy.');
     await page.getByRole('button', { name: 'Parse' }).click();
     await expect(page.getByText(/Will add the stage to .Acme Backend interview./)).toBeVisible();
     await page.getByRole('button', { name: 'Add stage' }).click();
+    await page.getByRole('button', { name: 'Stages', exact: true }).click();
     await expect(page.getByText('Tech screening')).toBeVisible();
     await expect(page.getByText('1 active process')).toBeVisible();
     const firstAgentPayload = await page.evaluate(() => (window as any).__openOfferTestState.lastCreateFromIntakePayload);
     expect(firstAgentPayload.selectedApplicationId).toBe('app_1');
 
-    await expect(page.getByText('Interview').first()).toBeVisible();
-    await page.getByRole('button', { name: 'Prep', exact: true }).click();
-    await page.getByLabel('Cheat sheet').fill('Review transactions and rollout tradeoffs.');
-    await page.getByRole('button', { name: 'Save prep' }).click();
-
-    await page.getByRole('button', { name: 'Questions', exact: true }).click();
-    await page.getByPlaceholder('Question').fill('How do you debug a slow SQL query?');
-    await page.getByPlaceholder('Category').fill('backend');
-    await page.getByRole('button', { name: 'Add' }).click();
-    await page.getByRole('button', { name: 'Save questions' }).click();
-    await expect(page.getByText('How do you debug a slow SQL query?')).toBeVisible();
-
-    await page.getByRole('button', { name: 'Stages', exact: true }).click();
-    await page.locator('select').last().selectOption('meeting_1');
-    await page.getByRole('button', { name: 'Link' }).click();
+    const techStage = page.getByTestId('interview-stage-card').filter({ hasText: 'Tech screening' });
+    await expect(techStage).toBeVisible();
+    await techStage.getByLabel('Title').fill('Technical sync');
+    await techStage.getByLabel('Meeting URL').fill('https://meet.example/edited');
+    await techStage.getByRole('button', { name: 'Save' }).click();
+    await expect(page.getByText('Technical sync')).toBeVisible();
+    const updatedTechStage = page.getByTestId('interview-stage-card').filter({ hasText: 'Technical sync' });
+    await updatedTechStage.getByRole('button', { name: 'Create in Google Calendar' }).click();
+    await expect(updatedTechStage.getByText('google', { exact: true }).first()).toBeVisible();
+    await updatedTechStage.getByLabel('Attach recording').selectOption({ label: 'Backend interview recording' });
+    await updatedTechStage.getByRole('button', { name: 'Link' }).click();
     await expect(page.getByText('Backend interview recording').last()).toBeVisible();
 
-    await page.getByRole('button', { name: 'Retro', exact: true }).click();
-    await page.getByRole('button', { name: 'Generate AI evaluation' }).click();
-    await expect(page.getByText('AI summary says the interview had a clear backend signal.')).toBeVisible();
-    await page.getByLabel('Main signal').fill('Strong backend signal, weak infra follow-up.');
-    await page.getByRole('button', { name: 'Save retro' }).click();
+    await updatedTechStage.getByRole('button', { name: 'Start recording' }).click();
+    const startPayload = await page.evaluate(() => (window as any).__openOfferTestState.lastStartMeetingPayload);
+    expect(startPayload.applicationId).toBe('app_1');
+    expect(startPayload.interviewStageId).toBe('stage_2');
 
     await page.getByRole('button', { name: /^Agent$/ }).click();
     const secondStageAgentInput = page.locator('textarea[maxlength="50000"]');
     await secondStageAgentInput.fill('Synthetic second stage update for existing saved vacancy.');
     await page.getByRole('button', { name: 'Parse' }).click();
     await expect(page.getByText(/Will add the stage to .Acme Backend interview./)).toBeVisible();
-    await page.getByRole('button', { name: 'Add stage' }).click();
-    await expect(page.getByText('2 stages')).toBeVisible();
+    await page.getByRole('button', { name: 'Add stage' }).nth(1).click();
+    await expect(page.getByText('2 stages', { exact: true }).first()).toBeVisible();
     const secondAgentPayload = await page.evaluate(() => (window as any).__openOfferTestState.lastCreateFromIntakePayload);
     expect(secondAgentPayload.selectedApplicationId).toBe('app_1');
 
     await page.getByRole('button', { name: 'Stages', exact: true }).click();
     const stageCards = page.getByTestId('interview-stage-card');
     await expect(stageCards).toHaveCount(2);
-    await expect(stageCards.filter({ hasText: 'Tech screening' }).getByTestId('stage-recording-count')).toHaveText('1');
-    await expect(stageCards.filter({ hasText: 'Final interview' }).getByTestId('stage-recording-count')).toHaveText('0');
+    const technicalStage = stageCards.nth(0);
+    const finalStage = stageCards.nth(1);
+    await expect(technicalStage).toContainText('Technical sync');
+    await expect(finalStage).toContainText('Final interview');
+    await expect(technicalStage.getByTestId('stage-recording-count')).toHaveText('2');
+    await expect(finalStage.getByTestId('stage-recording-count')).toHaveText('0');
+    await finalStage.getByLabel('Attach recording').selectOption({ label: 'Final stage recording' });
+    await finalStage.getByRole('button', { name: 'Link' }).click();
+    await expect(finalStage.getByTestId('stage-recording-count')).toHaveText('1');
+
+    await page.getByRole('button', { name: 'Add stage' }).first().click();
+    await expect(page.getByTestId('interview-stage-card')).toHaveCount(3);
+    await expect(page.getByTestId('interview-stage-card').filter({ hasText: 'Interview stage' })).toBeVisible();
+
+    await finalStage.getByTitle('Archive stage').click();
+    await expect(page.getByText('Archived stages')).toBeVisible();
+    await expect(page.getByTestId('interview-stage-card').filter({ hasText: 'Final interview' }).getByRole('button', { name: 'Start recording' })).toHaveCount(0);
+    await page.getByTestId('interview-stage-card').filter({ hasText: 'Final interview' }).getByTitle('Restore stage').click();
+    await expect(page.getByTestId('interview-stage-card').filter({ hasText: 'Final interview' }).getByRole('button', { name: 'Start recording' })).toBeVisible();
   });
 });

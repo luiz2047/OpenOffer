@@ -9,11 +9,13 @@ import {
   ChevronRight,
   CircleDot,
   Clock3,
+  Copy,
   FileText,
   Link as LinkIcon,
   MessageSquareText,
   Plus,
   RefreshCw,
+  RotateCcw,
   Search,
   Trash2,
   UserRound,
@@ -23,6 +25,7 @@ import type {
   ApplicationDetail,
   ApplicationIntakeResult,
   ApplicationStatus,
+  ApplicationUpdatePatch,
   CalendarProvider,
   CalendarSnapshot,
   InterviewCreatePayload,
@@ -33,13 +36,18 @@ import type {
   InterviewRetroEvaluation,
   InterviewRetroPayload,
   InterviewStage,
+  InterviewStageCreatePayload,
+  InterviewStageFormat,
   InterviewStatus,
+  InterviewStageStatus,
+  InterviewStageType,
+  InterviewStageUpdatePatch,
   LinkedMeeting,
   PrepBriefPayload,
   RetroPromptDecision,
   VacancyDossierPayload,
 } from '../../types/interviews';
-import { applicationApi, interviewApi } from './api';
+import { applicationApi, interviewApi, stageApi } from './api';
 
 interface MeetingSummary {
   id: string;
@@ -81,13 +89,18 @@ interface InterviewCommandCenterProps {
 }
 
 const STATUS_OPTIONS: InterviewStatus[] = ['active', 'applied', 'screening', 'interviewing', 'offer', 'rejected', 'withdrawn', 'archived'];
+const APPLICATION_STATUS_OPTIONS: ApplicationStatus[] = ['lead_found', 'applied', 'screening', 'interviewing', 'offer', 'rejected', 'withdrawn', 'archived'];
 const PRIORITY_OPTIONS: InterviewPriority[] = ['normal', 'high', 'low'];
-const DETAIL_TABS = ['Vacancy', 'Stages', 'Prep', 'Retro', 'Questions'] as const;
+const DETAIL_TABS = ['Vacancy', 'Stages'] as const;
 const AGENT_STEPS = ['read', 'search', 'extract', 'stage', 'match', 'proposal'] as const;
+const STAGE_TYPE_OPTIONS: InterviewStageType[] = ['recruiter_screen', 'technical_screen', 'system_design', 'leadership', 'final', 'offer_security', 'custom'];
+const STAGE_STATUS_OPTIONS: InterviewStageStatus[] = ['draft', 'scheduled', 'done', 'waiting_feedback', 'passed', 'rejected', 'canceled', 'archived'];
+const STAGE_FORMAT_OPTIONS: InterviewStageFormat[] = ['online', 'onsite', 'phone', 'async', 'unknown'];
 
-type DetailTab = typeof DETAIL_TABS[number];
+type DetailTab = 'Vacancy' | 'Stages' | 'Prep' | 'Retro' | 'Questions';
 type DraftStatus = 'synced' | 'dirty' | 'saved' | 'failed';
 type AgentStep = typeof AGENT_STEPS[number] | 'apply';
+type VacancyStatusFilter = 'active' | 'all' | ApplicationStatus;
 
 interface VacancyListItem {
   id: string;
@@ -109,12 +122,9 @@ interface VacancyListItem {
   stages: InterviewListItem[];
 }
 
-const DETAIL_TAB_I18N_KEY: Record<DetailTab, string> = {
+const DETAIL_TAB_I18N_KEY: Record<typeof DETAIL_TABS[number], string> = {
   Vacancy: 'interviews.detailTabs.vacancy',
   Stages: 'interviews.detailTabs.stages',
-  Prep: 'interviews.detailTabs.prep',
-  Retro: 'interviews.detailTabs.retro',
-  Questions: 'interviews.detailTabs.questions',
 };
 
 const AGENT_STEP_I18N_KEY: Record<AgentStep, string> = {
@@ -128,8 +138,29 @@ const AGENT_STEP_I18N_KEY: Record<AgentStep, string> = {
 };
 
 const DRAFT_PREFIX = 'openoffer:interviews:draft';
+const PANE_LAYOUT_STORAGE_KEY = 'openoffer:interviews:pane-layout:v1';
 const AGENT_INPUT_MAX_CHARS = 50000;
 const INACTIVE_APPLICATION_STATUSES = new Set<ApplicationStatus>(['rejected', 'withdrawn', 'archived']);
+const PANE_LAYOUT_LIMITS = {
+  calendarMin: 220,
+  calendarMax: 520,
+  vacancyMin: 280,
+  vacancyMax: 560,
+  detailMin: 420,
+};
+const DEFAULT_PANE_LAYOUT: InterviewPaneLayout = {
+  calendarWidth: 280,
+  vacancyWidth: 360,
+  detailMinWidth: PANE_LAYOUT_LIMITS.detailMin,
+  updatedAt: '',
+};
+
+interface InterviewPaneLayout {
+  calendarWidth: number;
+  vacancyWidth: number;
+  detailMinWidth: number;
+  updatedAt: string;
+}
 
 function draftKey(interviewId: string, kind: 'dossier' | 'prep' | 'retro'): string {
   return `${DRAFT_PREFIX}:${interviewId}:${kind}`;
@@ -160,6 +191,47 @@ function clearLocalDraft(interviewId: string, kind: 'dossier' | 'prep' | 'retro'
     if (typeof window !== 'undefined') window.localStorage.removeItem(draftKey(interviewId, kind));
   } catch {
     // Local draft cleanup is best-effort.
+  }
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function normalizePaneLayout(value: Partial<InterviewPaneLayout> | null | undefined): InterviewPaneLayout {
+  return {
+    calendarWidth: clampNumber(
+      Number(value?.calendarWidth) || DEFAULT_PANE_LAYOUT.calendarWidth,
+      PANE_LAYOUT_LIMITS.calendarMin,
+      PANE_LAYOUT_LIMITS.calendarMax
+    ),
+    vacancyWidth: clampNumber(
+      Number(value?.vacancyWidth) || DEFAULT_PANE_LAYOUT.vacancyWidth,
+      PANE_LAYOUT_LIMITS.vacancyMin,
+      PANE_LAYOUT_LIMITS.vacancyMax
+    ),
+    detailMinWidth: PANE_LAYOUT_LIMITS.detailMin,
+    updatedAt: typeof value?.updatedAt === 'string' ? value.updatedAt : '',
+  };
+}
+
+function readPaneLayout(): InterviewPaneLayout {
+  try {
+    if (typeof window === 'undefined') return DEFAULT_PANE_LAYOUT;
+    const raw = window.localStorage.getItem(PANE_LAYOUT_STORAGE_KEY);
+    return raw ? normalizePaneLayout(JSON.parse(raw) as Partial<InterviewPaneLayout>) : DEFAULT_PANE_LAYOUT;
+  } catch {
+    return DEFAULT_PANE_LAYOUT;
+  }
+}
+
+function persistPaneLayout(layout: InterviewPaneLayout): void {
+  try {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(PANE_LAYOUT_STORAGE_KEY, JSON.stringify(layout));
+    }
+  } catch {
+    // Pane layout persistence is best-effort.
   }
 }
 
@@ -207,6 +279,26 @@ function fromLocalInputValue(value: string): number | null {
   if (!value) return null;
   const ms = new Date(value).getTime();
   return Number.isFinite(ms) ? ms : null;
+}
+
+function emptyToNull(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function isValidUrl(value?: string | null): boolean {
+  if (!value) return false;
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function copyText(value?: string | null): Promise<void> {
+  if (!value) return;
+  await navigator.clipboard?.writeText(value);
 }
 
 function splitLines(value: string): string[] {
@@ -449,6 +541,38 @@ function initialDossierDraft() {
   };
 }
 
+function applicationDraftFromDetail(application: ApplicationDetail | null) {
+  return {
+    title: application?.title ?? '',
+    company: application?.company ?? '',
+    roleTitle: application?.roleTitle ?? '',
+    status: application?.status ?? 'lead_found' as ApplicationStatus,
+    priority: application?.priority ?? 'normal' as InterviewPriority,
+    source: application?.source ?? '',
+    sourceUrl: application?.sourceUrl ?? '',
+    vacancyUrl: application?.vacancyUrl ?? '',
+    compensationText: application?.compensationText ?? '',
+    locationFormat: application?.locationFormat ?? '',
+    nextAction: application?.nextAction ?? '',
+    nextActionDueAt: toLocalInputValue(application?.nextActionDueAt),
+    rawSourceText: application?.rawSourceText ?? '',
+  };
+}
+
+function stageDraftFromStage(stage: InterviewStage) {
+  return {
+    title: stage.title,
+    stageType: stage.stageType,
+    status: stage.status,
+    startsAt: toLocalInputValue(stage.startsAt),
+    endsAt: toLocalInputValue(stage.endsAt),
+    timezone: stage.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
+    format: stage.format ?? 'unknown' as InterviewStageFormat,
+    meetingUrl: stage.meetingUrl ?? '',
+    rawSourceText: stage.rawSourceText ?? '',
+  };
+}
+
 function dossierDraftFromDetail(detail: InterviewDetail) {
   return {
     description: detail.dossier?.description ?? '',
@@ -525,6 +649,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const [rawSourceExpanded, setRawSourceExpanded] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>('Vacancy');
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<VacancyStatusFilter>('active');
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<InterviewCreatePayload>(initialCreateForm);
   const [createCalendarProvider, setCreateCalendarProvider] = useState<'none' | 'google' | 'macos'>('none');
@@ -535,6 +660,11 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const [agentPreview, setAgentPreview] = useState<ApplicationIntakeResult | null>(null);
   const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
   const [dossierDraft, setDossierDraft] = useState(initialDossierDraft);
+  const [applicationDraft, setApplicationDraft] = useState(() => applicationDraftFromDetail(null));
+  const [applicationSaveStatus, setApplicationSaveStatus] = useState<DraftStatus>('synced');
+  const [stageDrafts, setStageDrafts] = useState<Record<string, ReturnType<typeof stageDraftFromStage>>>({});
+  const [stageSaveStatus, setStageSaveStatus] = useState<Record<string, DraftStatus>>({});
+  const [paneLayout, setPaneLayout] = useState<InterviewPaneLayout>(() => readPaneLayout());
   const [prepDraft, setPrepDraft] = useState({
     oneLineGoal: '',
     pitch30s: '',
@@ -553,7 +683,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const [questionDrafts, setQuestionDrafts] = useState<InterviewQuestionPayload[]>([]);
   const [questionText, setQuestionText] = useState('');
   const [questionCategory, setQuestionCategory] = useState('');
-  const [attachMeetingId, setAttachMeetingId] = useState('');
+  const [attachMeetingIds, setAttachMeetingIds] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -562,12 +692,15 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       setError(null);
       const [rows, applicationRows] = await Promise.all([
         interviewApi.list({ limit: 100 }),
-        applicationApi.list().catch(() => [] as ApplicationDetail[]),
+        applicationApi.list({ includeArchived: true }).catch(() => [] as ApplicationDetail[]),
       ]);
       setInterviews(rows);
-      setApplications(applicationRows.filter(application => isActiveApplication(application.status)));
+      setApplications(applicationRows);
       setSelectedId(current => {
-        if (current && rows.some(row => row.id === current)) return current;
+        const currentApplication = current
+          ? applicationRows.find(application => legacyIdForApplication(application) === current)
+          : null;
+        if (current && (rows.some(row => row.id === current) || currentApplication)) return current;
         const firstApplication = applicationRows.find(application => isActiveApplication(application.status));
         const applicationLegacyId = firstApplication ? legacyIdForApplication(firstApplication) : null;
         return applicationLegacyId ?? rows[0]?.id ?? null;
@@ -616,6 +749,10 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         if (cancelled) return;
         setDetail(nextDetail);
         setApplicationDetail(nextApplication);
+        setApplicationDraft(applicationDraftFromDetail(nextApplication));
+        setApplicationSaveStatus('synced');
+        setStageDrafts(Object.fromEntries((nextApplication?.stages ?? []).map(stage => [stage.id, stageDraftFromStage(stage)])));
+        setStageSaveStatus(Object.fromEntries((nextApplication?.stages ?? []).map(stage => [stage.id, 'synced' as DraftStatus])));
         setRetroPrompt(nextRetroPrompt);
         setRetroEvaluation(nextDetail.retroEvaluation ?? null);
         const dossierLocalDraft = readLocalDraft<ReturnType<typeof initialDossierDraft>>(nextDetail.id, 'dossier');
@@ -639,10 +776,27 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     };
   }, [selectedId]);
 
+  useEffect(() => {
+    if (!applicationDetail?.id) return;
+    let cancelled = false;
+    void applicationApi.get(applicationDetail.id)
+      .then(next => {
+        if (cancelled) return;
+        setApplicationDetail(next);
+        setStageDrafts(current => ({
+          ...Object.fromEntries(next.stages.map(stage => [stage.id, stageDraftFromStage(stage)])),
+          ...Object.fromEntries(Object.entries(current).filter(([stageId]) => next.stages.some(stage => stage.id === stageId))),
+        }));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [meetings.length]);
+
   const vacancyItems = useMemo(() => {
     const grouped = new Map(groupVacanciesFromInterviews(interviews).map(item => [item.id, item]));
     for (const application of applications) {
-      if (!isActiveApplication(application.status)) continue;
       grouped.set(application.id, vacancyFromApplication(application, grouped.get(application.id)));
     }
     return Array.from(grouped.values()).sort((a, b) => {
@@ -652,10 +806,16 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     });
   }, [applications, interviews]);
 
+  const statusFilteredVacancies = useMemo(() => {
+    if (statusFilter === 'all') return vacancyItems;
+    if (statusFilter === 'active') return vacancyItems.filter(item => isActiveApplication(item.status));
+    return vacancyItems.filter(item => item.status === statusFilter);
+  }, [statusFilter, vacancyItems]);
+
   const filteredVacancies = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return vacancyItems;
-    return vacancyItems.filter(item => [
+    if (!needle) return statusFilteredVacancies;
+    return statusFilteredVacancies.filter(item => [
       item.title,
       item.company,
       item.roleTitle,
@@ -664,7 +824,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       item.vacancyUrl,
       ...item.stages.map(stage => stage.stage),
     ].some(value => String(value ?? '').toLowerCase().includes(needle)));
-  }, [query, vacancyItems]);
+  }, [query, statusFilteredVacancies]);
 
   const upcomingAgenda = useMemo(() => {
     return upcomingEvents
@@ -699,6 +859,8 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     return findMatchingApplication(agentPreview, vacancyItems);
   }, [agentPreview, vacancyItems]);
   const stages = applicationDetail?.stages ?? [];
+  const activeStages = stages.filter(stage => stage.status !== 'archived' && !stage.archivedAt);
+  const archivedStages = stages.filter(stage => stage.status === 'archived' || stage.archivedAt);
   const formatSchedule = useCallback((ms?: number | null) => (ms ? formatDateTime(ms) : t('interviews.unscheduled')), [t]);
   const requirementGroups = useMemo(
     () => groupRequirementLines(splitLines(dossierDraft.requirements), t('interviews.detail.requirements')),
@@ -887,6 +1049,134 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     });
   };
 
+  const updateApplicationDraft = <K extends keyof typeof applicationDraft>(key: K, value: typeof applicationDraft[K]) => {
+    setApplicationDraft(prev => ({ ...prev, [key]: value }));
+    setApplicationSaveStatus('dirty');
+  };
+
+  const saveApplication = async () => {
+    if (!applicationDetail) return;
+    const patch: ApplicationUpdatePatch = {
+      title: applicationDraft.title,
+      company: emptyToNull(applicationDraft.company),
+      roleTitle: emptyToNull(applicationDraft.roleTitle),
+      status: applicationDraft.status,
+      priority: applicationDraft.priority,
+      source: emptyToNull(applicationDraft.source),
+      sourceUrl: emptyToNull(applicationDraft.sourceUrl),
+      vacancyUrl: emptyToNull(applicationDraft.vacancyUrl),
+      compensationText: emptyToNull(applicationDraft.compensationText),
+      locationFormat: emptyToNull(applicationDraft.locationFormat),
+      nextAction: emptyToNull(applicationDraft.nextAction),
+      nextActionDueAt: fromLocalInputValue(applicationDraft.nextActionDueAt),
+      rawSourceText: emptyToNull(applicationDraft.rawSourceText),
+    };
+    await run(async () => {
+      const updated = await applicationApi.update(applicationDetail.id, patch);
+      setApplicationDetail(updated);
+      setApplicationDraft(applicationDraftFromDetail(updated));
+      setStageDrafts(Object.fromEntries(updated.stages.map(stage => [stage.id, stageDraftFromStage(stage)])));
+      setApplicationSaveStatus('saved');
+      await loadInterviews();
+      const nextLegacyId = legacyIdForApplication(updated);
+      if (nextLegacyId) setSelectedId(nextLegacyId);
+    }).catch(() => setApplicationSaveStatus('failed'));
+  };
+
+  const updateStageDraft = <K extends keyof ReturnType<typeof stageDraftFromStage>>(stageId: string, key: K, value: ReturnType<typeof stageDraftFromStage>[K]) => {
+    setStageDrafts(prev => ({
+      ...prev,
+      [stageId]: {
+        ...(prev[stageId] ?? {}),
+        [key]: value,
+      } as ReturnType<typeof stageDraftFromStage>,
+    }));
+    setStageSaveStatus(prev => ({ ...prev, [stageId]: 'dirty' }));
+  };
+
+  const saveStage = async (stage: InterviewStage) => {
+    const draft = stageDrafts[stage.id] ?? stageDraftFromStage(stage);
+    const patch: InterviewStageUpdatePatch = {
+      title: draft.title,
+      stageType: draft.stageType,
+      status: draft.status,
+      startsAt: fromLocalInputValue(draft.startsAt),
+      endsAt: fromLocalInputValue(draft.endsAt),
+      timezone: emptyToNull(draft.timezone),
+      format: draft.format,
+      meetingUrl: emptyToNull(draft.meetingUrl),
+      rawSourceText: emptyToNull(draft.rawSourceText),
+      calendarProvider: draft.startsAt || draft.endsAt || draft.meetingUrl ? stage.calendarProvider ?? 'manual' : stage.calendarProvider ?? null,
+      calendarSyncStatus: stage.calendarSyncStatus ?? 'local_only',
+    };
+    await run(async () => {
+      const updated = await stageApi.update(stage.id, patch);
+      setApplicationDetail(updated);
+      setStageDrafts(Object.fromEntries(updated.stages.map(nextStage => [nextStage.id, stageDraftFromStage(nextStage)])));
+      setStageSaveStatus(prev => ({ ...prev, [stage.id]: 'saved' }));
+      await loadInterviews();
+      const nextLegacyId = legacyIdForApplication(updated);
+      if (nextLegacyId) setSelectedId(nextLegacyId);
+    }).catch(() => setStageSaveStatus(prev => ({ ...prev, [stage.id]: 'failed' })));
+  };
+
+  const addStage = async () => {
+    if (!applicationDetail) return;
+    const payload: InterviewStageCreatePayload = {
+      applicationId: applicationDetail.id,
+      title: t('interviews.detail.newStageTitle'),
+      stageType: 'custom',
+      status: 'draft',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      format: 'unknown',
+    };
+    await run(async () => {
+      const updated = await stageApi.create(payload);
+      setApplicationDetail(updated);
+      setStageDrafts(Object.fromEntries(updated.stages.map(stage => [stage.id, stageDraftFromStage(stage)])));
+      await loadInterviews();
+    });
+  };
+
+  const archiveStage = async (stage: InterviewStage) => {
+    await run(async () => {
+      const updated = await stageApi.archive(stage.id);
+      setApplicationDetail(updated);
+      setStageDrafts(Object.fromEntries(updated.stages.map(nextStage => [nextStage.id, stageDraftFromStage(nextStage)])));
+      await loadInterviews();
+    });
+  };
+
+  const restoreStage = async (stage: InterviewStage) => {
+    await run(async () => {
+      const updated = await stageApi.restore(stage.id, 'scheduled');
+      setApplicationDetail(updated);
+      setStageDrafts(Object.fromEntries(updated.stages.map(nextStage => [nextStage.id, stageDraftFromStage(nextStage)])));
+      await loadInterviews();
+    });
+  };
+
+  const createStageCalendarEvent = async (stage: InterviewStage, provider: 'google' | 'macos') => {
+    await run(async () => {
+      const updated = await stageApi.createCalendarEvent(stage.id, provider);
+      setApplicationDetail(updated);
+      setStageDrafts(Object.fromEntries(updated.stages.map(nextStage => [nextStage.id, stageDraftFromStage(nextStage)])));
+      await loadInterviews();
+    });
+  };
+
+  const startStageRecording = (stage: InterviewStage) => {
+    if (!applicationDetail || stage.status === 'archived' || stage.archivedAt) return;
+    onStartMeeting({
+      title: stage.title || applicationDetail.title,
+      interviewEventId: stage.legacyInterviewEventId ?? applicationDetail.legacyInterviewEventId ?? undefined,
+      interviewStageId: stage.id,
+      applicationId: applicationDetail.id,
+      calendarEventId: stage.calendarEventId ?? undefined,
+      source: 'manual',
+    });
+  };
+
   const saveDossier = async () => {
     if (!detail) return;
     const payload: VacancyDossierPayload = {
@@ -996,34 +1286,118 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     setQuestionCategory('');
   };
 
-  const attachMeeting = async () => {
-    if (!detail || !attachMeetingId) return;
+  const attachMeeting = async (stage: InterviewStage) => {
+    if (!detail || !applicationDetail) return;
+    const meetingId = attachMeetingIds[stage.id];
+    if (!meetingId) return;
     await run(async () => {
-      await interviewApi.attachMeeting(detail.id, attachMeetingId);
+      await stageApi.attachMeeting(stage.id, meetingId);
       const next = await interviewApi.get(detail.id);
+      const nextApplication = await applicationApi.get(applicationDetail.id).catch(() => null);
       setDetail(next);
-      setApplicationDetail(next.applicationId ? await applicationApi.get(next.applicationId).catch(() => null) : null);
-      setAttachMeetingId('');
+      setApplicationDetail(nextApplication);
+      setAttachMeetingIds(prev => ({ ...prev, [stage.id]: '' }));
     });
   };
+
+  const updatePaneLayout = useCallback((nextLayout: InterviewPaneLayout) => {
+    setPaneLayout(nextLayout);
+    persistPaneLayout(nextLayout);
+  }, []);
+
+  const resetPaneLayout = useCallback(() => {
+    updatePaneLayout({
+      ...DEFAULT_PANE_LAYOUT,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [updatePaneLayout]);
+
+  const startPaneResize = useCallback((pane: 'calendar' | 'vacancy', event: React.PointerEvent<HTMLDivElement>) => {
+    if (typeof window === 'undefined') return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startLayout = paneLayout;
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const delta = moveEvent.clientX - startX;
+      const nextLayout = normalizePaneLayout({
+        ...startLayout,
+        calendarWidth: pane === 'calendar' ? startLayout.calendarWidth + delta : startLayout.calendarWidth,
+        vacancyWidth: pane === 'vacancy' ? startLayout.vacancyWidth + delta : startLayout.vacancyWidth,
+        updatedAt: new Date().toISOString(),
+      });
+      updatePaneLayout(nextLayout);
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp, { once: true });
+  }, [paneLayout, updatePaneLayout]);
 
   const startSelectedInterview = () => {
     if (!detail) {
       onStartMeeting();
       return;
     }
-    onStartMeeting({
-      title: detail.title,
-      interviewEventId: detail.id,
-      interviewStageId: detail.selectedStageId ?? undefined,
-      applicationId: detail.applicationId ?? undefined,
-      calendarEventId: detail.calendarEventId ?? undefined,
-      source: 'manual',
+    if (!applicationDetail) {
+      onStartMeeting({
+        title: detail.title,
+        interviewEventId: detail.id,
+        interviewStageId: detail.selectedStageId ?? undefined,
+        applicationId: detail.applicationId ?? undefined,
+        calendarEventId: detail.calendarEventId ?? undefined,
+        source: 'manual',
+      });
+      return;
+    }
+    void run(async () => {
+      const activeStage = applicationDetail.stages.find(stage => stage.status !== 'archived' && !stage.archivedAt);
+      const targetApplication = activeStage
+        ? applicationDetail
+        : await stageApi.create({
+          applicationId: applicationDetail.id,
+          title: t('interviews.detail.defaultRecordingStageTitle'),
+          stageType: 'custom',
+          status: 'draft',
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          format: 'unknown',
+        });
+      const targetStage = activeStage
+        ?? targetApplication.stages.find(stage => stage.status !== 'archived' && !stage.archivedAt)
+        ?? targetApplication.stages[0];
+      setApplicationDetail(targetApplication);
+      setStageDrafts(Object.fromEntries(targetApplication.stages.map(stage => [stage.id, stageDraftFromStage(stage)])));
+      onStartMeeting({
+        title: targetStage?.title || targetApplication.title || detail.title,
+        interviewEventId: targetStage?.legacyInterviewEventId ?? targetApplication.legacyInterviewEventId ?? detail.id,
+        interviewStageId: targetStage?.id,
+        applicationId: targetApplication.id,
+        calendarEventId: targetStage?.calendarEventId ?? detail.calendarEventId ?? undefined,
+        source: 'manual',
+      });
     });
   };
 
+  const paneLayoutStyle = {
+    '--interview-calendar-width': `${paneLayout.calendarWidth}px`,
+    '--interview-vacancy-width': `${paneLayout.vacancyWidth}px`,
+    '--interview-detail-min-width': `${paneLayout.detailMinWidth}px`,
+  } as React.CSSProperties;
+
   return (
-    <div data-testid="interview-command-center" className="grid h-full min-h-0 grid-cols-1 overflow-y-auto bg-[#0a0b0c] text-text-primary lg:grid-cols-[280px_minmax(320px,380px)_minmax(0,1fr)] lg:overflow-hidden">
+    <div
+      data-testid="interview-command-center"
+      className="grid h-full min-h-0 grid-cols-1 overflow-y-auto bg-[#0a0b0c] text-text-primary lg:grid-cols-[minmax(220px,var(--interview-calendar-width))_6px_minmax(280px,var(--interview-vacancy-width))_6px_minmax(var(--interview-detail-min-width),1fr)] lg:overflow-hidden"
+      style={paneLayoutStyle}
+    >
       <aside className="flex min-h-[520px] flex-col bg-[#101214] lg:min-h-0 lg:border-r lg:border-white/[0.07]">
         <div className={paneHeaderClass}>
           <div className="flex items-center gap-2">
@@ -1158,11 +1532,17 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         </div>
       </aside>
 
+      <PaneResizeHandle
+        label={t('interviews.resizePanes')}
+        onPointerDown={(event) => startPaneResize('calendar', event)}
+        onDoubleClick={resetPaneLayout}
+      />
+
       <section className="flex min-h-[560px] flex-col bg-[#0c0e10] lg:min-h-0 lg:border-r lg:border-white/[0.07]">
         <div className={paneHeaderClass}>
           <div>
             <div className="text-[15px] font-semibold">{t('interviews.vacancyOS')}</div>
-            <div className="text-[11px] text-text-tertiary">{t('interviews.activeProcessCount', { count: vacancyItems.length })}</div>
+            <div className="text-[11px] text-text-tertiary">{t('interviews.activeProcessCount', { count: vacancyItems.filter(item => isActiveApplication(item.status)).length })}</div>
           </div>
           <button type="button"
             onClick={() => setShowCreate(true)}
@@ -1183,6 +1563,29 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               placeholder={t('interviews.searchPlaceholder')}
               className="min-h-11 w-full bg-transparent text-[13px] outline-none placeholder:text-text-tertiary"
             />
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-1.5">
+            {([
+              ['active', t('interviews.filters.active')],
+              ['all', t('interviews.filters.all')],
+              ['lead_found', t(applicationStatusLabelKey('lead_found'))],
+              ['applied', t(applicationStatusLabelKey('applied'))],
+              ['screening', t(applicationStatusLabelKey('screening'))],
+              ['interviewing', t(applicationStatusLabelKey('interviewing'))],
+              ['offer', t(applicationStatusLabelKey('offer'))],
+              ['rejected', t(applicationStatusLabelKey('rejected'))],
+              ['withdrawn', t(applicationStatusLabelKey('withdrawn'))],
+              ['archived', t(applicationStatusLabelKey('archived'))],
+            ] as Array<[VacancyStatusFilter, string]>).map(([value, label]) => (
+              <button
+                type="button"
+                key={value}
+                onClick={() => setStatusFilter(value)}
+                className={`min-h-9 rounded-md px-2 text-[11px] font-semibold transition ${statusFilter === value ? 'bg-cyan-300/12 text-cyan-100 ring-1 ring-cyan-300/25' : 'bg-white/[0.025] text-text-secondary hover:bg-white/[0.06] hover:text-white'}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -1240,6 +1643,12 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         </div>
       </section>
 
+      <PaneResizeHandle
+        label={t('interviews.resizePanes')}
+        onPointerDown={(event) => startPaneResize('vacancy', event)}
+        onDoubleClick={resetPaneLayout}
+      />
+
       <section className="flex min-h-[680px] flex-col bg-[#0a0b0c] lg:min-h-0">
         <div className="flex min-h-16 items-center justify-between border-b border-white/[0.07] px-5">
           <div className="flex min-w-0 items-center gap-3">
@@ -1247,8 +1656,8 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               <BriefcaseBusiness size={17} />
             </div>
             <div className="min-w-0">
-              <div className="truncate text-[15px] font-semibold">{detail?.title ?? t('interviews.noInterviewSelected')}</div>
-              <div className="truncate text-[11px] text-text-tertiary">{detail ? [detail.company, detail.roleTitle].filter(Boolean).join(' · ') || t('interviews.vacancyContextPending') : t('interviews.createOrSelectProcess')}</div>
+              <div className="truncate text-[15px] font-semibold">{applicationDetail?.title ?? detail?.title ?? t('interviews.noInterviewSelected')}</div>
+              <div className="truncate text-[11px] text-text-tertiary">{detail ? [applicationDetail?.company ?? detail.company, applicationDetail?.roleTitle ?? detail.roleTitle].filter(Boolean).join(' · ') || t('interviews.vacancyContextPending') : t('interviews.createOrSelectProcess')}</div>
             </div>
           </div>
           {detail && (
@@ -1261,14 +1670,26 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 {isMeetingActive ? t('common.openLive') : t('common.start')}
               </button>
               <select
-                value={detail.status}
-                onChange={event => updateStatus(detail.id, event.target.value as InterviewStatus)}
+                value={applicationDetail?.status ?? statusFromInterview(detail.status)}
+                onChange={event => {
+                  updateApplicationDraft('status', event.target.value as ApplicationStatus);
+                  if (applicationDetail) void run(async () => {
+                    const updated = await applicationApi.update(applicationDetail.id, { status: event.target.value as ApplicationStatus });
+                    setApplicationDetail(updated);
+                    setApplicationDraft(applicationDraftFromDetail(updated));
+                    await loadInterviews();
+                  });
+                }}
                 className="min-h-11 rounded-md border border-white/[0.08] bg-black/20 px-3 text-[12px] outline-none focus:border-cyan-300/45"
               >
-                {STATUS_OPTIONS.map(status => <option key={status} value={status}>{t(`interviews.status.${status}`)}</option>)}
+                {APPLICATION_STATUS_OPTIONS.map(status => <option key={status} value={status}>{t(applicationStatusLabelKey(status))}</option>)}
               </select>
               <button type="button" className={iconButtonClass} title={t('interviews.archive')} onClick={() => detail && run(async () => {
-                await interviewApi.archive(detail.id);
+                if (applicationDetail) {
+                  await applicationApi.update(applicationDetail.id, { status: 'archived' });
+                } else {
+                  await interviewApi.archive(detail.id);
+                }
                 await loadInterviews();
               })}>
                 <Trash2 size={15} />
@@ -1301,27 +1722,81 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
               {detailTab === 'Vacancy' && (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <InfoTile icon={<BriefcaseBusiness size={16} />} label={t('interviews.detail.company')} value={detail.company || t('interviews.detail.unfilled')} />
-                    <InfoTile icon={<UserRound size={16} />} label={t('interviews.detail.role')} value={detail.roleTitle || t('interviews.detail.unfilled')} />
-                    <InfoTile icon={<CircleDot size={16} />} label={t('interviews.detail.stage')} value={detail.stage || t('interviews.detail.unfilled')} />
-                    <InfoTile icon={<Clock3 size={16} />} label={t('interviews.detail.schedule')} value={formatSchedule(detail.startsAt)} />
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    <button type="button"
-                      className="flex min-h-14 items-center justify-between rounded-md bg-white/[0.025] p-3 text-left transition hover:bg-white/[0.055] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60"
-                      onClick={() => detail.vacancyUrl && window.electronAPI?.openExternal?.(detail.vacancyUrl)}
-                    >
-                      <span className="text-[13px] text-text-secondary">{t('interviews.detail.vacancyUrl')}</span>
-                      <ArrowUpRight size={15} className="text-text-tertiary" />
-                    </button>
-                    <button type="button"
-                      className="flex min-h-14 items-center justify-between rounded-md bg-white/[0.025] p-3 text-left transition hover:bg-white/[0.055] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60"
-                      onClick={() => detail.meetingUrl && window.electronAPI?.openExternal?.(detail.meetingUrl)}
-                    >
-                      <span className="text-[13px] text-text-secondary">{t('interviews.detail.meetingUrl')}</span>
-                      <LinkIcon size={15} className="text-text-tertiary" />
-                    </button>
+                  <div data-testid="application-fields-card" className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[15px] font-semibold">{t('interviews.detail.applicationFields')}</div>
+                        <div className="mt-0.5 text-[11px] text-text-tertiary">
+                          {applicationSaveStatus === 'dirty'
+                            ? t('interviews.detail.draftChanged')
+                            : applicationSaveStatus === 'saved'
+                              ? t('interviews.detail.synced')
+                              : applicationSaveStatus === 'failed'
+                                ? t('interviews.detail.draftNotSavedLocally')
+                                : t('interviews.detail.synced')}
+                        </div>
+                      </div>
+                      <button type="button" onClick={saveApplication} disabled={busy || !applicationDetail || !applicationDraft.title.trim()} className={primaryButtonClass}>
+                        {t('common.save')}
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <Field label={t('interviews.detail.title')}>
+                        <input className={inputClass} value={applicationDraft.title} onChange={event => updateApplicationDraft('title', event.target.value)} />
+                      </Field>
+                      <Field label={t('interviews.detail.company')}>
+                        <input className={inputClass} value={applicationDraft.company} onChange={event => updateApplicationDraft('company', event.target.value)} />
+                      </Field>
+                      <Field label={t('interviews.detail.role')}>
+                        <input className={inputClass} value={applicationDraft.roleTitle} onChange={event => updateApplicationDraft('roleTitle', event.target.value)} />
+                      </Field>
+                      <Field label={t('interviews.detail.status')}>
+                        <select className={inputClass} value={applicationDraft.status} onChange={event => updateApplicationDraft('status', event.target.value as ApplicationStatus)}>
+                          {APPLICATION_STATUS_OPTIONS.map(status => <option key={status} value={status}>{t(applicationStatusLabelKey(status))}</option>)}
+                        </select>
+                      </Field>
+                      <Field label={t('interviews.detail.priority')}>
+                        <select className={inputClass} value={applicationDraft.priority} onChange={event => updateApplicationDraft('priority', event.target.value as InterviewPriority)}>
+                          {PRIORITY_OPTIONS.map(priority => <option key={priority} value={priority}>{t(`interviews.priority.${priority}`, priority)}</option>)}
+                        </select>
+                      </Field>
+                      <Field label={t('interviews.detail.source')}>
+                        <input className={inputClass} value={applicationDraft.source} onChange={event => updateApplicationDraft('source', event.target.value)} />
+                      </Field>
+                      <Field label={t('interviews.detail.sourceUrl')}>
+                        <UrlInput
+                          value={applicationDraft.sourceUrl}
+                          emptyLabel={t('interviews.detail.notSpecified')}
+                          invalidLabel={t('interviews.detail.invalidUrl')}
+                          onChange={value => updateApplicationDraft('sourceUrl', value)}
+                        />
+                      </Field>
+                      <Field label={t('interviews.detail.vacancyUrl')}>
+                        <UrlInput
+                          value={applicationDraft.vacancyUrl}
+                          emptyLabel={t('interviews.detail.notSpecified')}
+                          invalidLabel={t('interviews.detail.invalidUrl')}
+                          onChange={value => updateApplicationDraft('vacancyUrl', value)}
+                        />
+                      </Field>
+                      <Field label={t('interviews.detail.compensation')}>
+                        <input className={inputClass} value={applicationDraft.compensationText} onChange={event => updateApplicationDraft('compensationText', event.target.value)} />
+                      </Field>
+                      <Field label={t('interviews.detail.locationFormat')}>
+                        <input className={inputClass} value={applicationDraft.locationFormat} onChange={event => updateApplicationDraft('locationFormat', event.target.value)} />
+                      </Field>
+                      <Field label={t('interviews.detail.nextAction')}>
+                        <input className={inputClass} value={applicationDraft.nextAction} onChange={event => updateApplicationDraft('nextAction', event.target.value)} />
+                      </Field>
+                      <Field label={t('interviews.detail.nextActionDueAt')}>
+                        <input className={inputClass} type="datetime-local" value={applicationDraft.nextActionDueAt} onChange={event => updateApplicationDraft('nextActionDueAt', event.target.value)} />
+                      </Field>
+                      <div className="md:col-span-2">
+                        <Field label={t('interviews.detail.sourceText')}>
+                          <textarea className={`${inputClass} min-h-[120px] resize-y`} value={applicationDraft.rawSourceText} onChange={event => updateApplicationDraft('rawSourceText', event.target.value)} />
+                        </Field>
+                      </div>
+                    </div>
                   </div>
                   <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
                     <div className={labelClass}>{t('interviews.detail.summary')}</div>
@@ -1389,62 +1864,170 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
               {detailTab === 'Stages' && (
                 <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[15px] font-semibold">{t('interviews.detail.stages')}</div>
+                      <div className="mt-0.5 text-[11px] text-text-tertiary">{t('interviews.stagesCount', { count: activeStages.length })}</div>
+                    </div>
+                    <button type="button" onClick={addStage} disabled={busy || !applicationDetail} className={primaryButtonClass}>
+                      <Plus size={14} />
+                      {t('interviews.detail.addStage')}
+                    </button>
+                  </div>
+
                   {stages.length > 0 ? (
-                    stages.map(stage => {
+                    [...activeStages, ...archivedStages].map((stage, index) => {
                       const stageMeetings = linkedMeetingsForStage(
                         stage,
                         applicationDetail?.linkedMeetings ?? detail.linkedMeetings ?? [],
                         stages.length,
                       );
+                      const stageDraft = stageDrafts[stage.id] ?? stageDraftFromStage(stage);
+                      const isArchived = stage.status === 'archived' || Boolean(stage.archivedAt);
                       return (
-                        <div key={stage.id} data-testid="interview-stage-card" className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="text-[14px] font-semibold text-text-primary">{stage.title}</div>
-                              <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-text-tertiary">
-                                <span>{formatSchedule(stage.startsAt)}</span>
-                                <span className="text-white/[0.16]">/</span>
-                                <span>{t(`interviews.stageStatus.${stage.status}`)}</span>
+                        <React.Fragment key={stage.id}>
+                          {index === activeStages.length && archivedStages.length > 0 && (
+                            <div className="flex items-center gap-3 pt-2">
+                              <div className="h-px flex-1 bg-white/[0.08]" />
+                              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-tertiary">{t('interviews.detail.archivedStages')}</span>
+                              <div className="h-px flex-1 bg-white/[0.08]" />
+                            </div>
+                          )}
+                          <div data-testid="interview-stage-card" className={`rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04] ${isArchived ? 'opacity-70' : ''}`}>
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="text-[14px] font-semibold text-text-primary">{stage.title}</div>
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-text-tertiary">
+                                  <span>{formatSchedule(stage.startsAt)}</span>
+                                  <span className="text-white/[0.16]">/</span>
+                                  <span>{t(`interviews.stageStatus.${stage.status}`)}</span>
+                                  <span className="text-white/[0.16]">/</span>
+                                  <span>{stage.calendarSyncStatus}</span>
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {!isArchived && (
+                                  <button type="button" onClick={() => startStageRecording(stage)} className={primaryButtonClass}>
+                                    {isMeetingActive ? t('common.openLive') : t('interviews.detail.startRecording')}
+                                  </button>
+                                )}
+                                <button type="button" onClick={() => createStageCalendarEvent(stage, 'google')} disabled={busy || isArchived || !stage.startsAt || !stage.endsAt} className={secondaryButtonClass}>
+                                  {t('interviews.detail.createInGoogleCalendar')}
+                                </button>
+                                <button type="button" onClick={() => createStageCalendarEvent(stage, 'macos')} disabled={busy || isArchived || !stage.startsAt || !stage.endsAt} className={secondaryButtonClass}>
+                                  {t('interviews.detail.createInMacCalendar')}
+                                </button>
+                                {!isArchived ? (
+                                  <button type="button" onClick={() => archiveStage(stage)} disabled={busy} className={iconButtonClass} title={t('interviews.detail.archiveStage')}>
+                                    <Trash2 size={14} />
+                                  </button>
+                                ) : (
+                                  <button type="button" onClick={() => restoreStage(stage)} disabled={busy} className={iconButtonClass} title={t('interviews.detail.restoreStage')}>
+                                    <RotateCcw size={14} />
+                                  </button>
+                                )}
                               </div>
                             </div>
-                            {stage.meetingUrl && (
-                              <button
-                                type="button"
-                                onClick={() => stage.meetingUrl && window.electronAPI?.openExternal?.(stage.meetingUrl)}
-                                className={secondaryButtonClass}
-                              >
-                                <LinkIcon size={14} />
-                                {t('interviews.detail.meetingUrl')}
+                            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                              <Field label={t('interviews.detail.title')}>
+                                <input className={inputClass} value={stageDraft.title} onChange={event => updateStageDraft(stage.id, 'title', event.target.value)} />
+                              </Field>
+                              <Field label={t('interviews.detail.stageType')}>
+                                <select className={inputClass} value={stageDraft.stageType} onChange={event => updateStageDraft(stage.id, 'stageType', event.target.value as InterviewStageType)}>
+                                  {STAGE_TYPE_OPTIONS.map(type => <option key={type} value={type}>{t(`interviews.stageType.${type}`, type)}</option>)}
+                                </select>
+                              </Field>
+                              <Field label={t('interviews.detail.status')}>
+                                <select className={inputClass} value={stageDraft.status} onChange={event => updateStageDraft(stage.id, 'status', event.target.value as InterviewStageStatus)}>
+                                  {STAGE_STATUS_OPTIONS.map(status => <option key={status} value={status}>{t(`interviews.stageStatus.${status}`)}</option>)}
+                                </select>
+                              </Field>
+                              <Field label={t('interviews.detail.format')}>
+                                <select className={inputClass} value={stageDraft.format} onChange={event => updateStageDraft(stage.id, 'format', event.target.value as InterviewStageFormat)}>
+                                  {STAGE_FORMAT_OPTIONS.map(format => <option key={format} value={format}>{t(`interviews.stageFormat.${format}`, format)}</option>)}
+                                </select>
+                              </Field>
+                              <Field label={t('interviews.detail.starts')}>
+                                <input className={inputClass} type="datetime-local" value={stageDraft.startsAt} onChange={event => updateStageDraft(stage.id, 'startsAt', event.target.value)} />
+                              </Field>
+                              <Field label={t('interviews.detail.ends')}>
+                                <input className={inputClass} type="datetime-local" value={stageDraft.endsAt} onChange={event => updateStageDraft(stage.id, 'endsAt', event.target.value)} />
+                              </Field>
+                              <Field label={t('interviews.detail.timezone')}>
+                                <input className={inputClass} value={stageDraft.timezone} onChange={event => updateStageDraft(stage.id, 'timezone', event.target.value)} />
+                              </Field>
+                              <Field label={t('interviews.detail.meetingUrl')}>
+                                <UrlInput
+                                  value={stageDraft.meetingUrl}
+                                  emptyLabel={t('interviews.detail.notSpecified')}
+                                  invalidLabel={t('interviews.detail.invalidUrl')}
+                                  onChange={value => updateStageDraft(stage.id, 'meetingUrl', value)}
+                                />
+                              </Field>
+                              <div className="md:col-span-2">
+                                <Field label={t('interviews.detail.sourceText')}>
+                                  <textarea className={`${inputClass} min-h-[88px] resize-y`} value={stageDraft.rawSourceText} onChange={event => updateStageDraft(stage.id, 'rawSourceText', event.target.value)} />
+                                </Field>
+                              </div>
+                            </div>
+                            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                              <div className="text-[11px] text-text-tertiary">
+                                {stageSaveStatus[stage.id] === 'dirty'
+                                  ? t('interviews.detail.draftChanged')
+                                  : stageSaveStatus[stage.id] === 'saved'
+                                    ? t('interviews.detail.synced')
+                                    : stageSaveStatus[stage.id] === 'failed'
+                                      ? t('interviews.detail.draftNotSavedLocally')
+                                      : t('interviews.detail.synced')}
+                              </div>
+                              <button type="button" onClick={() => saveStage(stage)} disabled={busy || !stageDraft.title.trim()} className={primaryButtonClass}>
+                                {t('common.save')}
                               </button>
+                            </div>
+                            <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
+                              <InfoTile icon={<FileText size={15} />} label={t('interviews.detail.stageRecordings')} value={`${stageMeetings.length}`} valueTestId="stage-recording-count" />
+                              <InfoTile icon={<CalendarDays size={15} />} label={t('interviews.detail.calendarSync')} value={stage.calendarSyncStatus} />
+                              <InfoTile icon={<CircleDot size={15} />} label={t('interviews.detail.stageStatus')} value={t(`interviews.stageStatus.${stage.status}`)} />
+                            </div>
+                            {!isArchived && (
+                              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+                                <select
+                                  value={attachMeetingIds[stage.id] ?? ''}
+                                  onChange={event => setAttachMeetingIds(prev => ({ ...prev, [stage.id]: event.target.value }))}
+                                  className={inputClass}
+                                  aria-label={t('interviews.detail.attachRecording')}
+                                >
+                                  <option value="">{t('interviews.detail.selectMeeting')}</option>
+                                  {meetings.map(meeting => <option key={meeting.id} value={meeting.id}>{meeting.title}</option>)}
+                                </select>
+                                <button type="button" onClick={() => attachMeeting(stage)} disabled={!attachMeetingIds[stage.id] || busy} className={secondaryButtonClass}>
+                                  {t('interviews.detail.link')}
+                                </button>
+                              </div>
                             )}
+                            <div className="mt-3 space-y-1.5">
+                              {stageMeetings.length > 0 ? stageMeetings.map(meeting => (
+                                <button
+                                  type="button"
+                                  key={meeting.id}
+                                  onClick={() => onOpenMeeting({
+                                    id: meeting.id,
+                                    title: meeting.title,
+                                    date: meeting.date,
+                                    duration: meeting.duration,
+                                    summary: '',
+                                  })}
+                                  className="flex min-h-9 w-full items-center justify-between rounded bg-black/20 px-2 py-1.5 text-left text-[12px] text-text-secondary transition hover:bg-white/[0.05]"
+                                >
+                                  <span className="truncate">{meeting.title}</span>
+                                  <ChevronRight size={13} className="shrink-0 text-text-tertiary" />
+                                </button>
+                              )) : (
+                                <div className="text-[12px] text-text-tertiary">{t('interviews.detail.none')}</div>
+                              )}
+                            </div>
                           </div>
-                          <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
-                            <InfoTile icon={<FileText size={15} />} label={t('interviews.detail.stageRecordings')} value={`${stageMeetings.length}`} valueTestId="stage-recording-count" />
-                            <InfoTile icon={<MessageSquareText size={15} />} label={t('interviews.detail.stageTranscript')} value={t('interviews.detail.comingSoon')} />
-                            <InfoTile icon={<CircleDot size={15} />} label={t('interviews.detail.stageRetro')} value={t('interviews.detail.comingSoon')} />
-                          </div>
-                          <div className="mt-3 space-y-1.5">
-                            {stageMeetings.length > 0 ? stageMeetings.map(meeting => (
-                              <button
-                                type="button"
-                                key={meeting.id}
-                                onClick={() => onOpenMeeting({
-                                  id: meeting.id,
-                                  title: meeting.title,
-                                  date: meeting.date,
-                                  duration: meeting.duration,
-                                  summary: '',
-                                })}
-                                className="flex min-h-9 w-full items-center justify-between rounded bg-black/20 px-2 py-1.5 text-left text-[12px] text-text-secondary transition hover:bg-white/[0.05]"
-                              >
-                                <span className="truncate">{meeting.title}</span>
-                                <ChevronRight size={13} className="shrink-0 text-text-tertiary" />
-                              </button>
-                            )) : (
-                              <div className="text-[12px] text-text-tertiary">{t('interviews.detail.none')}</div>
-                            )}
-                          </div>
-                        </div>
+                        </React.Fragment>
                       );
                     })
                   ) : (
@@ -1452,25 +2035,6 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       {t('interviews.detail.noStages')}
                     </div>
                   )}
-
-                  <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
-                    <div className={labelClass}>{t('interviews.detail.attachRecording')}</div>
-                    <div className="mt-3 flex gap-2">
-                      <select value={attachMeetingId} onChange={event => setAttachMeetingId(event.target.value)} className={inputClass}>
-                        <option value="">{t('interviews.detail.selectMeeting')}</option>
-                        {meetings.map(meeting => <option key={meeting.id} value={meeting.id}>{meeting.title}</option>)}
-                      </select>
-                      <button type="button" onClick={attachMeeting} disabled={!attachMeetingId || busy} className={secondaryButtonClass}>
-                        {t('interviews.detail.link')}
-                      </button>
-                    </div>
-                    <div className="mt-3 space-y-2">
-                      {(detail.linkedMeetings ?? []).map(meeting => (
-                        <div key={meeting.id} className="rounded bg-black/20 px-2 py-1.5 text-[12px] text-text-secondary">{meeting.title}</div>
-                      ))}
-                      {(detail.linkedMeetings ?? []).length === 0 && <div className="text-[12px] text-text-tertiary">{t('interviews.detail.none')}</div>}
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -1804,6 +2368,59 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
     <div className="mt-1.5">{children}</div>
   </label>
 );
+
+const PaneResizeHandle: React.FC<{
+  label: string;
+  onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onDoubleClick: () => void;
+}> = ({ label, onPointerDown, onDoubleClick }) => (
+  <div
+    role="separator"
+    aria-orientation="vertical"
+    aria-label={label}
+    title={label}
+    data-testid="interview-pane-resize-handle"
+    onPointerDown={onPointerDown}
+    onDoubleClick={onDoubleClick}
+    className="group hidden cursor-col-resize items-stretch justify-center bg-[#0a0b0c] outline-none transition hover:bg-cyan-300/[0.08] focus-visible:bg-cyan-300/[0.08] lg:flex"
+    tabIndex={0}
+  >
+    <div className="my-3 w-px rounded-full bg-white/[0.08] transition group-hover:bg-cyan-300/40" />
+  </div>
+);
+
+const UrlInput: React.FC<{
+  value: string;
+  emptyLabel: string;
+  invalidLabel: string;
+  onChange: (value: string) => void;
+}> = ({ value, emptyLabel, invalidLabel, onChange }) => {
+  const hasValue = value.trim().length > 0;
+  const valid = isValidUrl(value);
+  return (
+    <div>
+      <div className="flex gap-1.5">
+        <input
+          className={`${inputClass} min-w-0 flex-1`}
+          value={value}
+          onChange={event => onChange(event.target.value)}
+          placeholder={emptyLabel}
+        />
+        <button type="button" className={iconButtonClass} disabled={!valid} onClick={() => window.electronAPI?.openExternal?.(value)} title={emptyLabel}>
+          <ArrowUpRight size={14} />
+        </button>
+        <button type="button" className={iconButtonClass} disabled={!hasValue} onClick={() => void copyText(value)} title="Copy">
+          <Copy size={14} />
+        </button>
+        <button type="button" className={iconButtonClass} disabled={!hasValue} onClick={() => onChange('')} title="Clear">
+          <X size={14} />
+        </button>
+      </div>
+      {!hasValue && <div className="mt-1.5 text-[11px] text-text-tertiary">{emptyLabel}</div>}
+      {hasValue && !valid && <div className="mt-1.5 text-[11px] text-red-300">{invalidLabel}</div>}
+    </div>
+  );
+};
 
 const InfoTile: React.FC<{ icon: React.ReactNode; label: string; value: string; valueTestId?: string }> = ({ icon, label, value, valueTestId }) => (
   <div className="rounded-md bg-white/[0.025] p-3 ring-1 ring-white/[0.04]">

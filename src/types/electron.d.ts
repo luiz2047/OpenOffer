@@ -4,6 +4,8 @@ import type {
   ApplicationDetail,
   ApplicationIntakeInput,
   ApplicationIntakeResult,
+  ApplicationListInput,
+  ApplicationUpdatePatch,
   InterviewCreatePayload,
   InterviewDetail,
   InterviewIpcResult,
@@ -16,6 +18,9 @@ import type {
   InterviewRetroPayload,
   InterviewSourceParseInput,
   InterviewSourceParseResult,
+  InterviewStageCalendarEventPayload,
+  InterviewStageCreatePayload,
+  InterviewStageUpdatePatch,
   InterviewUpdatePatch,
   PrepBrief,
   PrepBriefPayload,
@@ -348,9 +353,16 @@ export interface ElectronAPI {
   interviewsCreate: (operationId: string, payload: InterviewCreatePayload) => Promise<InterviewIpcResult<InterviewDetail>>
   interviewsParseSourceText: (input: InterviewSourceParseInput | string) => Promise<InterviewIpcResult<InterviewSourceParseResult>>
   applicationIntakeParse: (input: ApplicationIntakeInput | string) => Promise<InterviewIpcResult<ApplicationIntakeResult>>
-  applicationsList: () => Promise<InterviewIpcResult<ApplicationDetail[]>>
+  applicationsList: (input?: ApplicationListInput) => Promise<InterviewIpcResult<ApplicationDetail[]>>
   applicationsGet: (id: string) => Promise<InterviewIpcResult<ApplicationDetail>>
+  applicationsUpdate: (id: string, patch: ApplicationUpdatePatch) => Promise<InterviewIpcResult<ApplicationDetail>>
   applicationsCreateFromIntake: (operationId: string, payload: ApplicationCreateFromIntakePayload) => Promise<InterviewIpcResult<ApplicationCreateFromIntakeResult>>
+  interviewStagesCreate: (payload: InterviewStageCreatePayload) => Promise<InterviewIpcResult<ApplicationDetail>>
+  interviewStagesUpdate: (id: string, patch: InterviewStageUpdatePatch) => Promise<InterviewIpcResult<ApplicationDetail>>
+  interviewStagesArchive: (id: string) => Promise<InterviewIpcResult<ApplicationDetail>>
+  interviewStagesRestore: (id: string, status?: InterviewStageUpdatePatch['status']) => Promise<InterviewIpcResult<ApplicationDetail>>
+  interviewStagesAttachMeeting: (id: string, meetingId: string) => Promise<InterviewIpcResult<{ attached: boolean }>>
+  interviewStagesCreateCalendarEvent: (id: string, provider: InterviewStageCalendarEventPayload['provider']) => Promise<InterviewIpcResult<ApplicationDetail>>
   interviewsUpdate: (id: string, patch: InterviewUpdatePatch) => Promise<InterviewIpcResult<InterviewDetail>>
   interviewsArchive: (id: string) => Promise<InterviewIpcResult<{ archived: boolean }>>
   interviewsDelete: (id: string, includeLinkedMeetings?: boolean) => Promise<InterviewIpcResult<{ deleted: boolean }>>

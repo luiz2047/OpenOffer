@@ -3,6 +3,8 @@ import type {
   ApplicationDetail,
   ApplicationIntakeInput,
   ApplicationIntakeResult,
+  ApplicationListInput,
+  ApplicationUpdatePatch,
   InterviewCreatePayload,
   InterviewDetail,
   InterviewIpcResult,
@@ -14,6 +16,9 @@ import type {
   InterviewRetroEvaluation,
   InterviewRetroPayload,
   InterviewSourceParseResult,
+  InterviewStageCalendarEventPayload,
+  InterviewStageCreatePayload,
+  InterviewStageUpdatePatch,
   InterviewUpdatePatch,
   PrepBrief,
   PrepBriefPayload,
@@ -124,12 +129,16 @@ export const applicationApi = {
     return unwrap(await requireBridge().applicationIntakeParse(input));
   },
 
-  async list(): Promise<ApplicationDetail[]> {
-    return unwrap(await requireBridge().applicationsList());
+  async list(input?: ApplicationListInput): Promise<ApplicationDetail[]> {
+    return unwrap(await requireBridge().applicationsList(input));
   },
 
   async get(id: string): Promise<ApplicationDetail> {
     return unwrap(await requireBridge().applicationsGet(id));
+  },
+
+  async update(id: string, patch: ApplicationUpdatePatch): Promise<ApplicationDetail> {
+    return unwrap(await requireBridge().applicationsUpdate(id, patch));
   },
 
   async createFromIntake(intake: ApplicationIntakeResult, options?: { selectedApplicationId?: string | null }): Promise<ApplicationCreateFromIntakeResult> {
@@ -137,5 +146,31 @@ export const applicationApi = {
       newOperationId('applications:create-from-intake'),
       { intake, selectedApplicationId: options?.selectedApplicationId ?? null },
     ));
+  },
+};
+
+export const stageApi = {
+  async create(payload: InterviewStageCreatePayload): Promise<ApplicationDetail> {
+    return unwrap(await requireBridge().interviewStagesCreate(payload));
+  },
+
+  async update(id: string, patch: InterviewStageUpdatePatch): Promise<ApplicationDetail> {
+    return unwrap(await requireBridge().interviewStagesUpdate(id, patch));
+  },
+
+  async archive(id: string): Promise<ApplicationDetail> {
+    return unwrap(await requireBridge().interviewStagesArchive(id));
+  },
+
+  async restore(id: string, status: InterviewStageUpdatePatch['status'] = 'scheduled'): Promise<ApplicationDetail> {
+    return unwrap(await requireBridge().interviewStagesRestore(id, status));
+  },
+
+  async attachMeeting(id: string, meetingId: string): Promise<{ attached: boolean }> {
+    return unwrap(await requireBridge().interviewStagesAttachMeeting(id, meetingId));
+  },
+
+  async createCalendarEvent(id: string, provider: InterviewStageCalendarEventPayload['provider']): Promise<ApplicationDetail> {
+    return unwrap(await requireBridge().interviewStagesCreateCalendarEvent(id, provider));
   },
 };

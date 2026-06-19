@@ -6135,8 +6135,8 @@ export function initializeIpcHandlers(appState: AppState): void {
     safeInterviewHandle(() => getInterviewService().parseApplicationIntake(input))
   ));
 
-  safeHandle('applications:list', async () => (
-    safeInterviewHandle(() => getInterviewService().listApplications())
+  safeHandle('applications:list', async (_, input?: unknown) => (
+    safeInterviewHandle(() => getInterviewService().listApplications(input ?? {}))
   ));
 
   safeHandle('applications:get', async (_, id: string) => (
@@ -6145,6 +6145,105 @@ export function initializeIpcHandlers(appState: AppState): void {
 
   safeHandle('applications:create-from-intake', async (_, operationId: string, payload: unknown) => (
     safeInterviewHandle(() => getInterviewService().createApplicationFromIntake(operationId, payload))
+  ));
+
+  safeHandle('applications:update', async (_, id: string, patch: unknown) => (
+    safeInterviewHandle(() => getInterviewService().updateApplication(id, patch))
+  ));
+
+  safeHandle('interview-stages:create', async (_, payload: unknown) => (
+    safeInterviewHandle(() => getInterviewService().createStage(payload))
+  ));
+
+  safeHandle('interview-stages:update', async (_, id: string, patch: unknown) => (
+    safeInterviewHandle(() => getInterviewService().updateStage(id, patch))
+  ));
+
+  safeHandle('interview-stages:archive', async (_, id: string) => (
+    safeInterviewHandle(() => getInterviewService().archiveStage(id))
+  ));
+
+  safeHandle('interview-stages:restore', async (_, id: string, status?: unknown) => (
+    safeInterviewHandle(() => getInterviewService().restoreStage(id, status))
+  ));
+
+  safeHandle('interview-stages:attach-meeting', async (_, stageId: string, meetingId: string) => (
+    safeInterviewHandle(() => getInterviewService().attachMeetingToStage(stageId, meetingId))
+  ));
+
+  safeHandle('interview-stages:create-calendar-event', async (_, stageId: string, provider: unknown) => (
+    safeInterviewHandle(async () => {
+      if (provider !== 'google' && provider !== 'macos') {
+        throw new InterviewDomainError('invalid_payload', 'calendar provider is invalid.', false, 'fix_input');
+      }
+      const service = getInterviewService();
+      const applications = service.listApplications({ includeArchived: true });
+      const application = applications.find(item => item.stages.some(stage => stage.id === stageId));
+      const stage = application?.stages.find(item => item.id === stageId);
+      if (!application || !stage) {
+        throw new InterviewDomainError('not_found', 'Stage not found.', false, 'none');
+      }
+      if (!stage.startsAt || !stage.endsAt) {
+        throw new InterviewDomainError('invalid_payload', 'Stage must have a start and end time before calendar sync.', false, 'fix_input');
+      }
+      if (stage.archivedAt || stage.status === 'archived') {
+        throw new InterviewDomainError('interview_deleted_or_archived', 'Stage is archived.', false, 'open_existing');
+      }
+      const description = [
+        application.company ? `Company: ${application.company}` : null,
+        application.roleTitle ? `Role: ${application.roleTitle}` : null,
+        stage.title ? `Stage: ${stage.title}` : null,
+        application.vacancyUrl ? `Vacancy: ${application.vacancyUrl}` : null,
+        stage.rawSourceText ? `Source:\n${stage.rawSourceText.slice(0, 1200)}` : null,
+      ].filter(Boolean).join('\n');
+      let event: any;
+      try {
+        event = provider === 'google'
+          ? await require('./services/CalendarManager').CalendarManager.getInstance().createEvent({
+            title: stage.title || application.title,
+            startTime: new Date(stage.startsAt).toISOString(),
+            endTime: new Date(stage.endsAt).toISOString(),
+            description,
+            link: stage.meetingUrl ?? undefined,
+            calendarId: 'primary',
+          })
+          : await require('./services/MacCalendarManager').MacCalendarManager.getInstance().createEvent({
+            title: stage.title || application.title,
+            startTime: new Date(stage.startsAt).toISOString(),
+            endTime: new Date(stage.endsAt).toISOString(),
+            description,
+            link: stage.meetingUrl ?? undefined,
+            calendarId: 'macos',
+          });
+      } catch (error: any) {
+        throw new InterviewDomainError(
+          'calendar_refresh_failed',
+          error?.message || 'Could not create calendar event.',
+          true,
+          provider === 'google' ? 'connect_calendar' : 'refresh_calendar',
+        );
+      }
+      const snapshot = {
+        provider,
+        calendarId: provider === 'google' ? 'primary' : 'macos',
+        eventId: event.id,
+        title: event.title,
+        startsAt: new Date(event.startTime).getTime(),
+        endsAt: new Date(event.endTime).getTime(),
+        meetingUrl: event.link,
+        attendeeEmails: (event.attendees ?? []).map((attendee: any) => attendee.email).filter(Boolean),
+        attendeeNames: (event.attendees ?? []).map((attendee: any) => attendee.name || attendee.email).filter(Boolean),
+        capturedAt: Date.now(),
+      };
+      return service.updateStage(stage.id, {
+        calendarProvider: provider,
+        calendarId: snapshot.calendarId,
+        calendarEventId: event.id,
+        calendarSnapshot: snapshot,
+        calendarLastSeenAt: Date.now(),
+        calendarSyncStatus: 'linked',
+      });
+    })
   ));
 
   safeHandle('interviews:update', async (_, id: string, patch: unknown) => (

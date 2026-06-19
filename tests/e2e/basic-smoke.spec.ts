@@ -295,6 +295,20 @@ test.describe('OpenOffer E2E smoke', () => {
     }
   });
 
+  test('settings panel stays within compact viewport bounds', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 740 });
+    await gotoApp(page);
+    await openSettings(page);
+
+    const panel = page.locator('#settings-panel');
+    const box = await panel.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(740);
+  });
+
   test('settings exposes local-first speech providers', async ({ page }) => {
     await gotoApp(page);
     await openSettings(page);

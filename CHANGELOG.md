@@ -4,6 +4,27 @@
 
     ## [Unreleased]
 
+    ## [1.4.0] - 2026-06-19
+
+    ### Added
+
+    - **Vacancy workflow editing contract**: Added typed application update/list filters plus stage create, update, archive, restore, calendar-event, and recording-attach contracts across service, IPC, preload, renderer API, and shared types.
+    - **Stage-first command center controls**: Vacancy details now expose editable application fields, direct stage creation/editing, stage-level calendar actions, stage-level recording attachment, archived-stage grouping, and desktop pane resizing.
+
+    ### Changed
+
+    - **Legacy compatibility sync**: Application and stage updates now keep mapped legacy interview rows compatible transactionally while preserving legacy-only interviews and unmapped stages.
+    - **Settings layout constraints**: Refined the Settings shell dimensions so the panel stays bounded on compact viewports.
+
+    ### Fixed
+
+    - **Archive semantics**: Archived applications and stages now filter consistently, application restore clears legacy archive state, and stage restore is an explicit action instead of an accidental status-edit side effect.
+    - **Provider failure handling**: Stage calendar writes preserve the local schedule when an external provider fails after local save.
+
+    ### Tests
+
+    - Added repository, service, IPC wiring, source hardening, i18n, and Playwright coverage for application filters, stage create/update/archive/restore, legacy sync, calendar write contracts, direct stage creation, stage recording links, pane resizing, and compact Settings bounds.
+
     ## [1.3.0] - 2026-06-18
 
     ### Added
