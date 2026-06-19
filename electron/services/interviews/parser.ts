@@ -12,7 +12,47 @@ const MEETING_HOSTS = [
   'teams.microsoft.com',
   'teams.live.com',
   'webex.com',
+  'telemost.yandex.ru',
 ];
+
+const RU_MONTHS: Record<string, number> = {
+  января: 0,
+  январь: 0,
+  февраля: 1,
+  февраль: 1,
+  марта: 2,
+  март: 2,
+  апреля: 3,
+  апрель: 3,
+  мая: 4,
+  май: 4,
+  июня: 5,
+  июнь: 5,
+  июля: 6,
+  июль: 6,
+  августа: 7,
+  август: 7,
+  сентября: 8,
+  сентябрь: 8,
+  октября: 9,
+  октябрь: 9,
+  ноября: 10,
+  ноябрь: 10,
+  декабря: 11,
+  декабрь: 11,
+};
+
+const RU_WEEKDAYS: Record<string, number> = {
+  воскресенье: 0,
+  понедельник: 1,
+  вторник: 2,
+  среда: 3,
+  среду: 3,
+  четверг: 4,
+  пятница: 5,
+  пятницу: 5,
+  суббота: 6,
+};
 
 const VACANCY_HOST_HINTS = [
   'hh.ru',
@@ -151,11 +191,67 @@ function extractSalary(text: string): string | null {
   return trimValue(salary, 120);
 }
 
+function normalizeRoleTitle(value: string | null): string | null {
+  const trimmed = trimValue(value, 120);
+  if (!trimmed) return null;
+  return trimmed
+    .replace(/-а(?=\s|$)/i, '')
+    .replace(/\s+в\s+компани[юи](?:\s|$).*$/i, '')
+    .trim();
+}
+
 function detectStage(text: string): string | null {
+  if (/(?:созвон|созвониться|обсудить детали вакансии|выберем.+слот|слоты для первого собеседования|10\s*[-–—]\s*15\s*мин|рекрутер|hr|эйчар|скрининг|screen)/i.test(text)) return 'Recruiter screen';
+  if (/онлайн[-\s]?собеседован|ссылка на видеовстречу|telemost|zoom\.us|meet\.google\.com/i.test(text)) return 'Interview stage';
   if (/system design|системн(ый|ое) дизайн/i.test(text)) return 'System design';
-  if (/technical|техническ|алгоритм|coding|live coding/i.test(text)) return 'Technical interview';
+  if (/(?:technical interview|техническ(?:ое|ий)\s+собеседован|алгоритм|coding|live coding)/i.test(text)) return 'Technical interview';
   if (/hr|recruiter|рекрутер|скрининг|screen/i.test(text)) return 'Recruiter screen';
   return null;
+}
+
+function extractDurationMs(text: string): number | null {
+  const range = text.match(/(\d{1,3})\s*(?:-|–|—)\s*(\d{1,3})\s*мин/i);
+  if (range?.[1] && range?.[2]) {
+    const minutes = Math.max(Number(range[1]), Number(range[2]));
+    return Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : null;
+  }
+  const single = text.match(/(?:на|длительностью|буквально на)?\s*(\d{1,3})\s*мин/i);
+  if (single?.[1]) {
+    const minutes = Number(single[1]);
+    return Number.isFinite(minutes) && minutes > 0 ? minutes * 60_000 : null;
+  }
+  return null;
+}
+
+function weekdayMatches(date: Date, weekday?: string): boolean {
+  if (!weekday) return true;
+  const expected = RU_WEEKDAYS[weekday.toLowerCase()];
+  return expected === undefined || date.getDay() === expected;
+}
+
+function extractRussianDateTime(text: string): number | null {
+  const pattern = /(?:(понедельник|вторник|среда|среду|четверг|пятница|пятницу|суббота|воскресенье)\s*,?\s*)?(\d{1,2})\s+(января|январь|февраля|февраль|марта|март|апреля|апрель|мая|май|июня|июнь|июля|июль|августа|август|сентября|сентябрь|октября|октябрь|ноября|ноябрь|декабря|декабрь)(?:\s+(\d{4}))?\s*,?\s*(\d{1,2})[:.](\d{2})/i;
+  const match = text.match(pattern);
+  if (!match) return null;
+
+  const weekday = match[1];
+  const day = Number(match[2]);
+  const month = RU_MONTHS[match[3].toLowerCase()];
+  const explicitYear = match[4] ? Number(match[4]) : null;
+  const hour = Number(match[5]);
+  const minute = Number(match[6]);
+  if (!Number.isFinite(day) || month === undefined || !Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+
+  const now = new Date();
+  const years = explicitYear
+    ? [explicitYear]
+    : [now.getFullYear(), now.getFullYear() + 1, now.getFullYear() - 1];
+  const candidates = years
+    .map(year => new Date(year, month, day, hour, minute, 0, 0))
+    .filter(date => date.getMonth() === month && date.getDate() === day && weekdayMatches(date, weekday));
+  const selected = candidates[0] ?? new Date(explicitYear ?? now.getFullYear(), month, day, hour, minute, 0, 0);
+  const ms = selected.getTime();
+  return Number.isFinite(ms) ? ms : null;
 }
 
 function buildCheatsheet(role: string | null, requirements: string[], source: string | null): string | null {
@@ -192,15 +288,21 @@ export function parseInterviewSourceText(rawText: string): InterviewSourceParseR
   const urls = extractUrls(normalizedText);
   const detectedSource = detectSource(normalizedText, urls);
   const vacancyUrl = urls.find(url => hostContains(url, VACANCY_HOST_HINTS)) ?? urls.find(url => !hostContains(url, MEETING_HOSTS)) ?? null;
-  const meetingUrl = urls.find(url => hostContains(url, MEETING_HOSTS)) ?? null;
+  const meetingUrls = urls.filter(url => hostContains(url, MEETING_HOSTS));
+  const meetingUrl = meetingUrls[meetingUrls.length - 1] ?? null;
+  const startsAt = extractRussianDateTime(normalizedText);
+  const durationMs = extractDurationMs(normalizedText);
+  const endsAt = startsAt && durationMs ? startsAt + durationMs : null;
   const company = lineValue(lines, [
     /^(?:компания|company|работодатель|employer)\s*[:—-]\s*(.+)$/i,
     /(?:в компании|at company|at)\s+([A-ZА-ЯЁ][\wА-Яа-яЁё ."'&-]{2,80})/i,
+    /(?:в компанию)\s+([A-ZА-ЯЁ][\wА-Яа-яЁё ."'&-]{2,80})/i,
   ], 120);
-  const roleTitle = lineValue(lines, [
+  const roleTitle = normalizeRoleTitle(lineValue(lines, [
     /^(?:вакансия|позиция|должность|role|position|job)\s*[:—-]\s*(.+)$/i,
-    /^([A-ZА-ЯЁ][\wА-Яа-яЁё +#/.-]{2,100}(?:developer|engineer|разработчик|инженер|frontend|backend|fullstack).*)$/i,
-  ], 120);
+    /поисках\s+([A-ZА-ЯЁ][\wА-Яа-яЁё +#/.-]{2,120}?)(?:\s+в\s+компани[юи]\b|$)/i,
+    /^([A-ZА-ЯЁ][\wА-Яа-яЁё +#/.-]{2,100}(?:developer|engineer|разработчик|инженер|frontend|backend|fullstack|data scientist|machine learning|ml engineer|аналитик|data analyst).*)$/i,
+  ], 120));
   const requirements = extractSection(
     lines,
     [/^(требования|requirements|stack|стек|что нужно|обязанности|responsibilities)(?:\s*[:—-]|$)/i],
@@ -238,6 +340,9 @@ export function parseInterviewSourceText(rawText: string): InterviewSourceParseR
     source: detectedSource,
     vacancyUrl,
     meetingUrl,
+    startsAt,
+    endsAt,
+    timezone: startsAt ? Intl.DateTimeFormat().resolvedOptions().timeZone : undefined,
     rawSourceText: normalizedText,
   };
   const dossier: VacancyDossierPayload = {

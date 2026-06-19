@@ -1,6 +1,6 @@
 {
   "name": "openoffer",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "main": "dist-electron/electron/main.js",
   "description": "OpenOffer is a local-first, open-source career assistant for interviews, meetings, and work notes.",
   "scripts": {

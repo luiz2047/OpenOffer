@@ -1,7 +1,7 @@
 import React from 'react';
 import {
     Github, Shield, Cpu, Database,
-    Mail, MicOff, Star, Bug, Globe, Zap, LayoutGrid, Volume2, Activity, Users
+    Mail, MicOff, Star, Bug, Globe, Users
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -27,88 +27,6 @@ export const AboutSection: React.FC<AboutSectionProps> = () => {
                 <h3 className="text-lg font-bold text-text-primary mb-1">{t('about.title')}</h3>
                 <p className="text-sm text-text-secondary">{t('about.subtitle')}</p>
             </div>
-
-            {/* What's New Section */}
-            <div>
-                <h4 className="text-xs font-bold text-text-tertiary uppercase tracking-wider mb-2 px-1">{t('about.whatsNew')}</h4>
-                <div className="bg-bg-item-surface rounded-xl border border-border-subtle overflow-hidden">
-                    {/* 1. Two New Meeting UI Styles */}
-                    <div className="p-3 border-b border-border-subtle bg-bg-card/50">
-                        <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400 shrink-0">
-                                <LayoutGrid size={20} />
-                            </div>
-                            <div>
-                                <h5 className="text-sm font-bold text-text-primary mb-1">{t('about.twoStylesTitle')}</h5>
-                                <p className="text-xs text-text-secondary leading-relaxed">
-                                    {t('about.twoStylesDescription')}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 2. DeepSeek AI Integrated */}
-                    <div className="p-3 border-b border-border-subtle bg-bg-card/50">
-                        <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0">
-                                <Cpu size={20} />
-                            </div>
-                            <div>
-                                <h5 className="text-sm font-bold text-text-primary mb-1">{t('about.deepseekTitle')}</h5>
-                                <p className="text-xs text-text-secondary leading-relaxed">
-                                    {t('about.deepseekDescription')}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 3. Audio & TCC Resolved */}
-                    <div className="p-3 border-b border-border-subtle bg-bg-card/50">
-                        <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400 shrink-0">
-                                <Volume2 size={20} />
-                            </div>
-                            <div>
-                                <h5 className="text-sm font-bold text-text-primary mb-1">{t('about.audioTitle')}</h5>
-                                <p className="text-xs text-text-secondary leading-relaxed">
-                                    {t('about.audioDescription')}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 4. Optimized Modes Manager */}
-                    <div className="p-3 border-b border-border-subtle bg-bg-card/50">
-                        <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 shrink-0">
-                                <Activity size={20} />
-                            </div>
-                            <div>
-                                <h5 className="text-sm font-bold text-text-primary mb-1">{t('about.modesTitle')}</h5>
-                                <p className="text-xs text-text-secondary leading-relaxed">
-                                    {t('about.modesDescription')}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 5. In-App Updates */}
-                    <div className="p-3 bg-bg-card/50">
-                        <div className="flex items-start gap-4">
-                            <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400 shrink-0">
-                                <Zap size={20} />
-                            </div>
-                            <div>
-                                <h5 className="text-sm font-bold text-text-primary mb-1">{t('about.updatesTitle')}</h5>
-                                <p className="text-xs text-text-secondary leading-relaxed">
-                                    {t('about.updatesDescription')}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             {/* Architecture Section */}
             <div>
                 <h4 className="text-xs font-bold text-text-tertiary uppercase tracking-wider mb-2 px-1">{t('about.howItWorks')}</h4>

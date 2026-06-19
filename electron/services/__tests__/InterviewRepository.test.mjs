@@ -1,5 +1,6 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -25,7 +26,7 @@ const {
   parseInterviewSourceText,
 } = require(path.join(root, 'dist-electron/electron/services/interviews/parser.js'));
 
-function createStack() {
+function createStack(options = {}) {
   const db = new Database(':memory:');
   db.exec(`
     CREATE TABLE meetings (
@@ -39,8 +40,20 @@ function createStack() {
   `);
   applyInterviewSchema(db);
   const repo = new InterviewRepository(createBetterSqliteExecutor(db));
-  const service = new InterviewService(repo);
+  const service = new InterviewService(repo, options.resolveModelForTask, options.generateStructuredContent);
   return { db, repo, service };
+}
+
+function createTranscriptTable(db) {
+  db.exec(`
+    CREATE TABLE transcripts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      meeting_id TEXT,
+      speaker TEXT,
+      content TEXT,
+      timestamp_ms INTEGER
+    );
+  `);
 }
 
 describe('Interview schema', () => {
@@ -62,6 +75,8 @@ describe('Interview schema', () => {
       'interview_contacts',
       'retro_prompt_state',
       'interview_client_operations',
+      'agent_proposal_applied_groups',
+      'interview_retro_evaluations',
     ]) {
       assert.ok(tableNames.includes(table), `${table} must exist`);
     }
@@ -69,6 +84,7 @@ describe('Interview schema', () => {
     const meetingColumns = db.prepare('PRAGMA table_info(meetings)').all().map(row => row.name);
     assert.ok(meetingColumns.includes('interview_event_id'));
     assert.ok(meetingColumns.includes('interview_stage_id'));
+    assert.ok(meetingColumns.includes('application_id'));
 
     const eventIndexes = db.prepare('PRAGMA index_list(interview_events)').all().map(row => row.name);
     assert.ok(eventIndexes.includes('idx_interview_events_time'));
@@ -76,6 +92,13 @@ describe('Interview schema', () => {
     assert.ok(eventIndexes.includes('uq_interview_events_calendar_ref'));
     const stageIndexes = db.prepare('PRAGMA index_list(interview_stages)').all().map(row => row.name);
     assert.ok(stageIndexes.includes('uq_interview_stages_calendar_ref'));
+    const meetingIndexes = db.prepare('PRAGMA index_list(meetings)').all().map(row => row.name);
+    assert.ok(meetingIndexes.includes('idx_meetings_application_id'));
+    assert.ok(meetingIndexes.includes('idx_meetings_interview_stage_id'));
+    assert.ok(meetingIndexes.includes('idx_meetings_interview_event_id'));
+    assert.ok(meetingIndexes.includes('idx_meetings_calendar_event_id'));
+    const retroEvalIndexes = db.prepare('PRAGMA index_list(interview_retro_evaluations)').all().map(row => row.name);
+    assert.ok(retroEvalIndexes.includes('idx_interview_retro_evaluations_meeting_id'));
 
     const operationColumns = db.prepare('PRAGMA table_info(interview_client_operations)').all();
     assert.deepEqual(
@@ -180,6 +203,7 @@ describe('InterviewRepository', () => {
     const detail = repo.get(event.id, ['prep', 'retros', 'questions', 'meetings']);
     assert.equal(detail.linkedMeetings.length, 1);
     assert.equal(detail.linkedMeetings[0].id, 'meeting-1');
+    assert.equal(detail.linkedMeetings[0].interviewEventId, event.id);
 
     assert.equal(repo.hardDelete(event.id, false), true);
     assert.equal(db.prepare('SELECT interview_event_id FROM meetings WHERE id = ?').get('meeting-1').interview_event_id, null);
@@ -210,7 +234,7 @@ describe('InterviewRepository', () => {
   });
 
   test('creates application and stage from intake while preserving legacy interview compatibility', () => {
-    const { repo } = createStack();
+    const { db, repo } = createStack();
     const result = repo.createApplicationFromIntake({
       classification: 'vacancy_with_scheduled_stage',
       confidence: 0.9,
@@ -218,9 +242,10 @@ describe('InterviewRepository', () => {
         title: 'Acme ML Engineer',
         company: 'Acme',
         roleTitle: 'ML Engineer',
+        description: 'Acme is hiring an ML Engineer for a production model deployment process. A recruiter screen is scheduled.',
         source: 'HH',
         vacancyUrl: 'https://example.com/vacancy/1',
-        requirements: ['Python'],
+        requirements: ['Stack: Python'],
         risks: ['Legacy stack'],
         questionsToAsk: ['How is ML deployed?'],
         rawSourceText: 'Acme ML Engineer interview tomorrow',
@@ -246,7 +271,9 @@ describe('InterviewRepository', () => {
     const mapped = repo.get(result.legacyInterview.id, ['dossier']);
     assert.equal(mapped.applicationId, result.application.id);
     assert.equal(mapped.selectedStageId, result.application.stages[0].id);
-    assert.deepEqual(mapped.dossier.requirements, ['Python']);
+    assert.equal(mapped.dossier.description, 'Acme is hiring an ML Engineer for a production model deployment process. A recruiter screen is scheduled.');
+    assert.notEqual(mapped.dossier.description, mapped.rawSourceText);
+    assert.deepEqual(mapped.dossier.requirements, ['Stack: Python']);
     const stage = repo.updateStageCalendarForLegacyInterview(result.legacyInterview.id, {
       calendarProvider: 'google',
       calendarId: 'primary',
@@ -256,6 +283,35 @@ describe('InterviewRepository', () => {
     assert.equal(stage.calendarEventId, 'evt-stage-1');
     assert.equal(repo.getApplication(result.application.id).stages[0].calendarSyncStatus, 'linked');
     assert.equal(repo.listApplications()[0].id, result.application.id);
+
+    db.prepare(`
+      INSERT INTO meetings (id, title, created_at, start_time, duration_ms, application_id)
+      VALUES ('meeting-app-link', 'Application linked recording', '2026-06-18T11:00:00.000Z', ?, 1800000, ?)
+    `).run(1_800_000_000_000, result.application.id);
+    db.prepare(`
+      INSERT INTO meetings (id, title, created_at, start_time, duration_ms, interview_stage_id)
+      VALUES ('meeting-stage-link', 'Stage linked recording', '2026-06-18T12:00:00.000Z', ?, 1800000, ?)
+    `).run(1_800_003_600_000, result.application.stages[0].id);
+    const detailWithLinkage = repo.get(result.legacyInterview.id, ['meetings']);
+    assert.deepEqual(
+      detailWithLinkage.linkedMeetings.map(meeting => meeting.id),
+      ['meeting-stage-link', 'meeting-app-link'],
+      'legacy detail reads include stage/application-linked recordings',
+    );
+    const applicationDetail = repo.getApplication(result.application.id);
+    assert.deepEqual(
+      applicationDetail.linkedMeetings.map(meeting => meeting.id),
+      ['meeting-stage-link', 'meeting-app-link'],
+      'application detail exposes enough linked meeting ids for vacancy refresh',
+    );
+    assert.equal(
+      applicationDetail.linkedMeetings.find(meeting => meeting.id === 'meeting-stage-link')?.interviewStageId,
+      result.application.stages[0].id,
+    );
+    assert.equal(
+      applicationDetail.linkedMeetings.find(meeting => meeting.id === 'meeting-app-link')?.applicationId,
+      result.application.id,
+    );
 
     const legacyOnly = repo.create({ title: 'Legacy only calendar owner' });
     repo.update(legacyOnly.id, {
@@ -275,6 +331,67 @@ describe('InterviewRepository', () => {
       'legacy and stage calendar updates must roll back together on duplicate references',
     );
     assert.equal(repo.getApplication(result.application.id).stages[0].calendarEventId, 'evt-stage-1');
+  });
+
+  test('adds a proposed stage to an existing application without duplicating the vacancy', () => {
+    const { repo } = createStack();
+    const initial = repo.createApplicationFromIntake({
+      classification: 'vacancy_only',
+      confidence: 0.8,
+      application: {
+        title: 'Northstar Learning Data Scientist',
+        company: 'Northstar Learning',
+        roleTitle: 'Data Scientist',
+        source: 'Telegram',
+        requirements: ['ML', 'LLM'],
+        risks: [],
+        questionsToAsk: [],
+        rawSourceText: 'Initial synthetic vacancy paste',
+      },
+      warnings: [],
+      missingFields: [],
+    }, 'op-northstar-vacancy');
+
+    const attached = repo.createApplicationFromIntake({
+      classification: 'vacancy_with_scheduled_stage',
+      confidence: 0.9,
+      application: {
+        title: 'Northstar Learning Data Scientist',
+        company: 'Northstar Learning',
+        roleTitle: 'Data Scientist',
+        source: 'Telegram',
+        requirements: [],
+        risks: [],
+        questionsToAsk: [],
+        rawSourceText: 'Synthetic stage paste',
+      },
+      stage: {
+        title: 'Recruiter screen',
+        stageType: 'recruiter_screen',
+        startsAt: 1_780_919_600_000,
+        endsAt: 1_780_920_500_000,
+        timezone: 'Europe/Moscow',
+        meetingUrl: 'https://telemost.yandex.ru/j/10000000000002',
+        status: 'scheduled',
+      },
+      warnings: [],
+      missingFields: [],
+    }, 'op-northstar-stage', initial.application.id);
+
+    assert.equal(repo.listApplications().length, 1);
+    assert.equal(attached.application.id, initial.application.id);
+    assert.equal(attached.application.stages.length, 1);
+    assert.equal(attached.application.stages[0].meetingUrl, 'https://telemost.yandex.ru/j/10000000000002');
+    assert.equal(attached.legacyInterview.applicationId, initial.application.id);
+    assert.equal(attached.legacyInterview.selectedStageId, attached.application.stages[0].id);
+
+    repo.update(attached.legacyInterview.id, { status: 'withdrawn' });
+    assert.equal(repo.getApplication(initial.application.id).status, 'withdrawn');
+
+    assert.equal(repo.archive(attached.legacyInterview.id), true);
+    const archived = repo.getApplication(initial.application.id);
+    assert.equal(archived.status, 'archived');
+    assert.ok(archived.archivedAt);
   });
 
   test('filters lists by status and time range, archives rows, and can delete linked meetings', () => {
@@ -475,6 +592,258 @@ describe('InterviewService', () => {
     assert.equal(telegram.detectedSource, 'Telegram');
   });
 
+  test('uses task model policy and structured AI to improve agent vacancy intake', async () => {
+    const sourceText = fs.readFileSync(path.join(root, 'tests/fixtures/interviews/synthetic-cv-hr-vacancy.txt'), 'utf8');
+    const startsAt = Date.parse('2026-06-10T11:00:00.000Z');
+    const endsAt = Date.parse('2026-06-10T12:00:00.000Z');
+    const { service } = createStack({
+      resolveModelForTask: (task) => {
+        assert.equal(task, 'agent_actions');
+        return {
+          task,
+          requestedMode: 'pinned',
+          resolvedModelId: 'gpt-5.4',
+          availability: 'available',
+          fallbackUsed: false,
+          warnings: [],
+        };
+      },
+      generateStructuredContent: async (prompt, options) => {
+        assert.equal(options.modelId, 'gpt-5.4');
+        assert.equal(options.task, 'agent_actions');
+        assert.match(prompt, /Task: agent_actions/);
+        assert.match(prompt, /Orbit Vision Lab/);
+        assert.match(prompt, /application.description must be a concise 1-3 sentence summary/);
+        assert.match(prompt, /Prefix each item with a logical group/);
+        return JSON.stringify({
+          classification: 'vacancy_with_scheduled_stage',
+          confidence: 0.93,
+          application: {
+            title: 'Orbit Vision Lab · Senior / Middle+ ML Engineer',
+            company: 'Orbit Vision Lab',
+            roleTitle: 'Senior / Middle+ Machine Learning Engineer',
+            description: 'Orbit Vision Lab builds production computer-vision services for image and video processing. The role is a hands-on ML engineering position focused on production CV pipelines, with an interview already scheduled.',
+            source: 'HH',
+            vacancyUrl: 'https://example.com/vacancy/orbit-vision-ml',
+            compensationText: null,
+            requirements: ['Stack: Python 3.x', 'Domain: Computer Vision', 'Stack: OpenCV', 'Stack: PyTorch/TensorFlow', 'Responsibilities: Object detection'],
+            risks: ['Need to clarify production CV ownership and GPU optimization expectations'],
+            questionsToAsk: ['Which CV models are already in production?', 'What latency targets exist for video streams?'],
+            rawSourceText: sourceText,
+          },
+          stage: {
+            stageType: 'recruiter_screen',
+            title: 'Orbit Vision Lab interview',
+            startsAt,
+            endsAt,
+            timezone: 'Europe/Moscow',
+            meetingUrl: 'https://zoom.us/j/1234567890',
+            status: 'scheduled',
+          },
+          warnings: [],
+          missingFields: [],
+        });
+      },
+    });
+
+    const intake = await service.parseApplicationIntake({
+      text: sourceText,
+      useAi: true,
+      task: 'agent_actions',
+    });
+
+    assert.equal(intake.classification, 'vacancy_with_scheduled_stage');
+    assert.equal(intake.confidence, 0.93);
+    assert.equal(intake.application.company, 'Orbit Vision Lab');
+    assert.equal(intake.application.roleTitle, 'Senior / Middle+ Machine Learning Engineer');
+    assert.equal(intake.application.description, 'Orbit Vision Lab builds production computer-vision services for image and video processing. The role is a hands-on ML engineering position focused on production CV pipelines, with an interview already scheduled.');
+    assert.equal(intake.application.vacancyUrl, 'https://example.com/vacancy/orbit-vision-ml');
+    assert.deepEqual(intake.application.requirements.slice(0, 3), ['Stack: Python 3.x', 'Domain: Computer Vision', 'Stack: OpenCV']);
+    assert.equal(intake.stage.stageType, 'recruiter_screen');
+    assert.equal(intake.stage.startsAt, startsAt);
+    assert.equal(intake.stage.endsAt, endsAt);
+    assert.equal(intake.stage.meetingUrl, 'https://zoom.us/j/1234567890');
+    assert.equal(intake.calendarProposal.startsAt, startsAt);
+    assert.equal(intake.calendarProposal.locationOrUrl, 'https://zoom.us/j/1234567890');
+    assert.deepEqual(intake.missingFields, []);
+  });
+
+  test('lets AI agent correct recruiter chat fields without leaking stale parser warnings', async () => {
+    const sourceText = fs.readFileSync(path.join(root, 'tests/fixtures/interviews/synthetic-recruiter-stage-chat.txt'), 'utf8');
+    const deterministic = parseInterviewSourceText(sourceText);
+    assert.deepEqual(deterministic.warnings, ['company_not_detected', 'role_not_detected']);
+
+    const startsAt = Date.parse('2026-06-18T14:00:00.000Z');
+    const endsAt = Date.parse('2026-06-18T14:30:00.000Z');
+    const { service } = createStack({
+      resolveModelForTask: (task) => ({
+        task,
+        requestedMode: 'pinned',
+        resolvedModelId: 'gpt-5.4',
+        availability: 'available',
+        fallbackUsed: false,
+        warnings: [],
+      }),
+      generateStructuredContent: async (prompt, options) => {
+        assert.equal(options.task, 'agent_actions');
+        assert.match(prompt, /Read recruiter chats as dialogue/);
+        assert.match(prompt, /candidate's accepted slot and the final meeting confirmation override earlier offered slots/);
+        assert.match(prompt, /company_not_detected, role_not_detected, or low_confidence_parse/);
+        return JSON.stringify({
+          classification: 'vacancy_with_scheduled_stage',
+          confidence: 0.91,
+          application: {
+            title: 'Nimbus Systems · Applied Math Developer',
+            company: 'Nimbus Systems',
+            roleTitle: 'Applied Math Developer',
+            description: 'Nimbus Systems is hiring an Applied Math Developer. The recruiter chat confirms the next step is a 30-minute technical screening with the engineering team.',
+            source: 'Telegram',
+            vacancyUrl: null,
+            compensationText: null,
+            requirements: ['Process: Technical screening with engineers', 'Logistics: Video interview with camera'],
+            risks: [],
+            questionsToAsk: ['Что будет на техническом скрининге?'],
+            rawSourceText: sourceText,
+          },
+          stage: {
+            stageType: 'technical_screen',
+            title: 'Технический скрининг с командой',
+            startsAt,
+            endsAt,
+            timezone: 'Europe/Moscow',
+            meetingUrl: 'https://video.example.com/meet/nimbus-tech-screen',
+            status: 'scheduled',
+          },
+          warnings: [],
+          missingFields: [],
+        });
+      },
+    });
+
+    const intake = await service.parseApplicationIntake({
+      text: sourceText,
+      useAi: true,
+      task: 'agent_actions',
+    });
+
+    assert.equal(intake.application.company, 'Nimbus Systems');
+    assert.equal(intake.application.roleTitle, 'Applied Math Developer');
+    assert.match(intake.application.description, /30-minute technical screening/);
+    assert.deepEqual(intake.application.requirements, ['Process: Technical screening with engineers', 'Logistics: Video interview with camera']);
+    assert.equal(intake.stage.stageType, 'technical_screen');
+    assert.equal(intake.stage.meetingUrl, 'https://video.example.com/meet/nimbus-tech-screen');
+    assert.equal(intake.stage.startsAt, startsAt);
+    assert.equal(intake.stage.endsAt, endsAt);
+    assert.deepEqual(intake.warnings, []);
+    assert.deepEqual(intake.missingFields, []);
+    assert.equal(intake.calendarProposal.locationOrUrl, 'https://video.example.com/meet/nimbus-tech-screen');
+  });
+
+  test('AI intake prompt preserves final recruiter messages from long pasted chats', async () => {
+    const sourceText = fs.readFileSync(path.join(root, 'tests/fixtures/interviews/synthetic-recruiter-stage-chat.txt'), 'utf8');
+    const longPreamble = Array.from({ length: 600 }, (_, index) => (
+      `Earlier unrelated message ${index}: обсуждали вакансию без финального подтверждения.`
+    )).join('\n');
+    const longSourceText = `${sourceText}\n\n${longPreamble}\n\n${sourceText}`;
+    assert.ok(longSourceText.length > 30000);
+    assert.ok(longSourceText.length < 50000);
+
+    const startsAt = Date.parse('2026-06-18T14:00:00.000Z');
+    const endsAt = Date.parse('2026-06-18T14:30:00.000Z');
+    const { service } = createStack({
+      resolveModelForTask: (task) => ({
+        task,
+        requestedMode: 'pinned',
+        resolvedModelId: 'gpt-5.4',
+        availability: 'available',
+        fallbackUsed: false,
+        warnings: [],
+      }),
+      generateStructuredContent: async (prompt, options) => {
+        assert.equal(options.task, 'agent_actions');
+        assert.match(prompt, /middle of long source omitted/);
+        assert.match(prompt, /Nimbus Systems/);
+        assert.match(prompt, /https:\/\/video\.example\.com\/meet\/nimbus-tech-screen/);
+        return JSON.stringify({
+          classification: 'vacancy_with_scheduled_stage',
+          confidence: 0.91,
+          application: {
+            title: 'Nimbus Systems · Applied Math Developer',
+            company: 'Nimbus Systems',
+            roleTitle: 'Applied Math Developer',
+            description: 'Nimbus Systems is hiring an Applied Math Developer. The long chat ends with a confirmed technical screening.',
+            source: 'Telegram',
+            vacancyUrl: null,
+            compensationText: null,
+            requirements: ['Process: Technical screening with engineers'],
+            risks: [],
+            questionsToAsk: [],
+            rawSourceText: longSourceText,
+          },
+          stage: {
+            stageType: 'technical_screen',
+            title: 'Технический скрининг с командой',
+            startsAt,
+            endsAt,
+            timezone: 'Europe/Moscow',
+            meetingUrl: 'https://video.example.com/meet/nimbus-tech-screen',
+            status: 'scheduled',
+          },
+          warnings: [],
+          missingFields: [],
+        });
+      },
+    });
+
+    const intake = await service.parseApplicationIntake({
+      text: longSourceText,
+      useAi: true,
+      task: 'agent_actions',
+    });
+
+    assert.equal(intake.application.company, 'Nimbus Systems');
+    assert.equal(intake.application.roleTitle, 'Applied Math Developer');
+    assert.equal(intake.stage.meetingUrl, 'https://video.example.com/meet/nimbus-tech-screen');
+    assert.equal(intake.stage.startsAt, startsAt);
+    assert.deepEqual(intake.warnings, []);
+  });
+
+  test('extracts synthetic Telegram recruiter chat as vacancy plus scheduled stage without AI', async () => {
+    const sourceText = fs.readFileSync(path.join(root, 'tests/fixtures/interviews/synthetic-telegram-recruiter-chat.txt'), 'utf8');
+    const { service } = createStack();
+
+    const intake = await service.parseApplicationIntake({
+      text: sourceText,
+      useAi: false,
+      task: 'agent_actions',
+    });
+
+    assert.equal(intake.classification, 'vacancy_with_scheduled_stage');
+    assert.equal(intake.application.company, 'Northstar Learning');
+    assert.equal(intake.application.roleTitle, 'Data Scientist');
+    assert.match(intake.application.description, /Northstar Learning/);
+    assert.notEqual(intake.application.description, intake.application.rawSourceText);
+    assert.equal(intake.stage?.stageType, 'recruiter_screen');
+    assert.equal(intake.stage?.title, 'Recruiter screen');
+    assert.equal(intake.stage?.meetingUrl, 'https://telemost.yandex.ru/j/10000000000002');
+    assert.equal(intake.stage?.status, 'scheduled');
+
+    const startsAt = new Date(intake.stage?.startsAt);
+    assert.equal(startsAt.getFullYear(), 2026);
+    assert.equal(startsAt.getMonth(), 5);
+    assert.equal(startsAt.getDate(), 8);
+    assert.equal(startsAt.getHours(), 13);
+    assert.equal(startsAt.getMinutes(), 0);
+    assert.equal(intake.stage?.endsAt, intake.stage?.startsAt + 15 * 60 * 1000);
+
+    const result = service.createApplicationFromIntake('op-synthetic-intake', { intake });
+    assert.equal(result.application.company, 'Northstar Learning');
+    assert.equal(result.application.stages.length, 1);
+    assert.notEqual(result.legacyInterview?.dossier?.description, intake.application.rawSourceText);
+    assert.equal(result.application.stages[0].meetingUrl, 'https://telemost.yandex.ru/j/10000000000002');
+    assert.equal(result.legacyInterview?.meetingUrl, 'https://telemost.yandex.ru/j/10000000000002');
+  });
+
   test('tracks retro prompt due, snooze, dismiss, and completion idempotently', () => {
     const { service } = createStack();
     const detail = service.create('op-ended-create', {
@@ -505,5 +874,171 @@ describe('InterviewService', () => {
     assert.equal(complete.due, false);
     assert.equal(complete.reason, 'has_retro');
     assert.ok(complete.state.completedAt);
+  });
+
+  test('generates and stores AI retro evaluation from a linked recording transcript', async () => {
+    const { db, repo } = createStack();
+    createTranscriptTable(db);
+    const service = new InterviewService(
+      repo,
+      task => ({
+        task,
+        requestedMode: 'default',
+        resolvedModelId: 'gemini-3.1-flash-lite',
+        availability: 'available',
+        fallbackUsed: false,
+        warnings: [],
+      }),
+      async () => JSON.stringify({
+        summary: 'The candidate gave strong backend tradeoff answers but was thin on Kubernetes depth.',
+        signals: ['Clear transaction tradeoff answer'],
+        risks: ['Kubernetes follow-up lacked detail'],
+        followups: ['Send a short follow-up with infrastructure examples'],
+        confidence: 0.82,
+      }),
+    );
+    const detail = service.create('op-retro-eval-create', {
+      title: 'Backend interview',
+      company: 'Acme',
+      roleTitle: 'Backend Developer',
+    });
+    db.prepare(`
+      INSERT INTO meetings (id, title, created_at, start_time, duration_ms, interview_event_id)
+      VALUES ('meeting-retro-eval', 'Backend call', '2026-06-18T10:00:00.000Z', ?, 3600000, ?)
+    `).run(Date.now(), detail.id);
+    db.prepare(`
+      INSERT INTO transcripts (meeting_id, speaker, content, timestamp_ms)
+      VALUES ('meeting-retro-eval', 'Interviewer', 'Tell me about transaction isolation.', 1000)
+    `).run();
+    db.prepare(`
+      INSERT INTO transcripts (meeting_id, speaker, content, timestamp_ms)
+      VALUES ('meeting-retro-eval', 'Candidate', 'I would choose repeatable read and call out phantom read tradeoffs.', 2000)
+    `).run();
+
+    const evaluation = await service.generateRetroEvaluation(detail.id);
+    assert.equal(evaluation.status, 'ready');
+    assert.equal(evaluation.meetingId, 'meeting-retro-eval');
+    assert.equal(evaluation.modelId, 'gemini-3.1-flash-lite');
+    assert.deepEqual(evaluation.signals, ['Clear transaction tradeoff answer']);
+
+    const saved = service.getRetroEvaluation(detail.id);
+    assert.equal(saved.id, evaluation.id);
+    assert.equal(saved.isActive, true);
+  });
+
+  test('retro evaluation requires a linked transcript before calling AI', async () => {
+    const { db, service } = createStack({
+      resolveModelForTask: task => ({
+        task,
+        requestedMode: 'default',
+        resolvedModelId: 'gemini-3.1-flash-lite',
+        availability: 'available',
+        fallbackUsed: false,
+        warnings: [],
+      }),
+      generateStructuredContent: async () => {
+        throw new Error('AI must not be called without a transcript');
+      },
+    });
+    createTranscriptTable(db);
+    const detail = service.create('op-retro-no-transcript', {
+      title: 'No transcript interview',
+      company: 'Acme',
+      roleTitle: 'Backend Developer',
+    });
+
+    await assert.rejects(
+      () => service.generateRetroEvaluation(detail.id),
+      error => error instanceof InterviewDomainError
+        && error.code === 'invalid_payload'
+        && /No linked recording transcript/.test(error.message),
+    );
+  });
+
+  test('retro evaluation records skipped and failed states and supersedes older meeting evaluations', async () => {
+    const { db, repo } = createStack();
+    createTranscriptTable(db);
+    const detail = repo.create({
+      title: 'Backend interview',
+      company: 'Acme',
+      roleTitle: 'Backend Developer',
+    });
+    db.prepare(`
+      INSERT INTO meetings (id, title, created_at, start_time, duration_ms, interview_event_id)
+      VALUES ('meeting-retro-states', 'Backend call', '2026-06-18T10:00:00.000Z', ?, 3600000, ?)
+    `).run(Date.now(), detail.id);
+    db.prepare(`
+      INSERT INTO transcripts (meeting_id, speaker, content, timestamp_ms)
+      VALUES ('meeting-retro-states', 'Candidate', 'I explained observability and rollback tradeoffs.', 1000)
+    `).run();
+
+    const unavailableService = new InterviewService(
+      repo,
+      task => ({
+        task,
+        requestedMode: 'default',
+        resolvedModelId: null,
+        availability: 'missing_credentials',
+        fallbackUsed: true,
+        warnings: ['No configured retro model.'],
+      }),
+      async () => {
+        throw new Error('AI must not be called when no model is available');
+      },
+    );
+    const skipped = await unavailableService.generateRetroEvaluation(detail.id);
+    assert.equal(skipped.status, 'skipped');
+    assert.equal(skipped.isActive, true);
+    assert.match(skipped.error, /No configured retro model/);
+
+    const failingService = new InterviewService(
+      repo,
+      task => ({
+        task,
+        requestedMode: 'default',
+        resolvedModelId: 'gemini-3.1-flash-lite',
+        availability: 'available',
+        fallbackUsed: false,
+        warnings: [],
+      }),
+      async () => {
+        throw new Error('provider json malformed');
+      },
+    );
+    const failed = await failingService.generateRetroEvaluation(detail.id);
+    assert.equal(failed.status, 'failed');
+    assert.equal(failed.isActive, true);
+    assert.match(failed.error, /provider json malformed/);
+    assert.equal(
+      db.prepare('SELECT is_active FROM interview_retro_evaluations WHERE id = ?').get(skipped.id).is_active,
+      0,
+    );
+
+    const readyService = new InterviewService(
+      repo,
+      task => ({
+        task,
+        requestedMode: 'default',
+        resolvedModelId: 'gemini-3.1-flash-lite',
+        availability: 'available',
+        fallbackUsed: false,
+        warnings: [],
+      }),
+      async () => JSON.stringify({
+        summary: 'The candidate gave grounded backend answers.',
+        signals: ['Strong rollback tradeoff answer'],
+        risks: [],
+        followups: ['Send concise follow-up'],
+        confidence: 0.86,
+      }),
+    );
+    const ready = await readyService.generateRetroEvaluation(detail.id);
+    assert.equal(ready.status, 'ready');
+    assert.equal(ready.isActive, true);
+    assert.equal(
+      db.prepare('SELECT is_active FROM interview_retro_evaluations WHERE id = ?').get(failed.id).is_active,
+      0,
+    );
+    assert.equal(readyService.getRetroEvaluation(detail.id).id, ready.id);
   });
 });

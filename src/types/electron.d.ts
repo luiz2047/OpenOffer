@@ -12,6 +12,7 @@ import type {
   InterviewQuestion,
   InterviewQuestionPayload,
   InterviewRetro,
+  InterviewRetroEvaluation,
   InterviewRetroPayload,
   InterviewSourceParseInput,
   InterviewSourceParseResult,
@@ -42,6 +43,30 @@ export interface InterfaceLocaleOption {
   coverage: number
   valid: boolean
   errors: string[]
+  warnings: string[]
+}
+
+export type AiTask = 'chat' | 'vacancy_intake' | 'scraping' | 'retro' | 'agent_actions'
+export type TaskModelMode = 'default' | 'auto' | 'pinned'
+
+export interface TaskModelPolicy {
+  version: 1
+  defaultModelId: string | null
+  seededFromProviderPreferred?: boolean
+  tasks: Partial<Record<AiTask, {
+    mode: TaskModelMode
+    modelId?: string
+    quality?: 'fast' | 'balanced' | 'quality'
+  }>>
+  updatedAt: string
+}
+
+export interface TaskModelResolution {
+  task: AiTask
+  requestedMode: TaskModelMode
+  resolvedModelId: string | null
+  availability: 'available' | 'missing_credentials' | 'provider_disabled' | 'model_unavailable'
+  fallbackUsed: boolean
   warnings: string[]
 }
 
@@ -333,6 +358,8 @@ export interface ElectronAPI {
   interviewsCreateCalendarEvent: (interviewId: string, provider: 'google' | 'macos') => Promise<InterviewIpcResult<InterviewDetail>>
   interviewsGetReadiness: (interviewId: string) => Promise<InterviewIpcResult<ReadinessResult>>
   interviewsGetRetroPrompt: (interviewId: string) => Promise<InterviewIpcResult<RetroPromptDecision>>
+  interviewsGetRetroEvaluation: (interviewId: string) => Promise<InterviewIpcResult<InterviewRetroEvaluation | null>>
+  interviewsGenerateRetroEvaluation: (interviewId: string) => Promise<InterviewIpcResult<InterviewRetroEvaluation>>
   interviewsUpdateRetroPrompt: (interviewId: string, payload: RetroPromptActionPayload) => Promise<InterviewIpcResult<RetroPromptDecision>>
   vacancyDossierSave: (interviewId: string, operationId: string, payload: VacancyDossierPayload) => Promise<InterviewIpcResult<VacancyDossier>>
   prepBriefSave: (interviewId: string, operationId: string, payload: PrepBriefPayload) => Promise<InterviewIpcResult<PrepBrief>>
@@ -406,6 +433,9 @@ export interface ElectronAPI {
   getDefaultModel: () => Promise<{ model: string }>;
   setModel: (modelId: string) => Promise<{ success: boolean; error?: string }>;
   setDefaultModel: (modelId: string) => Promise<{ success: boolean; error?: string }>;
+  getTaskModelPolicy: () => Promise<TaskModelPolicy>;
+  setTaskModelPolicy: (policy: TaskModelPolicy) => Promise<{ success: boolean; policy?: TaskModelPolicy; error?: string }>;
+  resolveModelForTask: (task: AiTask, options?: { overrideModelId?: string | null }) => Promise<TaskModelResolution>;
   toggleModelSelector: (coords: { x: number; y: number; activate?: boolean }) => Promise<void>;
   modelSelectorCloseIfOpen: () => Promise<void>;
   forceRestartOllama: () => Promise<void>;

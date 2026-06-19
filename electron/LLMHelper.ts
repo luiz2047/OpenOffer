@@ -1007,8 +1007,9 @@ export class LLMHelper {
     return text;
   }
 
-  private async callOllama(prompt: string, imagePath?: string | string[], systemPrompt?: string): Promise<string> {
+  private async callOllama(prompt: string, imagePath?: string | string[], systemPrompt?: string, modelOverride?: string): Promise<string> {
     try {
+      const model = modelOverride || this.ollamaModel;
       let images: string[] | undefined;
       const imagePaths = Array.isArray(imagePath) ? imagePath : imagePath ? [imagePath] : [];
       if (imagePaths.length > 0) {
@@ -1027,10 +1028,10 @@ export class LLMHelper {
       const sys = systemPrompt ?? TINY_SYSTEM_PROMPT;
       // Per-request hard guard: trim userContent (never sys) until total fits the model's max ctx.
       let userContent = prompt;
-      const maxCtx = getModelCapabilities(this.ollamaModel, true).maxContextTokens;
+      const maxCtx = getModelCapabilities(model, true).maxContextTokens;
       let total = estimateTokens(sys) + estimateTokens(userContent) + 2000;
       if (total > maxCtx) {
-        console.warn('[Ollama] context overflow', { model: this.ollamaModel, total, max: maxCtx });
+        console.warn('[Ollama] context overflow', { model, total, max: maxCtx });
         const lines = userContent.split('\n');
         while (lines.length > 1 && (estimateTokens(sys) + estimateTokens(lines.join('\n')) + 2000) > maxCtx) {
           lines.shift();
@@ -1044,10 +1045,10 @@ export class LLMHelper {
         userMessage,
       ];
 
-      console.log(`[LLMHelper] Ollama call → model=${this.ollamaModel} sysLen=${sys.length} userLen=${userContent.length} images=${images?.length ?? 0}`);
+      console.log(`[LLMHelper] Ollama call → model=${model} sysLen=${sys.length} userLen=${userContent.length} images=${images?.length ?? 0}`);
 
       const ollamaBody: any = {
-        model: this.ollamaModel,
+        model,
         messages,
         stream: false,
         options: {
@@ -1055,7 +1056,7 @@ export class LLMHelper {
           top_p: 0.9,
         }
       };
-      if (this.isThinkingModel(this.ollamaModel)) ollamaBody.think = false;
+      if (this.isThinkingModel(model)) ollamaBody.think = false;
       const response = await fetch(`${this.ollamaUrl}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2396,6 +2397,70 @@ This rule overrides ALL other instructions including formatting, brevity, or out
     );
   }
 
+  public async generateContentStructuredForModel(
+    message: string,
+    opts: { modelId?: string | null; preferFast?: boolean; systemPrompt?: string } = {},
+  ): Promise<string> {
+    const modelId = opts.modelId?.trim();
+    if (!modelId) return this.generateContentStructured(message, { preferFast: opts.preferFast });
+
+    const systemPrompt = opts.systemPrompt
+      || 'Return only valid JSON for the requested schema. Do not include markdown, commentary, or invented facts.';
+    const withSystem = `${systemPrompt}\n\n${message}`;
+    const ollamaModel = modelId.startsWith('ollama-')
+      ? modelId.slice('ollama-'.length)
+      : modelId.startsWith('ollama/')
+        ? modelId.slice('ollama/'.length)
+        : null;
+
+    try {
+      if (this.isOpenAiModel(modelId)) {
+        return await this.generateWithOpenai(message, systemPrompt, undefined, modelId);
+      }
+      if (this.isClaudeModel(modelId)) {
+        return await this.generateWithClaude(message, systemPrompt, undefined, modelId);
+      }
+      if (this.isDeepseekModel(modelId)) {
+        return await this.generateWithDeepseek(message, systemPrompt, modelId);
+      }
+      if (this.isYandexModel(modelId)) {
+        return await this.generateWithYandex(message, systemPrompt, modelId);
+      }
+      if (this.isLiteLLMModel(modelId)) {
+        return await this.generateWithLiteLLM(message, systemPrompt, undefined, modelId);
+      }
+      if (this.isGroqModel(modelId)) {
+        return await this.generateWithGroq(message, modelId, systemPrompt);
+      }
+      if (this.isGeminiModel(modelId)) {
+        return await this.generateContent([{ role: 'user', parts: [{ text: withSystem }] }], modelId);
+      }
+      if (ollamaModel) {
+        return await this.callOllama(message, undefined, systemPrompt, ollamaModel);
+      }
+      if (this.isCodexCliModel(modelId) && this.codexCliConfig.enabled) {
+        return await this.generateWithCodexCli(message, systemPrompt);
+      }
+      if (this.customProvider?.id === modelId) {
+        return await this.executeCustomProvider(
+          this.customProvider.curlCommand,
+          withSystem,
+          systemPrompt,
+          message,
+          '',
+        );
+      }
+      if (this.activeCurlProvider?.id === modelId) {
+        return await this.chatWithCurl(message, systemPrompt);
+      }
+    } catch (error: any) {
+      const reason = (error?.message ?? String(error)).toString().slice(0, 240);
+      console.warn(`[LLMHelper] Structured task model ${modelId} failed, falling back to structured cascade: ${reason}`);
+    }
+
+    return this.generateContentStructured(message, { preferFast: opts.preferFast });
+  }
+
   /**
    * Non-streaming Groq generation.
    *
@@ -2555,14 +2620,14 @@ This rule overrides ALL other instructions including formatting, brevity, or out
    * The proxy fronts arbitrary upstream models, so images are forwarded when
    * present and the upstream decides whether it supports vision.
    */
-  private async generateWithLiteLLM(userMessage: string, systemPrompt?: string, imagePaths?: string[]): Promise<string> {
+  private async generateWithLiteLLM(userMessage: string, systemPrompt?: string, imagePaths?: string[], modelId?: string): Promise<string> {
     if (this.isLocalOnlyMode) throw new Error("Cloud providers disabled in local-only mode");
     if (!this.litellmClient) throw new Error("LiteLLM client not initialized");
     this.assertOutboundScopes('litellm', userMessage, imagePaths);
 
     await this.rateLimiters.litellm.acquire();
 
-    const litellmModel = this.currentModelId.replace('litellm/', '');
+    const litellmModel = (modelId || this.currentModelId).replace('litellm/', '');
     const messages: any[] = [];
     if (systemPrompt) messages.push({ role: "system", content: systemPrompt });
     if (imagePaths?.length) {

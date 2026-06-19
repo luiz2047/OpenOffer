@@ -1,0 +1,20 @@
+Recruiter:
+Hi Alex. I am Mira, IT recruiter Nimbus Systems. You previously spoke with my colleague about the Applied Math Developer position. We would like to invite you to the next stage, a technical screening with engineers from the team. It should take about 30 minutes. Video interview with camera.
+
+Would Thursday 18.06 work for you?
+Available slots: 13:30, 17:00, 17:30
+
+Candidate:
+Hello, yes, let's do 17:00.
+
+Recruiter:
+Confirmed.
+
+Recruiter:
+Thursday, 18 June 2026
+17:00 - 17:30 (Moscow time)
+Meeting link:
+https://video.example.com/meet/nimbus-tech-screen
+
+Recruiter:
+Have a good day.

@@ -40,6 +40,8 @@ export interface Meeting {
     }>;
     calendarEventId?: string;
     interviewEventId?: string;
+    interviewStageId?: string;
+    applicationId?: string;
     source?: 'manual' | 'calendar';
     isProcessed?: boolean;
 }
@@ -794,6 +796,88 @@ export class DatabaseManager {
             tx();
         }
 
+        // Version 18 -> 19: Vacancy-first meeting linkage and AI retro foundation.
+        // Additive and idempotent; existing legacy links are backfilled through the
+        // application/stage map, then calendar ids are used as a best-effort fallback.
+        if (version < 19) {
+            console.log('[DatabaseManager] Applying migration v18 -> v19: Meeting application linkage and retro evaluations');
+            const tx = this.db.transaction(() => {
+                applyInterviewSchema(this.db!);
+                this.db!.exec(`
+                    UPDATE meetings
+                    SET
+                      application_id = COALESCE(application_id, (
+                        SELECT map.application_id
+                        FROM legacy_interview_event_map map
+                        WHERE map.legacy_interview_event_id = meetings.interview_event_id
+                        LIMIT 1
+                      )),
+                      interview_stage_id = COALESCE(interview_stage_id, (
+                        SELECT map.stage_id
+                        FROM legacy_interview_event_map map
+                        WHERE map.legacy_interview_event_id = meetings.interview_event_id
+                        LIMIT 1
+                      ))
+                    WHERE interview_event_id IS NOT NULL;
+
+                    UPDATE meetings
+                    SET
+                      application_id = COALESCE(application_id, (
+                        SELECT s.application_id
+                        FROM interview_stages s
+                        WHERE s.calendar_event_id = meetings.calendar_event_id
+                          AND s.archived_at IS NULL
+                        LIMIT 1
+                      )),
+                      interview_stage_id = COALESCE(interview_stage_id, (
+                        SELECT s.id
+                        FROM interview_stages s
+                        WHERE s.calendar_event_id = meetings.calendar_event_id
+                          AND s.archived_at IS NULL
+                        LIMIT 1
+                      )),
+                      interview_event_id = COALESCE(interview_event_id, (
+                        SELECT s.legacy_interview_event_id
+                        FROM interview_stages s
+                        WHERE s.calendar_event_id = meetings.calendar_event_id
+                          AND s.archived_at IS NULL
+                          AND s.legacy_interview_event_id IS NOT NULL
+                        LIMIT 1
+                      ))
+                    WHERE calendar_event_id IS NOT NULL;
+
+                    UPDATE meetings
+                    SET
+                      application_id = COALESCE(application_id, (
+                        SELECT map.application_id
+                        FROM legacy_interview_event_map map
+                        JOIN interview_events e ON e.id = map.legacy_interview_event_id
+                        WHERE e.calendar_event_id = meetings.calendar_event_id
+                          AND e.archived_at IS NULL
+                        LIMIT 1
+                      )),
+                      interview_stage_id = COALESCE(interview_stage_id, (
+                        SELECT map.stage_id
+                        FROM legacy_interview_event_map map
+                        JOIN interview_events e ON e.id = map.legacy_interview_event_id
+                        WHERE e.calendar_event_id = meetings.calendar_event_id
+                          AND e.archived_at IS NULL
+                        LIMIT 1
+                      )),
+                      interview_event_id = COALESCE(interview_event_id, (
+                        SELECT e.id
+                        FROM interview_events e
+                        WHERE e.calendar_event_id = meetings.calendar_event_id
+                          AND e.archived_at IS NULL
+                        LIMIT 1
+                      ))
+                    WHERE calendar_event_id IS NOT NULL;
+                `);
+                this.db!.pragma('user_version = 19');
+            });
+            tx();
+        }
+
         console.log('[DatabaseManager] Migrations completed.');
     }
 
@@ -1237,21 +1321,58 @@ export class DatabaseManager {
         }
 
         const existingMeeting = this.db
-            .prepare('SELECT calendar_event_id, interview_event_id FROM meetings WHERE id = ?')
-            .get(meeting.id) as { calendar_event_id?: string | null; interview_event_id?: string | null } | undefined;
+            .prepare('SELECT calendar_event_id, interview_event_id, interview_stage_id, application_id FROM meetings WHERE id = ?')
+            .get(meeting.id) as {
+                calendar_event_id?: string | null;
+                interview_event_id?: string | null;
+                interview_stage_id?: string | null;
+                application_id?: string | null;
+            } | undefined;
         const effectiveCalendarEventId = meeting.calendarEventId ?? existingMeeting?.calendar_event_id ?? null;
         let effectiveInterviewEventId = meeting.interviewEventId ?? existingMeeting?.interview_event_id ?? null;
+        let effectiveInterviewStageId = meeting.interviewStageId ?? existingMeeting?.interview_stage_id ?? null;
+        let effectiveApplicationId = meeting.applicationId ?? existingMeeting?.application_id ?? null;
 
-        if (!effectiveInterviewEventId && effectiveCalendarEventId) {
+        if ((!effectiveApplicationId || !effectiveInterviewStageId) && effectiveInterviewEventId) {
             try {
-                const matches = this.db.prepare(`
-                    SELECT id
-                    FROM interview_events
+                const map = this.db.prepare(`
+                    SELECT application_id, stage_id
+                    FROM legacy_interview_event_map
+                    WHERE legacy_interview_event_id = ?
+                `).get(effectiveInterviewEventId) as { application_id?: string | null; stage_id?: string | null } | undefined;
+                effectiveApplicationId = effectiveApplicationId ?? map?.application_id ?? null;
+                effectiveInterviewStageId = effectiveInterviewStageId ?? map?.stage_id ?? null;
+            } catch {
+                // Interview schema may not exist in older/recovery contexts; leave unlinked.
+            }
+        }
+
+        if (effectiveCalendarEventId && (!effectiveApplicationId || !effectiveInterviewStageId || !effectiveInterviewEventId)) {
+            try {
+                const stageMatches = this.db.prepare(`
+                    SELECT id, application_id, legacy_interview_event_id
+                    FROM interview_stages
                     WHERE calendar_event_id = ? AND archived_at IS NULL
                     LIMIT 2
-                `).all(effectiveCalendarEventId) as Array<{ id: string }>;
-                if (matches.length === 1) {
-                    effectiveInterviewEventId = matches[0].id;
+                `).all(effectiveCalendarEventId) as Array<{ id: string; application_id: string; legacy_interview_event_id?: string | null }>;
+                if (stageMatches.length === 1) {
+                    effectiveInterviewStageId = effectiveInterviewStageId ?? stageMatches[0].id;
+                    effectiveApplicationId = effectiveApplicationId ?? stageMatches[0].application_id;
+                    effectiveInterviewEventId = effectiveInterviewEventId ?? stageMatches[0].legacy_interview_event_id ?? null;
+                }
+                if (!effectiveInterviewEventId || !effectiveApplicationId || !effectiveInterviewStageId) {
+                    const eventMatches = this.db.prepare(`
+                        SELECT e.id, map.application_id, map.stage_id
+                        FROM interview_events e
+                        LEFT JOIN legacy_interview_event_map map ON map.legacy_interview_event_id = e.id
+                        WHERE e.calendar_event_id = ? AND e.archived_at IS NULL
+                        LIMIT 2
+                    `).all(effectiveCalendarEventId) as Array<{ id: string; application_id?: string | null; stage_id?: string | null }>;
+                    if (eventMatches.length === 1) {
+                        effectiveInterviewEventId = effectiveInterviewEventId ?? eventMatches[0].id;
+                        effectiveApplicationId = effectiveApplicationId ?? eventMatches[0].application_id ?? null;
+                        effectiveInterviewStageId = effectiveInterviewStageId ?? eventMatches[0].stage_id ?? null;
+                    }
                 }
             } catch {
                 // Interview schema may not exist in older/recovery contexts; leave unlinked.
@@ -1259,8 +1380,12 @@ export class DatabaseManager {
         }
 
         const insertMeeting = this.db.prepare(`
-            INSERT OR REPLACE INTO meetings (id, title, start_time, duration_ms, summary_json, created_at, calendar_event_id, source, is_processed, interview_event_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO meetings (
+                id, title, start_time, duration_ms, summary_json, created_at,
+                calendar_event_id, source, is_processed, interview_event_id,
+                interview_stage_id, application_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         const insertTranscript = this.db.prepare(`
@@ -1290,7 +1415,9 @@ export class DatabaseManager {
                 effectiveCalendarEventId,
                 meeting.source || 'manual',
                 meeting.isProcessed ? 1 : 0,
-                effectiveInterviewEventId
+                effectiveInterviewEventId,
+                effectiveInterviewStageId,
+                effectiveApplicationId
             );
 
             // 2. Insert Transcript
@@ -1427,6 +1554,9 @@ export class DatabaseManager {
                 summary: summaryData.legacySummary || '',
                 detailedSummary: summaryData.detailedSummary,
                 calendarEventId: row.calendar_event_id,
+                interviewEventId: row.interview_event_id,
+                interviewStageId: row.interview_stage_id,
+                applicationId: row.application_id,
                 source: row.source as any,
                 // We don't load full transcript/usage for list view to keep it light
                 transcript: [] as any[],
@@ -1495,6 +1625,9 @@ export class DatabaseManager {
             summary: summaryData.legacySummary || '',
             detailedSummary: summaryData.detailedSummary,
             calendarEventId: meetingRow.calendar_event_id,
+            interviewEventId: meetingRow.interview_event_id,
+            interviewStageId: meetingRow.interview_stage_id,
+            applicationId: meetingRow.application_id,
             source: meetingRow.source,
             transcript: transcript,
             usage: usage
@@ -1543,6 +1676,9 @@ export class DatabaseManager {
                 summary: summaryData.legacySummary || '',
                 detailedSummary: summaryData.detailedSummary,
                 calendarEventId: row.calendar_event_id,
+                interviewEventId: row.interview_event_id,
+                interviewStageId: row.interview_stage_id,
+                applicationId: row.application_id,
                 source: row.source,
                 isProcessed: false,
                 transcript: [] as any[], // Fetched separately via getMeetingDetails or manually if needed

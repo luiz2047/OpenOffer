@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Plus, Trash2, Edit2, AlertCircle, CheckCircle, Save, ChevronDown, Check, RefreshCw, ExternalLink, Loader2 } from 'lucide-react';
 import { CODEX_CLI_MODEL, CODEX_CLI_MODEL_PRESETS, codexCliSelectorId, STANDARD_CLOUD_MODELS, prettifyModelId } from '../../utils/modelUtils';
 import { validateCurl } from '../../lib/curl-validator';
@@ -47,6 +47,27 @@ interface AnswerStylePackOption {
     language: 'any';
     recommended: boolean;
 }
+
+type AiTask = 'vacancy_intake' | 'scraping' | 'retro' | 'agent_actions';
+type TaskModelMode = 'default' | 'auto' | 'pinned';
+
+interface TaskModelPolicy {
+    version: 1;
+    defaultModelId: string | null;
+    tasks: Partial<Record<AiTask, {
+        mode: TaskModelMode;
+        modelId?: string;
+        quality?: 'fast' | 'balanced' | 'quality';
+    }>>;
+    updatedAt: string;
+}
+
+const TASK_MODEL_ROWS: Array<{ task: AiTask; title: string; description: string }> = [
+    { task: 'vacancy_intake', title: 'Вакансии из текста', description: 'Парсинг вакансий, HR-сообщений и встреч.' },
+    { task: 'scraping', title: 'AI-скрапинг', description: 'Извлечение данных со страниц и источников.' },
+    { task: 'retro', title: 'Ретро по собеседованию', description: 'Оценка созвона по транскрипту.' },
+    { task: 'agent_actions', title: 'Агентные действия', description: 'Действия помощника в Vacancy OS.' },
+];
 
 const DEFAULT_ANSWER_STYLE_PACKS: AnswerStylePackOption[] = [
     { id: 'automatic', label: 'Автоматически', shortLabel: 'Авто', description: 'Использует рекомендованное поведение для этой модели и языка.', sample: 'Настройки по умолчанию с учетом вопроса.', language: 'any', recommended: true },
@@ -209,6 +230,8 @@ export const AIProvidersSettings: React.FC = () => {
 
     // --- Default Model ---
     const [defaultModel, setDefaultModel] = useState<string>('gemini-3.5-flash');
+    const [taskModelPolicy, setTaskModelPolicy] = useState<TaskModelPolicy | null>(null);
+    const [taskPolicySaving, setTaskPolicySaving] = useState<AiTask | 'default' | null>(null);
     const [fastResponseMode, setFastResponseMode] = useState(false);
     const [credentialsLoaded, setCredentialsLoaded] = useState(false);
     const canUseFastMode = !!(hasStoredKey.groq || codexCliConfig.enabled);
@@ -299,6 +322,11 @@ export const AIProvidersSettings: React.FC = () => {
                 const result = await window.electronAPI?.getDefaultModel();
                 if (result && result.model) {
                     setDefaultModel(sanitizeDefaultModel(result.model));
+                }
+
+                const taskPolicy = await window.electronAPI?.getTaskModelPolicy?.();
+                if (taskPolicy) {
+                    setTaskModelPolicy(taskPolicy);
                 }
 
                 await loadYandexAnswerStyle(creds?.yandexPreferredModel || 'yandex/yandexgpt-5-lite');
@@ -784,6 +812,47 @@ export const AIProvidersSettings: React.FC = () => {
 
     const yandexStyleOptions = answerStylePacks.length ? answerStylePacks : DEFAULT_ANSWER_STYLE_PACKS;
     const selectedYandexAnswerStyle = yandexStyleOptions.find(style => style.id === (yandexAnswerStyleId || 'automatic')) || yandexStyleOptions[0];
+    const availableModelOptions = useMemo(() => {
+        const opts: ModelOption[] = [];
+
+        for (const [prov, cfg] of Object.entries(STANDARD_CLOUD_MODELS)) {
+            if (!hasStoredKey[prov as keyof typeof hasStoredKey]) continue;
+            cfg.ids.forEach((id, i) => opts.push({ id, name: cfg.names[i] }));
+            const pm = preferredModels[prov as keyof typeof preferredModels];
+            if (pm && !cfg.ids.includes(pm)) {
+                opts.push({ id: pm, name: prettifyModelId(pm) });
+            }
+        }
+        if (codexCliConfig.enabled) {
+            opts.push({ id: CODEX_CLI_MODEL.id, name: `${CODEX_CLI_MODEL.name} (${prettifyModelId(codexCliConfig.model)})` });
+            CODEX_CLI_MODEL_PRESETS.forEach(model => {
+                const id = codexCliSelectorId(model.id);
+                if (!opts.find(o => o.id === id)) {
+                    opts.push({ id, name: `${CODEX_CLI_MODEL.name}: ${model.name}` });
+                }
+            });
+        }
+        customProviders.forEach(p => opts.push({ id: p.id, name: p.name }));
+        ollamaModels.forEach(m => opts.push({ id: `ollama-${m}`, name: `${m} (локально)` }));
+
+        if (defaultModel && !opts.find(o => o.id === defaultModel)) {
+            opts.unshift({ id: defaultModel, name: prettifyModelId(defaultModel) });
+        }
+        return opts;
+    }, [codexCliConfig.enabled, codexCliConfig.model, customProviders, defaultModel, hasStoredKey, ollamaModels, preferredModels]);
+
+    const saveTaskPolicy = async (next: TaskModelPolicy, savingKey: AiTask | 'default') => {
+        setTaskPolicySaving(savingKey);
+        setTaskModelPolicy(next);
+        try {
+            const result = await window.electronAPI?.setTaskModelPolicy?.(next as any);
+            if (result?.policy) setTaskModelPolicy(result.policy as TaskModelPolicy);
+        } catch (error) {
+            console.error('Failed to save task model policy:', error);
+        } finally {
+            setTaskPolicySaving(null);
+        }
+    };
 
     return (
         <div className="space-y-5 animated fadeIn pb-10">
@@ -801,40 +870,82 @@ export const AIProvidersSettings: React.FC = () => {
                     </div>
                     <ModelSelect
                         value={defaultModel}
-                        options={(() => {
-                            const opts: { id: string; name: string }[] = [];
-
-                            for (const [prov, cfg] of Object.entries(STANDARD_CLOUD_MODELS)) {
-                                if (!hasStoredKey[prov as keyof typeof hasStoredKey]) continue;
-                                cfg.ids.forEach((id, i) => opts.push({ id, name: cfg.names[i] }));
-                                const pm = preferredModels[prov as keyof typeof preferredModels];
-                                if (pm && !cfg.ids.includes(pm)) {
-                                    opts.push({ id: pm, name: prettifyModelId(pm) });
-                                }
-                            }
-                            if (codexCliConfig.enabled) {
-                                opts.push({ id: CODEX_CLI_MODEL.id, name: `${CODEX_CLI_MODEL.name} (${prettifyModelId(codexCliConfig.model)})` });
-                                CODEX_CLI_MODEL_PRESETS.forEach(model => {
-                                    const id = codexCliSelectorId(model.id);
-                                    if (!opts.find(o => o.id === id)) {
-                                        opts.push({ id, name: `${CODEX_CLI_MODEL.name}: ${model.name}` });
-                                    }
-                                });
-                            }
-                            customProviders.forEach(p => opts.push({ id: p.id, name: p.name }));
-                            ollamaModels.forEach(m => opts.push({ id: `ollama-${m}`, name: `${m} (локально)` }));
-
-                            if (defaultModel && !opts.find(o => o.id === defaultModel)) {
-                                opts.unshift({ id: defaultModel, name: prettifyModelId(defaultModel) });
-                            }
-                            return opts;
-                        })()}
+                        options={availableModelOptions}
                         onChange={(val) => {
                             setDefaultModel(val);
+                            if (taskModelPolicy) {
+                                void saveTaskPolicy({
+                                    ...taskModelPolicy,
+                                    defaultModelId: val,
+                                    updatedAt: new Date().toISOString(),
+                                }, 'default');
+                            }
                             // @ts-ignore - persist as default + update runtime + broadcast
                             window.electronAPI?.setDefaultModel(val).catch(console.error);
                         }}
                     />
+                </div>
+
+                <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-4">
+                    <div className="flex items-start justify-between gap-4">
+                        <div>
+                            <h3 className="text-sm font-bold text-text-primary mb-1">Модели для задач</h3>
+                            <p className="text-xs text-text-secondary">По умолчанию эти задачи используют активную модель чата. Закрепите отдельную модель только там, где это нужно.</p>
+                        </div>
+                        <span className="shrink-0 rounded border border-border-subtle bg-bg-input px-2 py-1 text-[10px] font-medium text-text-secondary">
+                            {taskPolicySaving ? 'Сохранение...' : 'Авто'}
+                        </span>
+                    </div>
+                    <div className="space-y-3">
+                        {TASK_MODEL_ROWS.map(row => {
+                            const override = taskModelPolicy?.tasks?.[row.task];
+                            const mode = override?.mode ?? 'default';
+                            const pinnedModel = override?.modelId || taskModelPolicy?.defaultModelId || defaultModel;
+                            const updateTask = (nextMode: TaskModelMode, modelId?: string) => {
+                                const base: TaskModelPolicy = taskModelPolicy ?? {
+                                    version: 1,
+                                    defaultModelId: defaultModel,
+                                    tasks: {},
+                                    updatedAt: new Date().toISOString(),
+                                };
+                                const next: TaskModelPolicy = {
+                                    ...base,
+                                    defaultModelId: base.defaultModelId || defaultModel,
+                                    tasks: {
+                                        ...base.tasks,
+                                        [row.task]: nextMode === 'pinned'
+                                            ? { mode: 'pinned', modelId: modelId || pinnedModel, quality: 'balanced' }
+                                            : { mode: nextMode, quality: 'balanced' },
+                                    },
+                                    updatedAt: new Date().toISOString(),
+                                };
+                                void saveTaskPolicy(next, row.task);
+                            };
+                            return (
+                                <div key={row.task} className="grid grid-cols-1 gap-3 rounded-lg border border-border-subtle bg-bg-card/60 p-3 md:grid-cols-[1fr_190px_240px] md:items-center">
+                                    <div className="min-w-0">
+                                        <div className="text-xs font-semibold text-text-primary">{row.title}</div>
+                                        <div className="mt-0.5 text-[10px] text-text-secondary">{row.description}</div>
+                                    </div>
+                                    <select
+                                        value={mode}
+                                        onChange={(event) => updateTask(event.target.value as TaskModelMode)}
+                                        className="w-full rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-accent-primary"
+                                    >
+                                        <option value="default">Как активная модель</option>
+                                        <option value="auto">Авто по задаче</option>
+                                        <option value="pinned">Закрепить модель</option>
+                                    </select>
+                                    <ModelSelect
+                                        value={pinnedModel}
+                                        options={availableModelOptions}
+                                        onChange={(modelId) => updateTask('pinned', modelId)}
+                                        className={mode === 'pinned' ? '' : 'opacity-60'}
+                                    />
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
 
                 {/* Быстрые ответы */}

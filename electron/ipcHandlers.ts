@@ -27,6 +27,7 @@ import {
 import { SkillsManager } from './services/SkillsManager';
 import { createBetterSqliteExecutor, InterviewRepository } from './services/interviews/InterviewRepository';
 import { InterviewDomainError, InterviewService, safeInterviewHandle } from './services/interviews/InterviewService';
+import { normalizeTaskModelPolicy, resolveTaskModel, type AiTask } from './services/TaskModelPolicy';
 
 import { TRIAL_SENTINEL_KEY, DOM_CONTEXT_MAX_CHARS } from './config/constants';
 import { AI_RESPONSE_LANGUAGES, RECOGNITION_LANGUAGES } from './config/languages';
@@ -387,7 +388,27 @@ export function initializeIpcHandlers(appState: AppState): void {
         'retry',
       );
     }
-    return new InterviewService(new InterviewRepository(createBetterSqliteExecutor(db)));
+    const { CredentialsManager } = require('./services/CredentialsManager');
+    return new InterviewService(
+      new InterviewRepository(createBetterSqliteExecutor(db)),
+      (task) => {
+        const cm = CredentialsManager.getInstance();
+        return resolveTaskModel(task, cm.getTaskModelPolicy(), cm.getAllCredentials());
+      },
+      async (prompt, options) => {
+        const llmHelper = appState.processingHelper?.getLLMHelper?.();
+        if (!llmHelper?.generateContentStructured) {
+          throw new Error('Structured AI generation is unavailable.');
+        }
+        if (typeof llmHelper.generateContentStructuredForModel === 'function') {
+          return llmHelper.generateContentStructuredForModel(prompt, {
+            modelId: options?.modelId,
+            preferFast: true,
+          });
+        }
+        return llmHelper.generateContentStructured(prompt, { preferFast: true });
+      },
+    );
   };
 
   // Clears premium-only context when the pro license is lost.
@@ -4077,6 +4098,40 @@ export function initializeIpcHandlers(appState: AppState): void {
     }
   });
 
+  safeHandle('get-task-model-policy', async () => {
+    try {
+      const { CredentialsManager } = require('./services/CredentialsManager');
+      return CredentialsManager.getInstance().getTaskModelPolicy();
+    } catch (error: any) {
+      console.error('Error getting task model policy:', error);
+      return normalizeTaskModelPolicy(null);
+    }
+  });
+
+  safeHandle('set-task-model-policy', async (_, policy: unknown) => {
+    try {
+      const { CredentialsManager } = require('./services/CredentialsManager');
+      const cm = CredentialsManager.getInstance();
+      return { success: true, policy: cm.setTaskModelPolicy(normalizeTaskModelPolicy(policy, cm.getAllCredentials())) };
+    } catch (error: any) {
+      console.error('Error setting task model policy:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  safeHandle('resolve-model-for-task', async (_, task: AiTask, options?: { overrideModelId?: string | null }) => {
+    try {
+      const { CredentialsManager } = require('./services/CredentialsManager');
+      const cm = CredentialsManager.getInstance();
+      return resolveTaskModel(task, cm.getTaskModelPolicy(), cm.getAllCredentials(), {
+        overrideModelId: options?.overrideModelId,
+      });
+    } catch (error: any) {
+      console.error('Error resolving task model:', error);
+      throw error;
+    }
+  });
+
   // --- Model Selector Window IPC ---
 
   safeHandle('show-model-selector', (_, coords: { x: number; y: number; activate?: boolean }) => {
@@ -6183,6 +6238,14 @@ export function initializeIpcHandlers(appState: AppState): void {
 
   safeHandle('interviews:get-retro-prompt', async (_, interviewId: string) => (
     safeInterviewHandle(() => getInterviewService().getRetroPrompt(interviewId))
+  ));
+
+  safeHandle('interviews:get-retro-evaluation', async (_, interviewId: string) => (
+    safeInterviewHandle(() => getInterviewService().getRetroEvaluation(interviewId))
+  ));
+
+  safeHandle('interviews:generate-retro-evaluation', async (_, interviewId: string) => (
+    safeInterviewHandle(() => getInterviewService().generateRetroEvaluation(interviewId))
   ));
 
   safeHandle('interviews:update-retro-prompt', async (_, interviewId: string, payload: unknown) => (

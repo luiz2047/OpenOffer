@@ -5,12 +5,12 @@ import {
   ArrowUpRight,
   BriefcaseBusiness,
   CalendarDays,
+  ChevronLeft,
   ChevronRight,
   CircleDot,
   Clock3,
   FileText,
   Link as LinkIcon,
-  ListChecks,
   MessageSquareText,
   Plus,
   RefreshCw,
@@ -20,7 +20,9 @@ import {
   X,
 } from 'lucide-react';
 import type {
+  ApplicationDetail,
   ApplicationIntakeResult,
+  ApplicationStatus,
   CalendarProvider,
   CalendarSnapshot,
   InterviewCreatePayload,
@@ -28,10 +30,12 @@ import type {
   InterviewListItem,
   InterviewPriority,
   InterviewQuestionPayload,
+  InterviewRetroEvaluation,
   InterviewRetroPayload,
+  InterviewStage,
   InterviewStatus,
+  LinkedMeeting,
   PrepBriefPayload,
-  ReadinessResult,
   RetroPromptDecision,
   VacancyDossierPayload,
 } from '../../types/interviews';
@@ -59,6 +63,8 @@ export interface InterviewMeetingStartMetadata {
   title?: string;
   calendarEventId?: string;
   interviewEventId?: string;
+  interviewStageId?: string;
+  applicationId?: string;
   source?: 'manual' | 'calendar';
 }
 
@@ -76,19 +82,54 @@ interface InterviewCommandCenterProps {
 
 const STATUS_OPTIONS: InterviewStatus[] = ['active', 'applied', 'screening', 'interviewing', 'offer', 'rejected', 'withdrawn', 'archived'];
 const PRIORITY_OPTIONS: InterviewPriority[] = ['normal', 'high', 'low'];
-const DETAIL_TABS = ['Vacancy', 'Prep', 'Retro', 'Questions'] as const;
+const DETAIL_TABS = ['Vacancy', 'Stages', 'Prep', 'Retro', 'Questions'] as const;
+const AGENT_STEPS = ['read', 'search', 'extract', 'stage', 'match', 'proposal'] as const;
 
 type DetailTab = typeof DETAIL_TABS[number];
 type DraftStatus = 'synced' | 'dirty' | 'saved' | 'failed';
+type AgentStep = typeof AGENT_STEPS[number] | 'apply';
+
+interface VacancyListItem {
+  id: string;
+  title: string;
+  company?: string | null;
+  roleTitle?: string | null;
+  source?: string | null;
+  vacancyUrl?: string | null;
+  status: ApplicationStatus;
+  priority: InterviewPriority;
+  selectedInterviewId: string | null;
+  selectedStageId?: string | null;
+  startsAt?: number | null;
+  stageTitle?: string | null;
+  stageCount: number;
+  linkedMeetingCount: number;
+  questionCount: number;
+  updatedAt: string;
+  stages: InterviewListItem[];
+}
 
 const DETAIL_TAB_I18N_KEY: Record<DetailTab, string> = {
   Vacancy: 'interviews.detailTabs.vacancy',
+  Stages: 'interviews.detailTabs.stages',
   Prep: 'interviews.detailTabs.prep',
   Retro: 'interviews.detailTabs.retro',
   Questions: 'interviews.detailTabs.questions',
 };
 
+const AGENT_STEP_I18N_KEY: Record<AgentStep, string> = {
+  read: 'interviews.agent.steps.read',
+  search: 'interviews.agent.steps.search',
+  extract: 'interviews.agent.steps.extract',
+  stage: 'interviews.agent.steps.stage',
+  match: 'interviews.agent.steps.match',
+  proposal: 'interviews.agent.steps.proposal',
+  apply: 'interviews.agent.steps.apply',
+};
+
 const DRAFT_PREFIX = 'openoffer:interviews:draft';
+const AGENT_INPUT_MAX_CHARS = 50000;
+const INACTIVE_APPLICATION_STATUSES = new Set<ApplicationStatus>(['rejected', 'withdrawn', 'archived']);
 
 function draftKey(interviewId: string, kind: 'dossier' | 'prep' | 'retro'): string {
   return `${DRAFT_PREFIX}:${interviewId}:${kind}`;
@@ -132,6 +173,29 @@ function formatDateTime(ms?: number | null): string {
   });
 }
 
+function startOfDay(value: Date): Date {
+  const next = new Date(value);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function addDays(value: Date, days: number): Date {
+  const next = new Date(value);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function startOfWeek(value: Date): Date {
+  const next = startOfDay(value);
+  const day = next.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  return addDays(next, mondayOffset);
+}
+
+function isSameLocalDay(left: Date, right: Date): boolean {
+  return startOfDay(left).getTime() === startOfDay(right).getTime();
+}
+
 function toLocalInputValue(ms?: number | null): string {
   if (!ms) return '';
   const date = new Date(ms);
@@ -156,10 +220,139 @@ function joinLines(value?: string[] | null): string {
   return (value ?? []).join('\n');
 }
 
-function readinessTone(level?: ReadinessResult['level']): string {
-  if (level === 'ready') return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-  if (level === 'needs_work') return 'text-amber-300 bg-amber-500/10 border-amber-500/20';
-  return 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20';
+function normalizeMatchValue(value?: string | null): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => window.setTimeout(resolve, ms));
+}
+
+function statusFromInterview(status: InterviewStatus): ApplicationStatus {
+  return status === 'active' ? 'lead_found' : status;
+}
+
+function legacyIdForApplication(application: ApplicationDetail): string | null {
+  const selectedStage = application.stages.find(stage => stage.id === application.selectedStageId);
+  return selectedStage?.legacyInterviewEventId
+    ?? application.stages.find(stage => stage.legacyInterviewEventId)?.legacyInterviewEventId
+    ?? application.legacyInterviewEventId
+    ?? null;
+}
+
+function legacyIdForVacancy(vacancy: VacancyListItem): string | null {
+  return vacancy.selectedInterviewId ?? vacancy.stages.find(stage => stage.id)?.id ?? null;
+}
+
+function isActiveApplication(status: ApplicationStatus): boolean {
+  return !INACTIVE_APPLICATION_STATUSES.has(status);
+}
+
+function vacancyFromApplication(application: ApplicationDetail, fallback?: VacancyListItem): VacancyListItem {
+  const selectedStage = application.stages.find(stage => stage.id === application.selectedStageId) ?? application.stages[0] ?? null;
+  const meetings = application.linkedMeetings ?? [];
+  return {
+    id: application.id,
+    title: application.title,
+    company: application.company,
+    roleTitle: application.roleTitle,
+    source: application.source,
+    vacancyUrl: application.vacancyUrl,
+    status: application.status,
+    priority: application.priority,
+    selectedInterviewId: legacyIdForApplication(application),
+    selectedStageId: selectedStage?.id ?? null,
+    startsAt: selectedStage?.startsAt ?? fallback?.startsAt ?? null,
+    stageTitle: selectedStage?.title ?? fallback?.stageTitle ?? null,
+    stageCount: application.stages.filter(stage => stage.archivedAt === null || stage.archivedAt === undefined).length,
+    linkedMeetingCount: meetings.length || fallback?.linkedMeetingCount || 0,
+    questionCount: fallback?.questionCount || 0,
+    updatedAt: application.updatedAt,
+    stages: fallback?.stages ?? [],
+  };
+}
+
+function groupVacanciesFromInterviews(interviews: InterviewListItem[]): VacancyListItem[] {
+  const groups = new Map<string, VacancyListItem>();
+  for (const item of interviews) {
+    const status = statusFromInterview(item.status);
+    if (!isActiveApplication(status)) continue;
+    const id = item.applicationId ?? item.id;
+    const current = groups.get(id);
+    const nextStages = [...(current?.stages ?? []), item].sort((a, b) => {
+      const left = a.startsAt ?? Number.MAX_SAFE_INTEGER;
+      const right = b.startsAt ?? Number.MAX_SAFE_INTEGER;
+      return left - right || b.updatedAt.localeCompare(a.updatedAt);
+    });
+    const selected = nextStages.find(stage => stage.id === item.selectedStageId) ?? nextStages[0] ?? item;
+    const updatedAtCandidates = [current?.updatedAt, item.updatedAt].filter(Boolean).sort();
+    groups.set(id, {
+      id,
+      title: current?.title ?? item.title,
+      company: current?.company ?? item.company,
+      roleTitle: current?.roleTitle ?? item.roleTitle,
+      source: current?.source ?? item.source,
+      vacancyUrl: current?.vacancyUrl ?? null,
+      status: current?.status === 'lead_found' ? status : current?.status ?? status,
+      priority: current?.priority ?? item.priority,
+      selectedInterviewId: selected.id,
+      selectedStageId: selected.selectedStageId,
+      startsAt: selected.startsAt,
+      stageTitle: selected.stage,
+      stageCount: nextStages.length,
+      linkedMeetingCount: nextStages.reduce((sum, stage) => sum + stage.linkedMeetingCount, 0),
+      questionCount: nextStages.reduce((sum, stage) => sum + stage.questionCount, 0),
+      updatedAt: updatedAtCandidates[updatedAtCandidates.length - 1] ?? item.updatedAt,
+      stages: nextStages,
+    });
+  }
+  return Array.from(groups.values()).sort((a, b) => {
+    const left = a.startsAt ?? Number.MAX_SAFE_INTEGER;
+    const right = b.startsAt ?? Number.MAX_SAFE_INTEGER;
+    return left - right || b.updatedAt.localeCompare(a.updatedAt);
+  });
+}
+
+function findMatchingApplication(preview: ApplicationIntakeResult | null, vacancies: VacancyListItem[]): VacancyListItem | null {
+  if (!preview) return null;
+  const aiMatchId = preview.existingApplicationMatch?.applicationId;
+  if (aiMatchId) {
+    const matched = vacancies.find(item => item.id === aiMatchId);
+    if (matched) return matched;
+  }
+  const company = normalizeMatchValue(preview.application.company);
+  const title = normalizeMatchValue(preview.application.title);
+  const role = normalizeMatchValue(preview.application.roleTitle);
+  const vacancyUrl = normalizeMatchValue(preview.application.vacancyUrl);
+  return vacancies.find(item => {
+    const itemCompany = normalizeMatchValue(item.company);
+    const itemTitle = normalizeMatchValue(item.title);
+    const itemRole = normalizeMatchValue(item.roleTitle);
+    const itemVacancyUrl = normalizeMatchValue(item.vacancyUrl);
+    const stageTitles = item.stages.map(stage => normalizeMatchValue(stage.stage));
+    return Boolean(
+      (vacancyUrl && itemVacancyUrl === vacancyUrl)
+      || (company && role && itemCompany === company && itemRole === role)
+      || (company && title && itemCompany === company && itemTitle === title)
+      || (company && title && itemCompany === company && stageTitles.includes(title)),
+    );
+  }) ?? null;
+}
+
+function groupRequirementLines(lines: string[], defaultLabel: string): Array<{ label: string; items: string[] }> {
+  const groups = new Map<string, string[]>();
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/^[-*•]\s*/, '').trim();
+    if (!line) continue;
+    const match = line.match(/^([^:：]{2,42})[:：]\s*(.+)$/);
+    const label = (match?.[1] ?? defaultLabel).trim();
+    const item = (match?.[2] ?? line).trim();
+    if (!item) continue;
+    const current = groups.get(label) ?? [];
+    current.push(item);
+    groups.set(label, current);
+  }
+  return Array.from(groups.entries()).map(([label, items]) => ({ label, items }));
 }
 
 function statusTone(status: InterviewStatus): string {
@@ -176,6 +369,23 @@ function statusTone(status: InterviewStatus): string {
     default:
       return 'text-zinc-200 bg-white/[0.04] border-white/[0.08]';
   }
+}
+
+function applicationStatusTone(status: ApplicationStatus): string {
+  return statusTone(status === 'lead_found' ? 'active' : status);
+}
+
+function applicationStatusLabelKey(status: ApplicationStatus): string {
+  return status === 'lead_found' ? 'interviews.status.active' : `interviews.status.${status}`;
+}
+
+function statusLabelKey(status: InterviewStatus, item?: Pick<InterviewListItem, 'stage' | 'startsAt' | 'selectedStageId'> | null): string {
+  if (status === 'active') {
+    return item?.stage || item?.startsAt || item?.selectedStageId
+      ? 'interviews.status.interviewing'
+      : 'interviews.status.active';
+  }
+  return `interviews.status.${status}`;
 }
 
 function eventProvider(event: CalendarEventSummary): CalendarProvider {
@@ -195,6 +405,19 @@ function eventSnapshot(event: CalendarEventSummary): CalendarSnapshot {
     attendeeNames: (event.attendees ?? []).map(attendee => attendee.name || attendee.email).filter(Boolean),
     capturedAt: Date.now(),
   };
+}
+
+function linkedMeetingsForStage(stage: InterviewStage, meetings: LinkedMeeting[], stageCount: number): LinkedMeeting[] {
+  return meetings.filter(meeting => (
+    meeting.interviewStageId === stage.id
+    || (stage.legacyInterviewEventId && meeting.interviewEventId === stage.legacyInterviewEventId)
+    || (
+      stageCount === 1
+      && meeting.applicationId === stage.applicationId
+      && !meeting.interviewStageId
+      && !meeting.interviewEventId
+    )
+  ));
 }
 
 function initialCreateForm(): InterviewCreatePayload {
@@ -228,7 +451,7 @@ function initialDossierDraft() {
 
 function dossierDraftFromDetail(detail: InterviewDetail) {
   return {
-    description: detail.dossier?.description ?? detail.rawSourceText ?? '',
+    description: detail.dossier?.description ?? '',
     requirements: joinLines(detail.dossier?.requirements),
     compensationText: detail.dossier?.compensationText ?? '',
     fitHypothesis: detail.dossier?.fitHypothesis ?? '',
@@ -290,12 +513,16 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 }) => {
   const { t } = useTranslation();
   const [interviews, setInterviews] = useState<InterviewListItem[]>([]);
+  const [applications, setApplications] = useState<ApplicationDetail[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<InterviewDetail | null>(null);
-  const [readiness, setReadiness] = useState<ReadinessResult | null>(null);
+  const [applicationDetail, setApplicationDetail] = useState<ApplicationDetail | null>(null);
   const [retroPrompt, setRetroPrompt] = useState<RetroPromptDecision | null>(null);
+  const [retroEvaluation, setRetroEvaluation] = useState<InterviewRetroEvaluation | null>(null);
+  const [retroEvaluating, setRetroEvaluating] = useState(false);
   const [calendarStatus, setCalendarStatus] = useState<{ connected: boolean; email?: string } | null>(null);
-  const [activeProvider, setActiveProvider] = useState<CalendarProvider>('google');
+  const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
+  const [rawSourceExpanded, setRawSourceExpanded] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>('Vacancy');
   const [query, setQuery] = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -306,6 +533,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const [agentOpen, setAgentOpen] = useState(false);
   const [agentText, setAgentText] = useState('');
   const [agentPreview, setAgentPreview] = useState<ApplicationIntakeResult | null>(null);
+  const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
   const [dossierDraft, setDossierDraft] = useState(initialDossierDraft);
   const [prepDraft, setPrepDraft] = useState({
     oneLineGoal: '',
@@ -332,11 +560,17 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const loadInterviews = useCallback(async () => {
     try {
       setError(null);
-      const rows = await interviewApi.list({ limit: 100 });
+      const [rows, applicationRows] = await Promise.all([
+        interviewApi.list({ limit: 100 }),
+        applicationApi.list().catch(() => [] as ApplicationDetail[]),
+      ]);
       setInterviews(rows);
+      setApplications(applicationRows.filter(application => isActiveApplication(application.status)));
       setSelectedId(current => {
         if (current && rows.some(row => row.id === current)) return current;
-        return rows[0]?.id ?? null;
+        const firstApplication = applicationRows.find(application => isActiveApplication(application.status));
+        const applicationLegacyId = firstApplication ? legacyIdForApplication(firstApplication) : null;
+        return applicationLegacyId ?? rows[0]?.id ?? null;
       });
     } catch (err: any) {
       setError(err?.message || 'Could not load interviews.');
@@ -364,21 +598,26 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   useEffect(() => {
     if (!selectedId) {
       setDetail(null);
-      setReadiness(null);
+      setApplicationDetail(null);
+      setRetroEvaluation(null);
       return;
     }
+    setRawSourceExpanded(false);
     let cancelled = false;
     void (async () => {
       try {
-        const [nextDetail, nextReadiness, nextRetroPrompt] = await Promise.all([
+        const [nextDetail, nextRetroPrompt] = await Promise.all([
           interviewApi.get(selectedId),
-          interviewApi.getReadiness(selectedId),
           interviewApi.getRetroPrompt(selectedId),
         ]);
+        const nextApplication = nextDetail.applicationId
+          ? await applicationApi.get(nextDetail.applicationId).catch(() => null)
+          : null;
         if (cancelled) return;
         setDetail(nextDetail);
-        setReadiness(nextReadiness);
+        setApplicationDetail(nextApplication);
         setRetroPrompt(nextRetroPrompt);
+        setRetroEvaluation(nextDetail.retroEvaluation ?? null);
         const dossierLocalDraft = readLocalDraft<ReturnType<typeof initialDossierDraft>>(nextDetail.id, 'dossier');
         const prepLocalDraft = readLocalDraft<ReturnType<typeof prepDraftFromDetail>>(nextDetail.id, 'prep');
         const retroLocalDraft = readLocalDraft<ReturnType<typeof initialRetroDraft>>(nextDetail.id, 'retro');
@@ -400,34 +639,71 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     };
   }, [selectedId]);
 
-  const filteredInterviews = useMemo(() => {
+  const vacancyItems = useMemo(() => {
+    const grouped = new Map(groupVacanciesFromInterviews(interviews).map(item => [item.id, item]));
+    for (const application of applications) {
+      if (!isActiveApplication(application.status)) continue;
+      grouped.set(application.id, vacancyFromApplication(application, grouped.get(application.id)));
+    }
+    return Array.from(grouped.values()).sort((a, b) => {
+      const left = a.startsAt ?? Number.MAX_SAFE_INTEGER;
+      const right = b.startsAt ?? Number.MAX_SAFE_INTEGER;
+      return left - right || b.updatedAt.localeCompare(a.updatedAt);
+    });
+  }, [applications, interviews]);
+
+  const filteredVacancies = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    if (!needle) return interviews;
-    return interviews.filter(item => [
+    if (!needle) return vacancyItems;
+    return vacancyItems.filter(item => [
       item.title,
       item.company,
       item.roleTitle,
-      item.stage,
+      item.stageTitle,
       item.source,
+      item.vacancyUrl,
+      ...item.stages.map(stage => stage.stage),
     ].some(value => String(value ?? '').toLowerCase().includes(needle)));
-  }, [interviews, query]);
+  }, [query, vacancyItems]);
 
-  const upcomingForProvider = useMemo(() => {
+  const upcomingAgenda = useMemo(() => {
     return upcomingEvents
-      .filter(event => eventProvider(event) === activeProvider)
       .filter(event => new Date(event.endTime).getTime() > Date.now() - 5 * 60_000)
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-  }, [activeProvider, upcomingEvents]);
+  }, [upcomingEvents]);
 
   const calendarDays = useMemo(() => {
-    const start = new Date();
+    const start = startOfWeek(selectedDate);
     return Array.from({ length: 7 }, (_, index) => {
-      const day = new Date(start);
-      day.setDate(start.getDate() + index);
-      const count = upcomingForProvider.filter(event => new Date(event.startTime).toDateString() === day.toDateString()).length;
+      const day = addDays(start, index);
+      const count = upcomingAgenda.filter(event => isSameLocalDay(new Date(event.startTime), day)).length
+        + interviews.filter(item => item.startsAt && isSameLocalDay(new Date(item.startsAt), day)).length;
       return { day, count };
     });
-  }, [upcomingForProvider]);
+  }, [interviews, selectedDate, upcomingAgenda]);
+
+  const selectedDayEvents = useMemo(() => {
+    return upcomingAgenda
+      .filter(event => isSameLocalDay(new Date(event.startTime), selectedDate))
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+  }, [selectedDate, upcomingAgenda]);
+
+  const selectedDayInterviews = useMemo(() => {
+    return interviews
+      .filter(item => item.startsAt && isSameLocalDay(new Date(item.startsAt), selectedDate))
+      .sort((a, b) => (a.startsAt ?? 0) - (b.startsAt ?? 0));
+  }, [interviews, selectedDate]);
+
+  const selectedDayCount = selectedDayEvents.length + selectedDayInterviews.length;
+  const agentMatchedVacancy = useMemo(() => {
+    return findMatchingApplication(agentPreview, vacancyItems);
+  }, [agentPreview, vacancyItems]);
+  const stages = applicationDetail?.stages ?? [];
+  const formatSchedule = useCallback((ms?: number | null) => (ms ? formatDateTime(ms) : t('interviews.unscheduled')), [t]);
+  const requirementGroups = useMemo(
+    () => groupRequirementLines(splitLines(dossierDraft.requirements), t('interviews.detail.requirements')),
+    [dossierDraft.requirements, t],
+  );
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -535,16 +811,44 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     });
   };
 
-  const runAgent = async (apply = false) => {
+  const runAgent = async () => {
     await run(async () => {
-      const preview = agentPreview ?? await applicationApi.parseIntake({ text: agentText, useAi: true });
+      setAgentPreview(null);
+      setAgentSteps([]);
+      const revealStep = async (step: AgentStep, delayMs = 180) => {
+        setAgentSteps(prev => prev.includes(step) ? prev : [...prev, step]);
+        if (delayMs > 0) await wait(delayMs);
+      };
+      await revealStep('read', 160);
+      await revealStep('search', 220);
+      const candidateApplicationIds = vacancyItems.map(item => item.id);
+      await revealStep('extract', 220);
+      const preview = await applicationApi.parseIntake({
+        text: agentText,
+        useAi: true,
+        task: 'agent_actions',
+        candidateApplicationIds,
+      });
+      if (preview.stage) await revealStep('stage', 180);
+      await revealStep('match', 160);
+      await revealStep('proposal', 0);
       setAgentPreview(preview);
-      if (!apply) return;
-      const result = await applicationApi.createFromIntake(preview);
+    });
+  };
+
+  const applyAgentProposal = async () => {
+    if (!agentPreview) return;
+    await run(async () => {
+      setAgentSteps(prev => Array.from(new Set([...prev, 'apply'])));
+      const selectedApplicationId = agentMatchedVacancy?.id && agentPreview.stage
+        ? agentMatchedVacancy.id
+        : null;
+      const result = await applicationApi.createFromIntake(agentPreview, { selectedApplicationId });
       await loadInterviews();
       setSelectedId(result.legacyInterview?.id ?? result.application.legacyInterviewEventId ?? null);
       setAgentText('');
       setAgentPreview(null);
+      setAgentSteps([]);
       setAgentOpen(false);
     });
   };
@@ -558,7 +862,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         stage: 'Scheduled interview',
         status: 'interviewing',
         priority: 'high',
-        source: activeProvider === 'macos' ? 'macOS Calendar' : 'Google Calendar',
+        source: eventProvider(event) === 'macos' ? 'macOS Calendar' : 'Google Calendar',
         meetingUrl: event.link ?? null,
         startsAt,
         endsAt,
@@ -598,7 +902,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       clearDraftStatus('dossier', detail.id);
       const next = await interviewApi.get(detail.id);
       setDetail(next);
-      setReadiness(await interviewApi.getReadiness(detail.id));
+      setApplicationDetail(next.applicationId ? await applicationApi.get(next.applicationId).catch(() => null) : null);
     });
   };
 
@@ -618,7 +922,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       clearDraftStatus('prep', detail.id);
       const next = await interviewApi.get(detail.id);
       setDetail(next);
-      setReadiness(await interviewApi.getReadiness(detail.id));
+      setApplicationDetail(next.applicationId ? await applicationApi.get(next.applicationId).catch(() => null) : null);
     });
   };
 
@@ -636,10 +940,26 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     await run(async () => {
       await interviewApi.saveRetro(detail.id, payload);
       clearDraftStatus('retro', detail.id);
-      setDetail(await interviewApi.get(detail.id));
+      const next = await interviewApi.get(detail.id);
+      setDetail(next);
+      setRetroEvaluation(next.retroEvaluation ?? retroEvaluation);
       setRetroPrompt(await interviewApi.getRetroPrompt(detail.id));
       setRetroDraft(initialRetroDraft());
     });
+  };
+
+  const generateRetroEvaluation = async () => {
+    if (!detail) return;
+    setRetroEvaluating(true);
+    try {
+      setError(null);
+      const evaluation = await interviewApi.generateRetroEvaluation(detail.id);
+      setRetroEvaluation(evaluation);
+    } catch (err: any) {
+      setError(err?.message || 'Could not generate retro evaluation.');
+    } finally {
+      setRetroEvaluating(false);
+    }
   };
 
   const updateRetroPrompt = async (action: 'snooze' | 'dismiss' | 'complete') => {
@@ -680,7 +1000,9 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     if (!detail || !attachMeetingId) return;
     await run(async () => {
       await interviewApi.attachMeeting(detail.id, attachMeetingId);
-      setDetail(await interviewApi.get(detail.id));
+      const next = await interviewApi.get(detail.id);
+      setDetail(next);
+      setApplicationDetail(next.applicationId ? await applicationApi.get(next.applicationId).catch(() => null) : null);
       setAttachMeetingId('');
     });
   };
@@ -693,6 +1015,8 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     onStartMeeting({
       title: detail.title,
       interviewEventId: detail.id,
+      interviewStageId: detail.selectedStageId ?? undefined,
+      applicationId: detail.applicationId ?? undefined,
       calendarEventId: detail.calendarEventId ?? undefined,
       source: 'manual',
     });
@@ -712,69 +1036,104 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         </div>
 
         <div className="border-b border-white/[0.07] p-3">
-          <div className="grid grid-cols-2 rounded-md bg-black/25 p-1">
-            {(['google', 'macos'] as CalendarProvider[]).map(provider => (
-              <button type="button"
-                key={provider}
-                onClick={() => setActiveProvider(provider)}
-                className={`min-h-11 rounded px-2 text-[12px] font-medium transition ${activeProvider === provider ? 'bg-white/[0.09] text-white shadow-sm' : 'text-white/70 hover:bg-white/[0.04] hover:text-white'}`}
+          <div className="flex min-h-9 items-center justify-between gap-3">
+            {calendarStatus?.connected ? (
+              <button
+                type="button"
+                onClick={refreshAll}
+                className="inline-flex min-w-0 items-center gap-2 text-[12px] font-medium text-text-secondary transition hover:text-white"
+                title={calendarStatus.email ?? t('interviews.sync')}
               >
-                {provider === 'google' ? t('interviews.google') : t('interviews.mac')}
-              </button>
-            ))}
-          </div>
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-white/[0.035] px-3 py-2.5">
-            <div className="min-w-0">
-              <div className="text-[12px] font-medium text-text-primary">
-                {activeProvider === 'google' ? (calendarStatus?.connected ? t('common.connected') : t('common.notConnected')) : t('interviews.localCalendar')}
-              </div>
-              <div className="truncate text-[11px] text-text-tertiary">
-                {activeProvider === 'google' ? (calendarStatus?.email ?? t('interviews.googleCalendar')) : t('interviews.macosCalendar')}
-              </div>
-            </div>
-            {activeProvider === 'google' ? (
-              <button type="button"
-                className="min-h-11 rounded-md bg-cyan-500 px-3 text-[12px] font-semibold text-black transition hover:bg-cyan-300"
-                onClick={() => window.electronAPI?.calendarConnect?.().then(result => {
-                  if (result.success) void loadCalendarStatus();
-                  else setError(result.error || 'Calendar connection failed.');
-                })}
-              >
-                {calendarStatus?.connected ? t('common.reconnect') : t('interviews.connect')}
+                <RefreshCw size={13} className={isRefreshing ? 'animate-spin text-cyan-300' : 'text-cyan-300'} />
+                <span className="truncate">{t('interviews.sync')}</span>
               </button>
             ) : (
-              <button type="button"
-                className="min-h-11 rounded-md border border-white/[0.08] px-3 text-[12px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white"
+              <button
+                type="button"
                 onClick={() => onOpenSettings('calendar')}
+                className="inline-flex min-w-0 items-center gap-1.5 text-[12px] font-medium text-text-tertiary transition hover:text-white"
               >
-                {t('common.settings')}
+                <span className="truncate">{t('interviews.syncNotConfigured')}</span>
+                <ArrowUpRight size={12} />
               </button>
             )}
+            {calendarStatus?.email && (
+              <span className="truncate text-[11px] text-text-tertiary">{calendarStatus.email}</span>
+            )}
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <button type="button"
+              className={iconButtonClass}
+              onClick={() => setSelectedDate(prev => addDays(prev, -7))}
+              title={t('interviews.previousWeek')}
+              aria-label={t('interviews.previousWeek')}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <button type="button"
+              className="min-h-11 flex-1 rounded-md border border-white/[0.08] px-3 text-[12px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white"
+              onClick={() => setSelectedDate(startOfDay(new Date()))}
+            >
+              {selectedDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+            </button>
+            <button type="button"
+              className={iconButtonClass}
+              onClick={() => setSelectedDate(prev => addDays(prev, 7))}
+              title={t('interviews.nextWeek')}
+              aria-label={t('interviews.nextWeek')}
+            >
+              <ChevronRight size={16} />
+            </button>
           </div>
         </div>
 
         <div className="grid grid-cols-7 gap-1.5 border-b border-white/[0.07] p-3">
           {calendarDays.map(({ day, count }) => {
             const today = day.toDateString() === new Date().toDateString();
+            const selected = isSameLocalDay(day, selectedDate);
             return (
-              <div key={day.toISOString()} className={`flex h-14 flex-col items-center justify-center rounded-md text-center transition ${today ? 'bg-cyan-400/10 text-white ring-1 ring-cyan-300/25' : 'text-text-secondary hover:bg-white/[0.035]'}`}>
+              <button
+                type="button"
+                key={day.toISOString()}
+                onClick={() => setSelectedDate(startOfDay(day))}
+                className={`flex h-14 flex-col items-center justify-center rounded-md text-center transition ${selected ? 'bg-cyan-400/10 text-white ring-1 ring-cyan-300/25' : today ? 'bg-white/[0.035] text-white' : 'text-text-secondary hover:bg-white/[0.035]'}`}
+              >
                 <span className="text-[10px] uppercase text-zinc-500">{day.toLocaleDateString([], { weekday: 'short' })}</span>
                 <span className="text-[14px] font-semibold tabular-nums">{day.getDate()}</span>
                 {count > 0 ? <span className="mt-1 h-1.5 w-5 rounded-full bg-cyan-300/85" /> : <span className="mt-1 h-1.5 w-1.5 rounded-full bg-white/[0.12]" />}
-              </div>
+              </button>
             );
           })}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
           <div className="mb-2 flex items-center justify-between">
-            <span className={labelClass}>{t('interviews.upcoming')}</span>
-            <span className="text-[11px] text-text-tertiary">{upcomingForProvider.length}</span>
+            <span className={labelClass}>{t('interviews.selectedDay')}</span>
+            <span className="text-[11px] text-text-tertiary">{selectedDayCount}</span>
           </div>
           <div className="space-y-2">
-            {upcomingForProvider.slice(0, 12).map(event => (
+            {selectedDayInterviews.map(item => (
               <button type="button"
-                key={event.id}
+                key={`interview:${item.id}`}
+                onClick={() => setSelectedId(item.id)}
+                className="min-h-16 w-full rounded-md border border-transparent px-3 py-2.5 text-left transition hover:bg-white/[0.055] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-[13px] font-semibold">{item.title}</div>
+                    <div className="mt-1 flex items-center gap-1.5 text-[11px] text-text-tertiary">
+                      <Clock3 size={12} />
+                      {formatSchedule(item.startsAt)}
+                    </div>
+                  </div>
+                  <ChevronRight size={15} className="mt-0.5 text-text-secondary" />
+                </div>
+              </button>
+            ))}
+            {selectedDayEvents.map(event => (
+              <button type="button"
+                key={`event:${event.source}:${event.id}`}
                 onClick={() => createFromEvent(event)}
                 className="min-h-16 w-full rounded-md border border-transparent px-3 py-2.5 text-left transition hover:bg-white/[0.055] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60"
               >
@@ -783,16 +1142,16 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                     <div className="truncate text-[13px] font-semibold">{event.title}</div>
                     <div className="mt-1 flex items-center gap-1.5 text-[11px] text-text-tertiary">
                       <Clock3 size={12} />
-                      {formatDateTime(new Date(event.startTime).getTime())}
+                      {formatDateTime(new Date(event.startTime).getTime())} · {eventProvider(event) === 'macos' ? t('interviews.mac') : t('interviews.google')}
                     </div>
                   </div>
                   <Plus size={15} className="mt-0.5 text-text-secondary" />
                 </div>
               </button>
             ))}
-            {upcomingForProvider.length === 0 && (
+            {selectedDayCount === 0 && (
               <div className="rounded-md bg-white/[0.025] p-4 text-[12px] text-text-tertiary">
-                {t('interviews.noScheduledEvents')}
+                {t('interviews.noEventsForSelectedDay')}
               </div>
             )}
           </div>
@@ -803,7 +1162,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         <div className={paneHeaderClass}>
           <div>
             <div className="text-[15px] font-semibold">{t('interviews.vacancyOS')}</div>
-            <div className="text-[11px] text-text-tertiary">{t('interviews.activeProcessCount', { count: interviews.length })}</div>
+            <div className="text-[11px] text-text-tertiary">{t('interviews.activeProcessCount', { count: vacancyItems.length })}</div>
           </div>
           <button type="button"
             onClick={() => setShowCreate(true)}
@@ -829,30 +1188,33 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
           <div className="space-y-2">
-            {filteredInterviews.map(item => (
+            {filteredVacancies.map(item => (
               <button type="button"
                 key={item.id}
-                onClick={() => setSelectedId(item.id)}
-                className={`min-h-24 w-full rounded-md border p-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60 ${selectedId === item.id ? 'border-cyan-300/35 bg-cyan-300/[0.08]' : 'border-transparent bg-transparent hover:bg-white/[0.045]'}`}
+                onClick={() => {
+                  const legacyId = legacyIdForVacancy(item);
+                  if (legacyId) setSelectedId(legacyId);
+                }}
+                className={`min-h-24 w-full rounded-md border p-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60 ${item.stages.some(stage => stage.id === selectedId) || item.selectedInterviewId === selectedId ? 'border-cyan-300/35 bg-cyan-300/[0.08]' : 'border-transparent bg-transparent hover:bg-white/[0.045]'}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="truncate text-[14px] font-semibold">{item.title}</div>
                     <div className="mt-1 truncate text-[12px] text-text-secondary">
-                      {[item.company, item.roleTitle].filter(Boolean).join(' · ') || item.stage || t('interviews.noVacancyContext')}
+                      {[item.company, item.roleTitle].filter(Boolean).join(' · ') || item.stageTitle || t('interviews.noVacancyContext')}
                     </div>
                   </div>
-                  <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold ${statusTone(item.status)}`}>
-                    {item.status}
+                  <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold ${applicationStatusTone(item.status)}`}>
+                    {t(applicationStatusLabelKey(item.status))}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-[11px] text-text-tertiary">
-                  <span>{formatDateTime(item.startsAt)}</span>
-                  <span>{t('interviews.questionsCount', { count: item.questionCount })}</span>
+                  <span>{formatSchedule(item.startsAt)}</span>
+                  <span>{item.stageCount > 1 ? t('interviews.stagesCount', { count: item.stageCount }) : t('interviews.questionsCount', { count: item.questionCount })}</span>
                 </div>
               </button>
             ))}
-            {filteredInterviews.length === 0 && (
+            {filteredVacancies.length === 0 && (
               <div className="rounded-md bg-white/[0.025] p-4 text-[13px] text-text-tertiary">
                 {t('interviews.noVacanciesYet')}
               </div>
@@ -923,8 +1285,8 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         )}
 
         {detail ? (
-          <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_252px]">
-            <div className="min-h-0 overflow-y-auto p-5 custom-scrollbar">
+          <div className="min-h-0 flex-1">
+            <div className="h-full min-h-0 overflow-y-auto p-5 pb-24 custom-scrollbar">
               <div className="mb-5 flex items-center gap-1 border-b border-white/[0.07]">
                 {DETAIL_TABS.map(tab => (
                   <button type="button"
@@ -943,7 +1305,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                     <InfoTile icon={<BriefcaseBusiness size={16} />} label={t('interviews.detail.company')} value={detail.company || t('interviews.detail.unfilled')} />
                     <InfoTile icon={<UserRound size={16} />} label={t('interviews.detail.role')} value={detail.roleTitle || t('interviews.detail.unfilled')} />
                     <InfoTile icon={<CircleDot size={16} />} label={t('interviews.detail.stage')} value={detail.stage || t('interviews.detail.unfilled')} />
-                    <InfoTile icon={<Clock3 size={16} />} label={t('interviews.detail.schedule')} value={formatDateTime(detail.startsAt)} />
+                    <InfoTile icon={<Clock3 size={16} />} label={t('interviews.detail.schedule')} value={formatSchedule(detail.startsAt)} />
                   </div>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <button type="button"
@@ -962,10 +1324,49 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                     </button>
                   </div>
                   <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
-                    <div className={labelClass}>{t('interviews.detail.rawVacancyContext')}</div>
-                    <div className="mt-3 whitespace-pre-wrap text-[13px] leading-6 text-text-secondary">
+                    <div className={labelClass}>{t('interviews.detail.summary')}</div>
+                    <div className="mt-2 text-[13px] leading-6 text-text-primary">
+                      {dossierDraft.description.trim() || t('interviews.detail.noSummary')}
+                    </div>
+                    <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                      {requirementGroups.length > 0 ? requirementGroups.map(group => (
+                        <div key={group.label} className="min-w-0">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-500">{group.label}</div>
+                          <ul className="mt-2 space-y-1.5 text-[12px] leading-5 text-text-secondary">
+                            {group.items.map((item, index) => (
+                              <li key={`${group.label}-${index}`} className="flex gap-2">
+                                <span className="mt-2 h-1 w-1 flex-none rounded-full bg-cyan-300/80" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )) : (
+                        <div className="text-[12px] text-text-tertiary">{t('interviews.detail.noRequirements')}</div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className={labelClass}>{t('interviews.detail.rawVacancyContext')}</div>
+                      {detail.rawSourceText && detail.rawSourceText.length > 360 && (
+                        <button
+                          type="button"
+                          onClick={() => setRawSourceExpanded(value => !value)}
+                          className="min-h-8 rounded-md border border-white/[0.08] px-2 text-[11px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white"
+                        >
+                          {rawSourceExpanded ? t('common.hide') : t('common.show')}
+                        </button>
+                      )}
+                    </div>
+                    <div className={`${rawSourceExpanded ? '' : 'max-h-28 overflow-hidden'} mt-3 whitespace-pre-wrap text-[13px] leading-6 text-text-secondary`}>
                       {detail.rawSourceText || t('interviews.detail.noSourceText')}
                     </div>
+                    {!rawSourceExpanded && detail.rawSourceText && detail.rawSourceText.length > 360 && (
+                      <div className="mt-2 text-[11px] text-text-tertiary">
+                        {t('interviews.detail.sourceTextCollapsed', { count: detail.rawSourceText.length })}
+                      </div>
+                    )}
                   </div>
                   <EditorPanel
                     title={t('interviews.detail.vacancyDossier')}
@@ -983,6 +1384,75 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                     ]}
                     onChange={(key, value) => updateDraft('dossier', setDossierDraft, key, value)}
                   />
+                </div>
+              )}
+
+              {detailTab === 'Stages' && (
+                <div className="space-y-4">
+                  {stages.length > 0 ? (
+                    stages.map(stage => {
+                      const stageMeetings = linkedMeetingsForStage(
+                        stage,
+                        applicationDetail?.linkedMeetings ?? detail.linkedMeetings ?? [],
+                        stages.length,
+                      );
+                      return (
+                        <div key={stage.id} data-testid="interview-stage-card" className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-[14px] font-semibold text-text-primary">{stage.title}</div>
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-text-tertiary">
+                                <span>{formatSchedule(stage.startsAt)}</span>
+                                <span className="text-white/[0.16]">/</span>
+                                <span>{t(`interviews.stageStatus.${stage.status}`)}</span>
+                              </div>
+                            </div>
+                            {stage.meetingUrl && (
+                              <button
+                                type="button"
+                                onClick={() => stage.meetingUrl && window.electronAPI?.openExternal?.(stage.meetingUrl)}
+                                className={secondaryButtonClass}
+                              >
+                                <LinkIcon size={14} />
+                                {t('interviews.detail.meetingUrl')}
+                              </button>
+                            )}
+                          </div>
+                          <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
+                            <InfoTile icon={<FileText size={15} />} label={t('interviews.detail.stageRecordings')} value={`${stageMeetings.length}`} valueTestId="stage-recording-count" />
+                            <InfoTile icon={<MessageSquareText size={15} />} label={t('interviews.detail.stageTranscript')} value={t('interviews.detail.comingSoon')} />
+                            <InfoTile icon={<CircleDot size={15} />} label={t('interviews.detail.stageRetro')} value={t('interviews.detail.comingSoon')} />
+                          </div>
+                          <div className="mt-3 space-y-1.5">
+                            {stageMeetings.length > 0 ? stageMeetings.map(meeting => (
+                              <button
+                                type="button"
+                                key={meeting.id}
+                                onClick={() => onOpenMeeting({
+                                  id: meeting.id,
+                                  title: meeting.title,
+                                  date: meeting.date,
+                                  duration: meeting.duration,
+                                  summary: '',
+                                })}
+                                className="flex min-h-9 w-full items-center justify-between rounded bg-black/20 px-2 py-1.5 text-left text-[12px] text-text-secondary transition hover:bg-white/[0.05]"
+                              >
+                                <span className="truncate">{meeting.title}</span>
+                                <ChevronRight size={13} className="shrink-0 text-text-tertiary" />
+                              </button>
+                            )) : (
+                              <div className="text-[12px] text-text-tertiary">{t('interviews.detail.none')}</div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-md bg-white/[0.025] p-4 text-[13px] text-text-tertiary">
+                      {t('interviews.detail.noStages')}
+                    </div>
+                  )}
+
                   <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
                     <div className={labelClass}>{t('interviews.detail.attachRecording')}</div>
                     <div className="mt-3 flex gap-2">
@@ -993,6 +1463,12 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       <button type="button" onClick={attachMeeting} disabled={!attachMeetingId || busy} className={secondaryButtonClass}>
                         {t('interviews.detail.link')}
                       </button>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {(detail.linkedMeetings ?? []).map(meeting => (
+                        <div key={meeting.id} className="rounded bg-black/20 px-2 py-1.5 text-[12px] text-text-secondary">{meeting.title}</div>
+                      ))}
+                      {(detail.linkedMeetings ?? []).length === 0 && <div className="text-[12px] text-text-tertiary">{t('interviews.detail.none')}</div>}
                     </div>
                   </div>
                 </div>
@@ -1031,6 +1507,62 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       </div>
                     </div>
                   )}
+                  <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className={labelClass}>{t('interviews.detail.aiEvaluation')}</div>
+                        <div className="mt-1 text-[12px] text-text-tertiary">
+                          {detail.linkedMeetings?.length
+                            ? t('interviews.detail.aiEvaluationDescription')
+                            : t('interviews.detail.aiEvaluationNeedsRecording')}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={generateRetroEvaluation}
+                        disabled={retroEvaluating || busy || !(detail.linkedMeetings?.length)}
+                        className={secondaryButtonClass}
+                      >
+                        <RefreshCw size={14} className={retroEvaluating ? 'animate-spin' : ''} />
+                        {retroEvaluation ? t('interviews.detail.regenerateAiEvaluation') : t('interviews.detail.generateAiEvaluation')}
+                      </button>
+                    </div>
+                    {retroEvaluation?.status === 'ready' && (
+                      <div className="mt-4 space-y-3 text-[12px] text-text-secondary">
+                        {retroEvaluation.summary && (
+                          <div className="rounded-md border border-white/[0.06] bg-white/[0.025] p-3 leading-5 text-text-primary">
+                            {retroEvaluation.summary}
+                          </div>
+                        )}
+                        {([
+                          ['signals', t('interviews.detail.aiSignals'), retroEvaluation.signals],
+                          ['risks', t('interviews.detail.aiRisks'), retroEvaluation.risks],
+                          ['followups', t('interviews.detail.aiFollowups'), retroEvaluation.followups],
+                        ] as const).map(([, label, items]) => (
+                          items.length > 0 && (
+                            <div key={label}>
+                              <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-500">{label}</div>
+                              <div className="space-y-1.5">
+                                {items.map((item, index) => (
+                                  <div key={`${label}-${index}`} className="rounded border border-white/[0.06] bg-black/20 px-3 py-2">{item}</div>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    )}
+                    {retroEvaluation && retroEvaluation.status !== 'ready' && (
+                      <div className="mt-4 rounded-md border border-amber-300/15 bg-amber-300/[0.06] p-3 text-[12px] leading-5 text-amber-100/80">
+                        {retroEvaluation.error || t(`interviews.detail.aiEvaluationStatus.${retroEvaluation.status}`)}
+                      </div>
+                    )}
+                    {!retroEvaluation && detail.linkedMeetings?.length ? (
+                      <div className="mt-4 rounded-md border border-white/[0.06] bg-white/[0.025] p-3 text-[12px] text-text-tertiary">
+                        {t('interviews.detail.aiEvaluationEmpty')}
+                      </div>
+                    ) : null}
+                  </div>
                   <EditorPanel
                     title={t('interviews.detail.retro')}
                     action={t('interviews.detail.saveRetro')}
@@ -1076,28 +1608,6 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 </div>
               )}
             </div>
-
-            <aside className="min-h-0 overflow-y-auto border-t border-white/[0.07] bg-[#0e1012] p-4 custom-scrollbar lg:border-l lg:border-t-0">
-              <div className={`rounded-md px-3 py-3 ring-1 ring-current/15 ${readinessTone(readiness?.level)}`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-[12px] font-semibold">{t('interviews.detail.readiness')}</span>
-                  <span className="text-[18px] font-bold tabular-nums">{readiness?.score ?? 0}</span>
-                </div>
-                <div className="mt-1 text-[11px] text-current opacity-80">{readiness?.nextAction ?? readiness?.level ?? 'not_started'}</div>
-              </div>
-              <SideMetric icon={<ListChecks size={15} />} label={t('interviews.detail.checklist')} value={`${detail.prep?.lastChecklist?.length ?? 0}`} />
-              <SideMetric icon={<MessageSquareText size={15} />} label={t('interviews.detail.questions')} value={`${detail.questions?.length ?? 0}`} />
-              <SideMetric icon={<FileText size={15} />} label={t('interviews.detail.retros')} value={`${detail.retros?.length ?? 0}`} />
-              <div className="mt-4 rounded-md bg-white/[0.025] p-3">
-                <div className={labelClass}>{t('interviews.detail.linkedRecordings')}</div>
-                <div className="mt-3 space-y-2">
-                  {(detail.linkedMeetings ?? []).map(meeting => (
-                    <div key={meeting.id} className="rounded bg-black/20 px-2 py-1.5 text-[12px] text-text-secondary">{meeting.title}</div>
-                  ))}
-                  {(detail.linkedMeetings ?? []).length === 0 && <div className="text-[12px] text-text-tertiary">{t('interviews.detail.none')}</div>}
-                </div>
-              </div>
-            </aside>
           </div>
         ) : (
           <div className="flex flex-1 items-center justify-center">
@@ -1216,25 +1726,65 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               <div className="text-[13px] font-semibold">{t('interviews.agent.title')}</div>
               <button type="button" className={iconButtonClass} onClick={() => setAgentOpen(false)} aria-label={t('common.close')}><X size={14} /></button>
             </div>
+            {agentSteps.length > 0 && (
+              <div className="mb-3 space-y-1.5">
+                {agentSteps.map(step => (
+                  <div key={step} className="flex items-center gap-2 text-[11px] text-text-secondary">
+                    <span className={`h-1.5 w-1.5 rounded-full ${step === 'apply' ? 'bg-emerald-300' : 'bg-cyan-300'}`} />
+                    <span>{t(AGENT_STEP_I18N_KEY[step])}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <textarea
               value={agentText}
               onChange={event => {
                 setAgentText(event.target.value);
                 setAgentPreview(null);
+                setAgentSteps([]);
               }}
-              className={`${inputClass} min-h-[110px] resize-none`}
+              className={`${inputClass} h-[120px] resize-none`}
+              maxLength={AGENT_INPUT_MAX_CHARS}
               placeholder={t('interviews.agent.placeholder')}
             />
+            <div className="mt-1 text-right text-[10px] text-text-tertiary">
+              {t('interviews.agent.characterCount', { count: agentText.length, limit: AGENT_INPUT_MAX_CHARS })}
+            </div>
             {agentPreview && (
               <div className="mt-3 rounded-md border border-cyan-300/20 bg-cyan-300/[0.06] p-3 text-[12px]">
-                <div className="font-semibold text-cyan-100">{agentPreview.classification}</div>
+                <div className="font-semibold text-cyan-100">{t('interviews.agent.proposalReady')}</div>
                 <div className="mt-1 text-text-secondary">{agentPreview.application.title || agentPreview.application.company || t('interviews.agent.untitled')}</div>
-                <div className="mt-1 text-text-tertiary">{Math.round(agentPreview.confidence * 100)}% confidence</div>
+                <div className="mt-2 space-y-1.5 text-text-tertiary">
+                  <div>{t('interviews.agent.confidence', { value: Math.round(agentPreview.confidence * 100) })}</div>
+                  {agentPreview.stage && (
+                    <div>{t('interviews.agent.detectedStage', { title: agentPreview.stage.title ?? t('interviews.detail.stage') })}</div>
+                  )}
+                  {agentMatchedVacancy?.id && agentPreview.stage ? (
+                    <div className="text-cyan-100">{t('interviews.agent.attachToExisting', { title: agentMatchedVacancy.title })}</div>
+                  ) : (
+                    <div>{agentPreview.stage ? t('interviews.agent.createVacancyAndStage') : t('interviews.agent.createVacancyOnly')}</div>
+                  )}
+                  {agentPreview.warnings.length > 0 && (
+                    <div>{t('interviews.agent.warnings', { value: agentPreview.warnings.join(', ') })}</div>
+                  )}
+                </div>
               </div>
             )}
-            <div className="mt-3 flex justify-end gap-2">
-              <button type="button" onClick={() => runAgent(false)} disabled={busy || !agentText.trim()} className={secondaryButtonClass}>{t('interviews.agent.propose')}</button>
-              <button type="button" onClick={() => runAgent(true)} disabled={busy || (!agentPreview && !agentText.trim())} className={primaryButtonClass}>{t('interviews.agent.apply')}</button>
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={agentPreview ? applyAgentProposal : runAgent}
+                disabled={busy || (!agentPreview && !agentText.trim())}
+                className={primaryButtonClass}
+              >
+                {agentPreview
+                  ? agentMatchedVacancy?.id && agentPreview.stage
+                    ? t('interviews.agent.addStage')
+                    : agentPreview.stage
+                      ? t('interviews.agent.createVacancyStage')
+                      : t('interviews.agent.createVacancy')
+                  : t('interviews.agent.run')}
+              </button>
             </div>
           </div>
         ) : (
@@ -1255,23 +1805,13 @@ const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, 
   </label>
 );
 
-const InfoTile: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
+const InfoTile: React.FC<{ icon: React.ReactNode; label: string; value: string; valueTestId?: string }> = ({ icon, label, value, valueTestId }) => (
   <div className="rounded-md bg-white/[0.025] p-3 ring-1 ring-white/[0.04]">
     <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.08em] text-text-tertiary">
       {icon}
       {label}
     </div>
-    <div className="mt-2 truncate text-[14px] font-semibold">{value}</div>
-  </div>
-);
-
-const SideMetric: React.FC<{ icon: React.ReactNode; label: string; value: string }> = ({ icon, label, value }) => (
-  <div className="mt-3 flex min-h-11 items-center justify-between rounded-md bg-white/[0.025] px-3 py-2">
-    <div className="flex items-center gap-2 text-[12px] text-text-secondary">
-      {icon}
-      {label}
-    </div>
-    <div className="text-[12px] font-semibold">{value}</div>
+    <div data-testid={valueTestId} className="mt-2 truncate text-[14px] font-semibold">{value}</div>
   </div>
 );
 

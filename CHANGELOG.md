@@ -4,6 +4,31 @@
 
     ## [Unreleased]
 
+    ## [1.3.0] - 2026-06-18
+
+    ### Added
+
+    - **Vacancy-first interview workspace**: Active vacancies now use application and stage entities, so a vacancy can show every linked interview stage, recording, transcript, retro evaluation, and meeting attachment without duplicating the vacancy.
+    - **AI intake for long recruiter chats**: The agent can parse longer pasted conversations, preserve the final scheduling messages for AI extraction, match stages to existing vacancies, and propose one clear action before applying it.
+    - **Task-specific AI model policy**: Settings now exposes default and per-task model choices for chat, vacancy intake, scraping, retro analysis, and agent actions, seeded from configured provider models when possible.
+    - **AI retro evaluation**: Linked recordings can produce a first-pass AI retro from transcript text before the user adds their own call notes.
+
+    ### Changed
+
+    - **Interview command center polish**: Simplified the main layout around the selected day, active vacancy list, vacancy detail, stage list, compact agent widget, and lightweight calendar sync state.
+    - **Calendar and meeting linkage**: Meeting records now carry application and stage ids, and legacy interview rows backfill those links so existing recordings remain visible in the new vacancy view.
+    - **Public app copy**: Removed the stale What's New section from the About surface.
+
+    ### Fixed
+
+    - **Recruiter chat parsing**: AI intake now recovers company, role, accepted slot, and meeting URL from dialogue-style recruiter messages such as Ozon Tech stage invitations.
+    - **Stage recording scope**: Recordings displayed inside a stage are scoped to that stage instead of leaking counts from the whole vacancy.
+    - **Status sync**: Archiving or status-changing a legacy interview keeps the mapped vacancy status in sync.
+
+    ### Tests
+
+    - Added service, IPC, task-model, parser, retro-evaluation, and Playwright coverage for vacancy matching, long pasted chats, stage linkage, task model resolution, raw text collapse, calendar navigation, recording attachment, and AI retro states.
+
     ## [1.2.0] - 2026-06-18
 
     ### Added

@@ -7,6 +7,11 @@ import { app, safeStorage } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import type { YandexPromptPackId } from '../llm/yandexPromptPacks';
+import {
+    createInitialTaskModelPolicy,
+    normalizeTaskModelPolicy,
+    type TaskModelPolicy,
+} from './TaskModelPolicy';
 
 const CREDENTIALS_PATH = path.join(app.getPath('userData'), 'credentials.enc');
 
@@ -54,6 +59,7 @@ export interface StoredCredentials {
     customProviders?: CustomProvider[];
     curlProviders?: CurlProvider[];
     defaultModel?: string;
+    taskModelPolicy?: TaskModelPolicy;
     nativelyApiKey?: string;
     // STT Provider settings
     sttProvider?: SttProviderId | 'natively';
@@ -249,6 +255,30 @@ export class CredentialsManager {
         return this.credentials.defaultModel || 'gemini-3.1-flash-lite';
     }
 
+    public getTaskModelPolicy(): TaskModelPolicy {
+        const policy = this.credentials.taskModelPolicy;
+        if (policy) {
+            return normalizeTaskModelPolicy(policy, this.credentials);
+        }
+        const initialized = createInitialTaskModelPolicy(this.credentials);
+        this.credentials.taskModelPolicy = initialized;
+        this.saveCredentials();
+        return initialized;
+    }
+
+    private seedTaskModelPolicyFromProviderPreferred(modelId: string): void {
+        const trimmed = (modelId || '').trim();
+        if (!trimmed) return;
+        const existing = this.credentials.taskModelPolicy;
+        const policy = normalizeTaskModelPolicy(existing, this.credentials);
+        if (!this.credentials.defaultModel && (!existing || policy.seededFromProviderPreferred || !policy.defaultModelId)) {
+            policy.defaultModelId = trimmed;
+            policy.seededFromProviderPreferred = true;
+            policy.updatedAt = new Date().toISOString();
+            this.credentials.taskModelPolicy = policy;
+        }
+    }
+
     public getNativelyApiKey(): string | undefined {
         return undefined;
     }
@@ -340,6 +370,7 @@ export class CredentialsManager {
         this.credentials.yandexPreferredModel = (preferredModel || '').trim() || this.credentials.yandexPreferredModel || 'yandex/yandexgpt-5-lite';
         this.credentials.yandexPromptPackId = promptPackId || this.credentials.yandexPromptPackId;
         this.credentials.yandexDisableDataLogging = disableDataLogging !== false;
+        this.seedTaskModelPolicyFromProviderPreferred(this.credentials.yandexPreferredModel);
         this.saveCredentials();
         console.log('[CredentialsManager] Yandex AI Studio config updated');
     }
@@ -486,8 +517,24 @@ export class CredentialsManager {
     }
     public setDefaultModel(model: string): void {
         this.credentials.defaultModel = model;
+        const policy = normalizeTaskModelPolicy(this.credentials.taskModelPolicy, this.credentials);
+        policy.defaultModelId = model;
+        policy.updatedAt = new Date().toISOString();
+        this.credentials.taskModelPolicy = policy;
         this.saveCredentials();
         console.log(`[CredentialsManager] Default Model set to: ${model}`);
+    }
+
+    public setTaskModelPolicy(policy: TaskModelPolicy): TaskModelPolicy {
+        const normalized = normalizeTaskModelPolicy(policy, this.credentials);
+        normalized.updatedAt = new Date().toISOString();
+        this.credentials.taskModelPolicy = normalized;
+        if (normalized.defaultModelId) {
+            this.credentials.defaultModel = normalized.defaultModelId;
+        }
+        this.saveCredentials();
+        console.log('[CredentialsManager] Task model policy updated');
+        return normalized;
     }
 
     public setNativelyApiKey(key: string): void {
@@ -511,12 +558,14 @@ export class CredentialsManager {
     public setPreferredModel(provider: 'gemini' | 'groq' | 'openai' | 'claude' | 'deepseek' | 'yandex', modelId: string): void {
         if (provider === 'yandex') {
             this.credentials.yandexPreferredModel = modelId || 'yandex/yandexgpt-5-lite';
+            this.seedTaskModelPolicyFromProviderPreferred(this.credentials.yandexPreferredModel);
             this.saveCredentials();
             console.log(`[CredentialsManager] yandex preferred model set to: ${this.credentials.yandexPreferredModel}`);
             return;
         }
         const key = `${provider}PreferredModel` as keyof StoredCredentials;
         (this.credentials as any)[key] = modelId;
+        this.seedTaskModelPolicyFromProviderPreferred(modelId);
         this.saveCredentials();
         console.log(`[CredentialsManager] ${provider} preferred model set to: ${modelId}`);
     }

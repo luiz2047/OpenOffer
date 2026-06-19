@@ -4,6 +4,7 @@ import type {
   ApplicationDetail,
   ApplicationIntakeInput,
   ApplicationIntakeResult,
+  ApplicationIntakeTask,
   InterviewCreatePayload,
   InterviewDetail,
   InterviewErrorAction,
@@ -15,6 +16,7 @@ import type {
   InterviewQuestion,
   InterviewQuestionPayload,
   InterviewRetro,
+  InterviewRetroEvaluation,
   InterviewRetroPayload,
   InterviewSourceParseResult,
   InterviewStageType,
@@ -30,14 +32,19 @@ import type {
 } from '../../../src/types/interviews';
 import { InterviewRepository } from './InterviewRepository';
 import { parseInterviewSourceText } from './parser';
+import type { AiTask, TaskModelResolution } from '../TaskModelPolicy';
 
 const VALID_STATUSES = new Set(['active', 'applied', 'screening', 'interviewing', 'offer', 'rejected', 'withdrawn', 'archived']);
 const VALID_PRIORITIES = new Set(['low', 'normal', 'high']);
 const VALID_CALENDAR_PROVIDERS = new Set(['google', 'macos', 'manual']);
 const VALID_CALENDAR_SYNC_STATUSES = new Set(['local_only', 'linked', 'changed', 'missing', 'calendar_disabled', 'refresh_error']);
 const VALID_INTAKE_CLASSIFICATIONS = new Set(['vacancy_only', 'vacancy_with_scheduled_stage', 'stage_update_for_existing_vacancy', 'calendar_only', 'unknown']);
+const VALID_APPLICATION_INTAKE_TASKS = new Set(['vacancy_intake', 'scraping', 'agent_actions']);
 const VALID_STAGE_TYPES = new Set(['recruiter_screen', 'technical_screen', 'system_design', 'leadership', 'final', 'offer_security', 'custom']);
 const VALID_STAGE_STATUSES = new Set(['draft', 'scheduled', 'done', 'waiting_feedback', 'passed', 'rejected', 'canceled', 'archived']);
+
+export type InterviewModelResolver = (task: AiTask) => TaskModelResolution;
+export type InterviewStructuredGenerator = (prompt: string, options?: { modelId?: string | null; task?: AiTask }) => Promise<string>;
 
 export class InterviewDomainError extends Error {
   constructor(
@@ -364,6 +371,9 @@ function normalizeApplicationIntakeInput(input: unknown): ApplicationIntakeInput
   const payload = typeof input === 'string' ? { text: input } : (input as any);
   const textValue = normalizeSourceParseInput(payload);
   const sourceHint = text(payload?.sourceHint, 'sourceHint', 80);
+  const task = typeof payload?.task === 'string' && VALID_APPLICATION_INTAKE_TASKS.has(payload.task)
+    ? payload.task as ApplicationIntakeTask
+    : undefined;
   return {
     text: textValue,
     sourceHint: sourceHint as ApplicationIntakeInput['sourceHint'],
@@ -371,6 +381,7 @@ function normalizeApplicationIntakeInput(input: unknown): ApplicationIntakeInput
       ? payload.candidateApplicationIds.map((id: unknown, index: number) => assertId(id, `candidateApplicationIds[${index}]`))
       : undefined,
     useAi: Boolean(payload?.useAi),
+    task,
   };
 }
 
@@ -390,6 +401,7 @@ function normalizeApplicationIntakeResult(input: unknown): ApplicationIntakeResu
       title: text(application.title, 'intake.application.title', 180) ?? undefined,
       company: text(application.company, 'intake.application.company', 120) ?? undefined,
       roleTitle: text(application.roleTitle, 'intake.application.roleTitle', 120) ?? undefined,
+      description: text(application.description, 'intake.application.description', 1200) ?? undefined,
       source: text(application.source, 'intake.application.source', 120) ?? undefined,
       vacancyUrl: optionalUrl(application.vacancyUrl, 'intake.application.vacancyUrl') ?? undefined,
       compensationText: text(application.compensationText, 'intake.application.compensationText', 2000) ?? undefined,
@@ -494,8 +506,387 @@ function normalizeRetroPromptAction(payload: any): { action: RetroPromptAction; 
   return { action, snoozeUntil };
 }
 
+function clampConfidence(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  return Math.max(0, Math.min(1, value));
+}
+
+function cleanStringArray(value: unknown, maxItems = 6): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(item => (typeof item === 'string' ? item.trim() : ''))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function extractJsonObject(raw: string): any {
+  const trimmed = raw.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const match = trimmed.match(/\{[\s\S]*\}/);
+    if (!match) throw new Error('AI response did not contain JSON.');
+    return JSON.parse(match[0]);
+  }
+}
+
+function normalizeRetroEvaluationResult(raw: string): Pick<InterviewRetroEvaluation, 'summary' | 'signals' | 'risks' | 'followups' | 'confidence'> {
+  const parsed = extractJsonObject(raw);
+  const summary = typeof parsed.summary === 'string' ? parsed.summary.trim().slice(0, 1200) : '';
+  return {
+    summary: summary || null,
+    signals: cleanStringArray(parsed.signals),
+    risks: cleanStringArray(parsed.risks),
+    followups: cleanStringArray(parsed.followups),
+    confidence: clampConfidence(parsed.confidence),
+  };
+}
+
+function buildRetroEvaluationPrompt(input: {
+  title: string;
+  company?: string | null;
+  roleTitle?: string | null;
+  stage?: string | null;
+  transcriptText: string;
+}): string {
+  const transcript = input.transcriptText.slice(0, 18000);
+  return `You are evaluating a completed job interview from the candidate's perspective.
+
+Vacancy:
+- Title: ${input.title}
+- Company: ${input.company || 'unknown'}
+- Role: ${input.roleTitle || 'unknown'}
+- Stage: ${input.stage || 'unknown'}
+
+Transcript:
+${transcript}
+
+Return ONLY valid JSON with this shape:
+{
+  "summary": "2-4 sentences with the main interview signal. Do not invent facts absent from the transcript.",
+  "signals": ["specific positive signal from the transcript"],
+  "risks": ["specific concern or weak moment from the transcript"],
+  "followups": ["concrete next action for the candidate"],
+	  "confidence": 0.0
+	}`;
+}
+
+function cleanBoundedText(value: unknown, max: number): string | undefined {
+  return typeof value === 'string' ? value.trim().slice(0, max) || undefined : undefined;
+}
+
+function cleanBoundedUrl(value: unknown): string | undefined {
+  const raw = cleanBoundedText(value, 2048);
+  if (!raw) return undefined;
+  try {
+    new URL(raw);
+    return raw;
+  } catch {
+    return undefined;
+  }
+}
+
+function cleanEpoch(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Date.parse(value.trim());
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function enumOrFallback<T extends string>(value: unknown, allowed: Set<string>, fallback: T): T {
+  return typeof value === 'string' && allowed.has(value) ? value as T : fallback;
+}
+
+function mergeStringArrays(fallback: string[] | undefined, value: unknown, maxItems: number): string[] {
+  const cleaned = cleanStringArray(value, maxItems);
+  return cleaned.length > 0 ? cleaned : fallback ?? [];
+}
+
+function buildApplicationDescription(result: Pick<ApplicationIntakeResult, 'application' | 'stage'>): string {
+  const company = result.application.company?.trim();
+  const role = result.application.roleTitle?.trim() || result.application.title?.trim();
+  const source = result.application.source?.trim();
+  const stage = result.stage?.title?.trim();
+  const schedule = result.stage?.startsAt ? new Date(result.stage.startsAt).toLocaleString() : null;
+  const subject = [company, role].filter(Boolean).join(' · ') || role || company || 'Vacancy';
+  const parts = [`${subject}.`];
+  if (source) parts.push(`Source: ${source}.`);
+  if (stage) parts.push(`Current process: ${stage}${schedule ? ` scheduled for ${schedule}` : ''}.`);
+  return parts.join(' ').slice(0, 1200);
+}
+
+function recomputeApplicationIntakeMissingFields(result: ApplicationIntakeResult): string[] {
+  const missingFields: string[] = [];
+  if (!result.application.company) missingFields.push('company');
+  if (!result.application.roleTitle && !result.application.title) missingFields.push('roleTitle');
+  if (result.stage?.startsAt && !result.stage.endsAt) missingFields.push('endsAt');
+  return missingFields;
+}
+
+function reconcileApplicationIntakeWarnings(result: ApplicationIntakeResult, warnings: string[]): string[] {
+  const next = new Set(warnings);
+  if (result.application.company) next.delete('company_not_detected');
+  if (result.application.roleTitle) next.delete('role_not_detected');
+  if (
+    result.confidence >= 0.6
+    && result.application.company
+    && (result.application.roleTitle || result.application.title)
+  ) {
+    next.delete('low_confidence_parse');
+  }
+  return Array.from(next);
+}
+
+function attachCalendarProposal(result: ApplicationIntakeResult): ApplicationIntakeResult {
+  delete result.calendarProposal;
+  if (result.stage?.startsAt && result.stage.endsAt) {
+    const timezone = result.stage.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const title = result.application.title
+      || [result.application.company, result.application.roleTitle].filter(Boolean).join(' · ')
+      || result.stage.title
+      || 'Interview';
+    result.calendarProposal = {
+      shouldCreate: true,
+      title,
+      startsAt: result.stage.startsAt,
+      endsAt: result.stage.endsAt,
+      timezone,
+      locationOrUrl: result.stage.meetingUrl,
+      description: [
+        result.application.company ? `Company: ${result.application.company}` : null,
+        result.application.roleTitle ? `Role: ${result.application.roleTitle}` : null,
+        result.application.vacancyUrl ? `Vacancy: ${result.application.vacancyUrl}` : null,
+      ].filter(Boolean).join('\n'),
+      reminders: [{ minutesBefore: 15 }],
+    };
+  }
+  return result;
+}
+
+function buildDeterministicApplicationIntakeResult(
+  normalized: ApplicationIntakeInput,
+  parsed: InterviewSourceParseResult,
+  warnings: string[] = parsed.warnings,
+): ApplicationIntakeResult {
+  const classification = classificationFromParsed(parsed);
+  const timezone = parsed.fields.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const hasStage = classification === 'vacancy_with_scheduled_stage';
+  const title = parsed.fields.title
+    || [parsed.fields.company, parsed.fields.roleTitle].filter(Boolean).join(' · ')
+    || 'Untitled vacancy';
+  const result: ApplicationIntakeResult = {
+    classification,
+    confidence: intakeConfidence(parsed),
+    application: {
+      title,
+      company: parsed.fields.company ?? undefined,
+      roleTitle: parsed.fields.roleTitle ?? undefined,
+      description: undefined,
+      source: parsed.fields.source ?? parsed.detectedSource ?? normalized.sourceHint ?? undefined,
+      vacancyUrl: parsed.fields.vacancyUrl ?? undefined,
+      compensationText: parsed.dossier?.compensationText ?? undefined,
+      requirements: parsed.dossier?.requirements ?? [],
+      risks: parsed.dossier?.risks ?? [],
+      questionsToAsk: parsed.dossier?.questionsToAsk ?? [],
+      rawSourceText: parsed.fields.rawSourceText ?? parsed.normalizedText ?? normalized.text,
+    },
+    warnings,
+    missingFields: [],
+  };
+  if (hasStage) {
+    result.stage = {
+      stageType: stageTypeFromParsedStage(parsed.fields.stage),
+      title: parsed.fields.stage ?? 'Initial stage',
+      startsAt: parsed.fields.startsAt ?? undefined,
+      endsAt: parsed.fields.endsAt ?? undefined,
+      timezone,
+      meetingUrl: parsed.fields.meetingUrl ?? undefined,
+      status: parsed.fields.startsAt ? 'scheduled' : 'draft',
+    };
+  }
+  result.application.description = buildApplicationDescription(result);
+  result.missingFields = recomputeApplicationIntakeMissingFields(result);
+  return attachCalendarProposal(result);
+}
+
+function sourceExcerptForAi(sourceText: string): string {
+  const normalized = sourceText.trim();
+  const maxLength = 30000;
+  if (normalized.length <= maxLength) return normalized;
+  const headLength = 12000;
+  const tailLength = 18000;
+  const head = normalized.slice(0, headLength).trimEnd();
+  const tail = normalized.slice(-tailLength).trimStart();
+  return `${head}\n\n[... middle of long source omitted; preserved the final recruiter/calendar messages below ...]\n\n${tail}`;
+}
+
+function buildApplicationIntakePrompt(input: {
+  sourceText: string;
+  deterministic: ApplicationIntakeResult;
+  task: ApplicationIntakeTask;
+}): string {
+  const deterministicDraft = {
+    ...input.deterministic,
+    application: {
+      ...input.deterministic.application,
+      rawSourceText: '[same as source text]',
+    },
+  };
+  return `You extract job application and interview scheduling data from pasted vacancy, recruiter, calendar, browser, or email text.
+
+Current time: ${new Date().toISOString()}
+Task: ${input.task}
+
+Rules:
+- Return ONLY valid JSON. No markdown.
+- Do not invent company, role, dates, links, compensation, or requirements.
+- application.description must be a concise 1-3 sentence summary of what the company does, what the role is, and what is happening in the process. Do not copy the pasted source text, chat transcript, or vacancy body into description.
+- application.requirements must be short bullet facts, not paragraphs. Prefix each item with a logical group such as "Stack:", "Responsibilities:", "Experience:", "Process:", "Domain:", or "Logistics:".
+- Read recruiter chats as dialogue, not only as vacancy pages.
+- In recruiter chats, infer the employer from phrases like "IT recruiter <Company>" or "recruiter at <Company>" when explicit.
+- In recruiter chats, infer the role from phrases like "по позиции <role>", "for the <role> position", or "следующий этап по <role>" when explicit.
+- For scheduling chats, the candidate's accepted slot and the final meeting confirmation override earlier offered slots.
+- Treat video meeting links on non-standard company domains as meetingUrl when the surrounding text says they are meeting links.
+- If the deterministic draft has company_not_detected, role_not_detected, or low_confidence_parse but the source text explicitly provides the field, fill the field and do not repeat that stale warning.
+- Keep rawSourceText exactly as the source text when you return application.rawSourceText.
+- If a date/time is explicit, return startsAt/endsAt as Unix epoch milliseconds.
+- If only start time is known and duration is absent, omit endsAt.
+- Use these enum values only:
+  classification: vacancy_only, vacancy_with_scheduled_stage, stage_update_for_existing_vacancy, calendar_only, unknown
+  stageType: recruiter_screen, technical_screen, system_design, leadership, final, offer_security, custom
+  stage.status: draft, scheduled, done, waiting_feedback, passed, rejected, canceled, archived
+
+Deterministic draft to improve:
+${JSON.stringify(deterministicDraft, null, 2)}
+
+Source text:
+${sourceExcerptForAi(input.sourceText)}
+
+Return this JSON shape:
+{
+  "classification": "vacancy_only",
+  "confidence": 0.0,
+  "application": {
+    "title": "short display title",
+    "company": "company name",
+    "roleTitle": "role title",
+    "description": "1-3 sentence summary, never the raw pasted text",
+    "source": "HH/Getmatch/Telegram/email/browser/manual/etc",
+    "vacancyUrl": "https://...",
+    "compensationText": "text if present",
+    "requirements": ["Stack: Python", "Responsibilities: Build production ML services"],
+    "risks": ["candidate risk or gap explicitly present"],
+    "questionsToAsk": ["useful question based on the source"],
+    "rawSourceText": "same source text"
+  },
+  "stage": {
+    "stageType": "recruiter_screen",
+    "title": "stage title",
+    "startsAt": 0,
+    "endsAt": 0,
+    "timezone": "IANA timezone if known",
+    "meetingUrl": "https://...",
+    "status": "scheduled"
+  },
+  "warnings": [],
+  "missingFields": []
+}`;
+}
+
+function normalizeAiApplicationIntakeResult(
+  raw: string,
+  fallback: ApplicationIntakeResult,
+  normalized: ApplicationIntakeInput,
+): ApplicationIntakeResult {
+  const parsed = extractJsonObject(raw);
+  const payload = parsed?.intake && typeof parsed.intake === 'object' ? parsed.intake : parsed;
+  const application = payload?.application && typeof payload.application === 'object' ? payload.application : {};
+  const stagePayload = payload?.stage && typeof payload.stage === 'object' ? payload.stage : null;
+
+  const result: ApplicationIntakeResult = {
+    classification: enumOrFallback(payload?.classification, VALID_INTAKE_CLASSIFICATIONS, fallback.classification),
+    confidence: clampConfidence(payload?.confidence) ?? fallback.confidence,
+    application: {
+      title: cleanBoundedText(application.title, 180) ?? fallback.application.title,
+      company: cleanBoundedText(application.company, 120) ?? fallback.application.company,
+      roleTitle: cleanBoundedText(application.roleTitle, 120) ?? fallback.application.roleTitle,
+      description: cleanBoundedText(application.description, 1200) ?? fallback.application.description,
+      source: cleanBoundedText(application.source, 120) ?? fallback.application.source ?? normalized.sourceHint,
+      vacancyUrl: cleanBoundedUrl(application.vacancyUrl) ?? fallback.application.vacancyUrl,
+      compensationText: cleanBoundedText(application.compensationText, 2000) ?? fallback.application.compensationText,
+      requirements: mergeStringArrays(fallback.application.requirements, application.requirements, 24),
+      risks: mergeStringArrays(fallback.application.risks, application.risks, 12),
+      questionsToAsk: mergeStringArrays(fallback.application.questionsToAsk, application.questionsToAsk, 12),
+      rawSourceText: normalized.text,
+    },
+    warnings: [
+      ...fallback.warnings,
+      ...cleanStringArray(payload?.warnings, 20),
+    ],
+    missingFields: [],
+  };
+
+  const fallbackStage = fallback.stage;
+  const hasAiStage = Boolean(stagePayload);
+  const stageTitle = cleanBoundedText(stagePayload?.title, 180);
+  const startsAt = cleanEpoch(stagePayload?.startsAt) ?? fallbackStage?.startsAt;
+  const endsAt = cleanEpoch(stagePayload?.endsAt) ?? fallbackStage?.endsAt;
+  const meetingUrl = cleanBoundedUrl(stagePayload?.meetingUrl) ?? fallbackStage?.meetingUrl;
+  if (hasAiStage || fallbackStage) {
+    result.stage = {
+      stageType: enumOrFallback(
+        stagePayload?.stageType,
+        VALID_STAGE_TYPES,
+        fallbackStage?.stageType ?? stageTypeFromParsedStage(stageTitle),
+      ),
+      title: stageTitle ?? fallbackStage?.title ?? 'Interview stage',
+      startsAt,
+      endsAt,
+      timezone: cleanBoundedText(stagePayload?.timezone, 120) ?? fallbackStage?.timezone,
+      meetingUrl,
+      status: enumOrFallback(
+        stagePayload?.status,
+        VALID_STAGE_STATUSES,
+        fallbackStage?.status ?? (startsAt ? 'scheduled' : 'draft'),
+      ),
+    };
+  }
+
+  if (
+    result.stage
+    && result.classification !== 'stage_update_for_existing_vacancy'
+    && result.classification !== 'calendar_only'
+    && (result.stage.startsAt || result.stage.meetingUrl || result.stage.title)
+  ) {
+    result.classification = 'vacancy_with_scheduled_stage';
+  }
+
+  const existingApplicationMatch = payload?.existingApplicationMatch;
+  if (existingApplicationMatch && typeof existingApplicationMatch === 'object') {
+    const applicationId = cleanBoundedText(existingApplicationMatch.applicationId, 128);
+    if (applicationId && normalized.candidateApplicationIds?.includes(applicationId)) {
+      result.existingApplicationMatch = {
+        applicationId,
+        confidence: clampConfidence(existingApplicationMatch.confidence) ?? 0.5,
+        reason: cleanBoundedText(existingApplicationMatch.reason, 1000) ?? 'Matched by AI intake.',
+      };
+    }
+  }
+
+  result.missingFields = recomputeApplicationIntakeMissingFields(result);
+  result.warnings = reconcileApplicationIntakeWarnings(result, result.warnings);
+  result.application.description = result.application.description || buildApplicationDescription(result);
+  return attachCalendarProposal(result);
+}
+
 export class InterviewService {
-  constructor(private readonly repo: InterviewRepository) {}
+  constructor(
+    private readonly repo: InterviewRepository,
+    private readonly resolveModelForTask?: InterviewModelResolver,
+    private readonly generateStructuredContent?: InterviewStructuredGenerator,
+  ) {}
 
   private requireActiveInterview(id: string): InterviewDetail {
     const detail = this.repo.get(id);
@@ -537,69 +928,50 @@ export class InterviewService {
     }
   }
 
-  parseApplicationIntake(input: unknown): ApplicationIntakeResult {
+  async parseApplicationIntake(input: unknown): Promise<ApplicationIntakeResult> {
     const normalized = normalizeApplicationIntakeInput(input);
     const parsed = this.parseSourceText({ text: normalized.text });
-    const classification = classificationFromParsed(parsed);
-    const timezone = parsed.fields.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const hasStage = classification === 'vacancy_with_scheduled_stage';
     const warnings = [...parsed.warnings];
+    const deterministic = buildDeterministicApplicationIntakeResult(normalized, parsed, warnings);
     if (normalized.useAi) {
-      warnings.push('AI enrichment is not configured yet; deterministic extraction was used.');
+      const task = normalized.task ?? 'vacancy_intake';
+      const resolution = this.resolveModelForTask?.(task);
+      if (!resolution?.resolvedModelId || resolution.availability !== 'available') {
+        deterministic.warnings.push(
+          'AI vacancy intake is unavailable; deterministic extraction was used.',
+          ...(resolution?.warnings ?? []),
+        );
+      } else {
+        console.log('[InterviewService] application-intake:parse resolved AI model', {
+          task: resolution.task,
+          resolvedModelId: resolution.resolvedModelId,
+          mode: resolution.requestedMode,
+          fallbackUsed: resolution.fallbackUsed,
+        });
+        if (!this.generateStructuredContent) {
+          deterministic.warnings.push('AI vacancy intake is not configured in this process; deterministic extraction was used.');
+          if (resolution.fallbackUsed) deterministic.warnings.push(...resolution.warnings);
+        } else {
+          try {
+            const raw = await this.generateStructuredContent(buildApplicationIntakePrompt({
+              sourceText: normalized.text,
+              deterministic,
+              task,
+            }), { modelId: resolution.resolvedModelId, task });
+            const result = normalizeAiApplicationIntakeResult(raw, deterministic, normalized);
+            if (resolution.fallbackUsed) result.warnings.push(...resolution.warnings);
+            return result;
+          } catch (error: any) {
+            deterministic.warnings.push(
+              'AI vacancy intake failed; deterministic extraction was used.',
+              (error?.message || 'Unknown AI intake error.').toString().slice(0, 240),
+            );
+          }
+        }
+      }
     }
-    const missingFields: string[] = [];
-    if (!parsed.fields.company) missingFields.push('company');
-    if (!parsed.fields.roleTitle && !parsed.fields.title) missingFields.push('roleTitle');
-    if (hasStage && parsed.fields.startsAt && !parsed.fields.endsAt) missingFields.push('endsAt');
-    const title = parsed.fields.title
-      || [parsed.fields.company, parsed.fields.roleTitle].filter(Boolean).join(' · ')
-      || 'Untitled vacancy';
-    const result: ApplicationIntakeResult = {
-      classification,
-      confidence: intakeConfidence(parsed),
-      application: {
-        title,
-        company: parsed.fields.company ?? undefined,
-        roleTitle: parsed.fields.roleTitle ?? undefined,
-        source: parsed.fields.source ?? parsed.detectedSource ?? normalized.sourceHint ?? undefined,
-        vacancyUrl: parsed.fields.vacancyUrl ?? undefined,
-        compensationText: parsed.dossier?.compensationText ?? undefined,
-        requirements: parsed.dossier?.requirements ?? [],
-        risks: parsed.dossier?.risks ?? [],
-        questionsToAsk: parsed.dossier?.questionsToAsk ?? [],
-        rawSourceText: parsed.fields.rawSourceText ?? parsed.normalizedText ?? normalized.text,
-      },
-      warnings,
-      missingFields,
-    };
-    if (hasStage) {
-      result.stage = {
-        stageType: stageTypeFromParsedStage(parsed.fields.stage),
-        title: parsed.fields.stage ?? 'Initial stage',
-        startsAt: parsed.fields.startsAt ?? undefined,
-        endsAt: parsed.fields.endsAt ?? undefined,
-        timezone,
-        meetingUrl: parsed.fields.meetingUrl ?? undefined,
-        status: parsed.fields.startsAt ? 'scheduled' : 'draft',
-      };
-    }
-    if (result.stage?.startsAt && result.stage.endsAt) {
-      result.calendarProposal = {
-        shouldCreate: true,
-        title,
-        startsAt: result.stage.startsAt,
-        endsAt: result.stage.endsAt,
-        timezone,
-        locationOrUrl: result.stage.meetingUrl,
-        description: [
-          result.application.company ? `Company: ${result.application.company}` : null,
-          result.application.roleTitle ? `Role: ${result.application.roleTitle}` : null,
-          result.application.vacancyUrl ? `Vacancy: ${result.application.vacancyUrl}` : null,
-        ].filter(Boolean).join('\n'),
-        reminders: [{ minutesBefore: 15 }],
-      };
-    }
-    return result;
+    deterministic.missingFields = recomputeApplicationIntakeMissingFields(deterministic);
+    return attachCalendarProposal(deterministic);
   }
 
   listApplications(): ApplicationDetail[] {
@@ -615,7 +987,11 @@ export class InterviewService {
   createApplicationFromIntake(operationId: string, payload: unknown): ApplicationCreateFromIntakeResult {
     assertId(operationId, 'operationId');
     const input = payload as ApplicationCreateFromIntakePayload;
-    return this.repo.createApplicationFromIntake(normalizeApplicationIntakeResult(input?.intake), operationId);
+    return this.repo.createApplicationFromIntake(
+      normalizeApplicationIntakeResult(input?.intake),
+      operationId,
+      input?.selectedApplicationId ? assertId(input.selectedApplicationId, 'selectedApplicationId') : undefined,
+    );
   }
 
   update(id: string, patch: unknown): InterviewDetail {
@@ -670,6 +1046,89 @@ export class InterviewService {
     const id = assertId(interviewId, 'interviewId');
     this.requireActiveInterview(id);
     return this.repo.saveRetro(id, normalizeRetro(payload), assertId(operationId, 'operationId'));
+  }
+
+  getRetroEvaluation(interviewId: string): InterviewRetroEvaluation | null {
+    const id = assertId(interviewId, 'interviewId');
+    this.requireActiveInterview(id);
+    return this.repo.getLatestRetroEvaluation(id);
+  }
+
+  async generateRetroEvaluation(interviewId: string): Promise<InterviewRetroEvaluation> {
+    const id = assertId(interviewId, 'interviewId');
+    const detail = this.requireActiveInterview(id);
+    const linked = this.repo.getLatestLinkedMeetingTranscript(id);
+    if (!linked) {
+      throw new InterviewDomainError(
+        'invalid_payload',
+        'No linked recording transcript is available for this interview yet.',
+        false,
+        'fix_input',
+      );
+    }
+
+    const resolution = this.resolveModelForTask?.('retro');
+    if (!resolution?.resolvedModelId || resolution.availability !== 'available') {
+      return this.repo.saveRetroEvaluation({
+        applicationId: linked.applicationId,
+        interviewStageId: linked.interviewStageId,
+        interviewEventId: linked.interviewEventId ?? id,
+        meetingId: linked.meeting.id,
+        status: 'skipped',
+        modelId: resolution?.resolvedModelId ?? null,
+        error: [
+          'AI retro evaluation is unavailable.',
+          ...(resolution?.warnings ?? []),
+        ].join(' '),
+      });
+    }
+
+    if (!this.generateStructuredContent) {
+      return this.repo.saveRetroEvaluation({
+        applicationId: linked.applicationId,
+        interviewStageId: linked.interviewStageId,
+        interviewEventId: linked.interviewEventId ?? id,
+        meetingId: linked.meeting.id,
+        status: 'skipped',
+        modelId: resolution.resolvedModelId,
+        error: 'AI retro evaluation is not configured in this process.',
+      });
+    }
+
+    try {
+      const raw = await this.generateStructuredContent(buildRetroEvaluationPrompt({
+        title: detail.title,
+        company: detail.company,
+        roleTitle: detail.roleTitle,
+        stage: detail.stage,
+        transcriptText: linked.transcriptText,
+      }), { modelId: resolution.resolvedModelId, task: 'retro' });
+      const normalized = normalizeRetroEvaluationResult(raw);
+      return this.repo.saveRetroEvaluation({
+        applicationId: linked.applicationId,
+        interviewStageId: linked.interviewStageId,
+        interviewEventId: linked.interviewEventId ?? id,
+        meetingId: linked.meeting.id,
+        status: 'ready',
+        modelId: resolution.resolvedModelId,
+        summary: normalized.summary,
+        signals: normalized.signals,
+        risks: normalized.risks,
+        followups: normalized.followups,
+        confidence: normalized.confidence,
+        error: resolution.fallbackUsed ? resolution.warnings.join(' ') : null,
+      });
+    } catch (error: any) {
+      return this.repo.saveRetroEvaluation({
+        applicationId: linked.applicationId,
+        interviewStageId: linked.interviewStageId,
+        interviewEventId: linked.interviewEventId ?? id,
+        meetingId: linked.meeting.id,
+        status: 'failed',
+        modelId: resolution.resolvedModelId,
+        error: error?.message || 'AI retro evaluation failed.',
+      });
+    }
   }
 
   getRetroPrompt(interviewId: string): RetroPromptDecision {

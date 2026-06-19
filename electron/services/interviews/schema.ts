@@ -2,6 +2,16 @@ export interface InterviewSchemaDb {
   exec(sql: string): void;
 }
 
+function addColumnIfMissing(db: InterviewSchemaDb, table: string, columnSql: string): void {
+  try {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${columnSql}`);
+  } catch (error: any) {
+    if (!/duplicate column name/i.test(String(error?.message || error))) {
+      throw error;
+    }
+  }
+}
+
 export function applyInterviewSchema(db: InterviewSchemaDb): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS interview_events (
@@ -123,6 +133,16 @@ export function applyInterviewSchema(db: InterviewSchemaDb): void {
       PRIMARY KEY(operation_id, action)
     );
 
+    CREATE TABLE IF NOT EXISTS agent_proposal_applied_groups (
+      group_id TEXT PRIMARY KEY,
+      source_text_hash TEXT NOT NULL,
+      proposal_ids_json TEXT NOT NULL,
+      result_application_id TEXT,
+      result_stage_ids_json TEXT NOT NULL,
+      result_event_ids_json TEXT NOT NULL,
+      applied_at TEXT NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS applications (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -179,6 +199,30 @@ export function applyInterviewSchema(db: InterviewSchemaDb): void {
       FOREIGN KEY(stage_id) REFERENCES interview_stages(id) ON DELETE SET NULL
     );
 
+    CREATE TABLE IF NOT EXISTS interview_retro_evaluations (
+      id TEXT PRIMARY KEY,
+      application_id TEXT,
+      interview_stage_id TEXT,
+      interview_event_id TEXT,
+      meeting_id TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('pending_transcript', 'generating', 'ready', 'failed', 'skipped')),
+      model_id TEXT,
+      summary TEXT,
+      signals_json TEXT,
+      risks_json TEXT,
+      followups_json TEXT,
+      confidence REAL,
+      error TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      superseded_at TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE SET NULL,
+      FOREIGN KEY(interview_stage_id) REFERENCES interview_stages(id) ON DELETE SET NULL,
+      FOREIGN KEY(interview_event_id) REFERENCES interview_events(id) ON DELETE SET NULL,
+      FOREIGN KEY(meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_interview_events_time ON interview_events(starts_at);
     CREATE INDEX IF NOT EXISTS idx_interview_events_status ON interview_events(status);
     CREATE INDEX IF NOT EXISTS idx_interview_events_calendar_ref ON interview_events(calendar_provider, calendar_id, calendar_event_id);
@@ -198,25 +242,23 @@ export function applyInterviewSchema(db: InterviewSchemaDb): void {
     CREATE UNIQUE INDEX IF NOT EXISTS uq_interview_stages_calendar_ref
       ON interview_stages(calendar_provider, calendar_id, calendar_event_id)
       WHERE calendar_provider IS NOT NULL AND calendar_id IS NOT NULL AND calendar_event_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_agent_proposal_groups_source_hash ON agent_proposal_applied_groups(source_text_hash);
+    CREATE INDEX IF NOT EXISTS idx_interview_retro_evaluations_meeting_id ON interview_retro_evaluations(meeting_id);
+    CREATE INDEX IF NOT EXISTS idx_interview_retro_evaluations_stage_id ON interview_retro_evaluations(interview_stage_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_interview_retro_evaluations_active_ready_meeting
+      ON interview_retro_evaluations(meeting_id)
+      WHERE status = 'ready' AND is_active = 1;
   `);
 
-  try {
-    db.exec('ALTER TABLE meetings ADD COLUMN interview_event_id TEXT');
-  } catch (error: any) {
-    if (!/duplicate column name/i.test(String(error?.message || error))) {
-      throw error;
-    }
-  }
+  addColumnIfMissing(db, 'meetings', 'calendar_event_id TEXT');
+  addColumnIfMissing(db, 'meetings', 'interview_event_id TEXT');
+  addColumnIfMissing(db, 'meetings', 'interview_stage_id TEXT');
+  addColumnIfMissing(db, 'meetings', 'application_id TEXT');
 
-  db.exec('CREATE INDEX IF NOT EXISTS idx_meetings_interview_event_id ON meetings(interview_event_id);');
-
-  try {
-    db.exec('ALTER TABLE meetings ADD COLUMN interview_stage_id TEXT');
-  } catch (error: any) {
-    if (!/duplicate column name/i.test(String(error?.message || error))) {
-      throw error;
-    }
-  }
-
-  db.exec('CREATE INDEX IF NOT EXISTS idx_meetings_interview_stage_id ON meetings(interview_stage_id);');
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_meetings_interview_event_id ON meetings(interview_event_id);
+    CREATE INDEX IF NOT EXISTS idx_meetings_interview_stage_id ON meetings(interview_stage_id);
+    CREATE INDEX IF NOT EXISTS idx_meetings_application_id ON meetings(application_id);
+    CREATE INDEX IF NOT EXISTS idx_meetings_calendar_event_id ON meetings(calendar_event_id);
+  `);
 }
