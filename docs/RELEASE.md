@@ -2,12 +2,17 @@
 
 This guide describes how to publish an OpenOffer release from the public repository.
 
-OpenOffer currently supports two macOS binary release modes:
+OpenOffer's release workflow publishes desktop artifacts from native GitHub Actions runners:
+
+- **macOS**: DMG and updater ZIP for Apple Silicon and Intel Macs.
+- **Windows**: unsigned x64 NSIS setup and portable EXE.
+
+macOS supports two binary release modes:
 
 - **Unsigned preview**: ad-hoc signed macOS artifacts for early testers. This works without Apple Developer Program membership, but macOS shows Gatekeeper warnings.
 - **Signed official**: Developer ID-signed, notarized, and stapled macOS artifacts. This requires Apple Developer ID credentials and repository secrets.
 
-The same GitHub Actions workflow chooses the mode automatically. If all signing secrets are present, it publishes signed artifacts. If they are missing, it publishes unsigned preview artifacts and marks the GitHub Release as a prerelease.
+The same GitHub Actions workflow chooses the macOS mode automatically. If all Apple signing secrets are present, it publishes signed macOS artifacts. If they are missing, it publishes unsigned preview artifacts and marks the GitHub Release as a prerelease. Windows artifacts are unsigned until Authenticode signing is configured, so SmartScreen warnings are expected.
 
 ## Version Source
 
@@ -41,18 +46,20 @@ A source release is acceptable when signed artifacts are not ready yet.
 3. Create a GitHub Release using `.github/RELEASE_TEMPLATE.md`.
 4. Do not imply signed binaries exist if no assets were uploaded.
 
-## Unsigned macOS Preview Release
+## Desktop Preview Release
 
-Use this mode until Apple Developer ID signing and notarization are configured.
+Use this mode until Apple Developer ID signing, notarization, and Windows Authenticode signing are configured.
 
 The preview release path uses:
 
-- `.github/workflows/release-macos.yml`
+- `.github/workflows/release-desktop.yml`
 - `electron-builder.preview.cjs` for ZIP/app packaging
 - `scripts/ad-hoc-sign.js`
 - `scripts/build-preview-dmgs.cjs` for sequential DMG creation via `create-dmg`
 
-The artifacts are ad-hoc signed with `codesign --sign -`. The workflow verifies the app signatures and DMG integrity, but it does not run `spctl` or `stapler` because these artifacts are not notarized. Preview DMGs are created after Electron Builder finishes ZIP/app packaging so CI does not race two `hdiutil create` jobs.
+The macOS artifacts are ad-hoc signed with `codesign --sign -`. The workflow verifies the app signatures and DMG integrity, but it does not run `spctl` or `stapler` because these artifacts are not notarized. Preview DMGs are created after Electron Builder finishes ZIP/app packaging so CI does not race two `hdiutil create` jobs.
+
+The Windows artifacts are built on `windows-latest` with `npm run app:build:win`, collected from `release/`, and published only if the macOS job also succeeds.
 
 ### Local Unsigned Build
 
@@ -81,9 +88,11 @@ Expected outputs in `release/`:
    git push origin vX.Y.Z
    ```
 
-3. The `Release (macOS artifacts)` workflow detects missing Apple secrets and builds unsigned preview artifacts.
-4. The workflow attaches `.dmg`, `.zip`, `latest-mac.yml`, optional `*.blockmap`, and `SHA256SUMS.txt`.
-5. The GitHub Release is marked as a prerelease and the release body starts with an unsigned-build warning.
+3. The `Release (desktop artifacts)` workflow starts macOS and Windows builds on native runners.
+4. The macOS job detects missing Apple secrets and builds unsigned preview artifacts.
+5. The Windows job builds x64 setup and portable `.exe` artifacts.
+6. The `publish-release` job runs only after both platform jobs pass, generates one combined `SHA256SUMS.txt`, and publishes all assets to the same GitHub Release.
+7. The GitHub Release is marked as a prerelease while macOS artifacts are unsigned, and the release body starts with an unsigned-build warning.
 
 ### Temporary macOS Installation
 
@@ -111,7 +120,7 @@ This workaround is only acceptable for artifacts downloaded from the OpenOffer G
 
 The signed release path uses:
 
-- `.github/workflows/release-macos.yml`
+- `.github/workflows/release-desktop.yml`
 - `electron-builder.signed.cjs`
 - `scripts/notarize.js`
 - `scripts/afterAllArtifactBuild.cjs`
@@ -146,9 +155,9 @@ npm run dist:signed
 
 1. Confirm secrets are configured.
 2. Create and push `vX.Y.Z`, or rerun the workflow against an existing tag.
-3. The `Release (macOS artifacts)` workflow builds both macOS arches in signed mode.
-4. The workflow prepares a `release-artifacts/` bundle with required `.dmg`, `.zip`, `latest-mac.yml`, `SHA256SUMS.txt`, and optional `*.blockmap` files when Electron Builder produces them.
-5. On tag builds, the workflow publishes that bundle to the GitHub Release.
+3. The `Release (desktop artifacts)` workflow builds macOS in signed mode and Windows in unsigned x64 mode.
+4. The macOS and Windows jobs upload platform artifacts separately.
+5. The `publish-release` job downloads both artifact sets, generates a combined `SHA256SUMS.txt`, and publishes everything to the GitHub Release.
 6. If `.github/release-notes/vX.Y.Z.md` exists, the workflow uses it as the GitHub Release body. Otherwise it falls back to a short generated body and `CHANGELOG.md` remains the source of detailed notes.
 
 ## Other Desktop Platforms
@@ -169,7 +178,7 @@ npm ci
 npm run app:build:win
 ```
 
-Expected outputs land in `release/`. Windows code signing is not configured yet, so users should expect SmartScreen warnings until an Authenticode signing certificate and Windows release workflow are added.
+Expected outputs land in `release/`. Windows code signing is not configured yet, so users should expect SmartScreen warnings until an Authenticode signing certificate is added.
 
 Do not publish `ia32` Windows artifacts yet. The Electron Builder config still lists the target, but `npm run app:build:win` intentionally forces `--x64` until the native module build produces every Windows arch that the installer packages.
 
@@ -184,17 +193,17 @@ npm run app:build:linux
 
 Expected outputs land in `release/`. Linux packaging is configured but not part of the current official release gate.
 
-### Future Multi-Platform Release Workflow
+### Current Multi-Platform Release Workflow
 
-The durable shape should be a matrix workflow:
+The release workflow shape is:
 
 | Runner | Command | Assets |
 | :----- | :------ | :----- |
 | `macos-14` | `npm run app:build:mac` or signed mode | `.dmg`, `.zip`, `latest-mac.yml` |
 | `windows-latest` | `npm run app:build:win` | x64 `.exe`, x64 portable archive |
-| `ubuntu-latest` | `npm run app:build:linux` | `.AppImage`, `.deb` |
+| `ubuntu-latest` | publish job only | combined `SHA256SUMS.txt` and GitHub Release upload |
 
-Each platform should generate checksums from the files it produced. Only promote a platform from "preview" to "official" after that platform has a passing install/run smoke test.
+The platform build jobs upload artifacts to Actions first. The publish job downloads both sets, generates a single checksum file from the exact files that will be uploaded, and publishes the GitHub Release only when both platform builds passed.
 
 ## Verification
 
@@ -219,11 +228,11 @@ xcrun stapler validate "release/OpenOffer-X.Y.Z-arm64.dmg"
 xcrun stapler validate "release/OpenOffer-X.Y.Z.dmg"
 ```
 
-Attach checksums to the release notes:
+Generate local checksums when testing by hand:
 
 ```bash
 shopt -s nullglob
-for asset in release/*.dmg release/*.zip release/latest-mac.yml release/*.blockmap; do
+for asset in release/*.dmg release/*.zip release/*.exe release/latest*.yml release/*.blockmap; do
   shasum -a 256 "$asset" | awk -v name="$(basename "$asset")" '{print $1 "  " name}'
 done > release/SHA256SUMS.txt
 ```
@@ -241,6 +250,6 @@ done > release/SHA256SUMS.txt
 ## Known Constraints
 
 - macOS preview artifacts are not notarized until Apple Developer ID secrets are configured.
-- Windows packaging exists in Electron Builder configuration, but it is not signed or release-gated yet.
+- Windows packaging is release-gated, but it is not signed yet.
 - Linux packaging exists in configuration, but Linux is not the primary tested path.
 - `npm audit` is not currently a clean release gate; dependency/security hardening should be tracked separately instead of hidden.

@@ -37,7 +37,7 @@ Demo media belongs under [`assets/demo/`](assets/demo/README.md); the README sho
 - LLM provider routing for text, vision/screenshot, and meeting assistance.
 - Local SQLite-backed session history and retrieval.
 - English and Russian interface locales plus custom translation packs.
-- Electron desktop builds for macOS, with Windows and Linux packaging configured for native-platform builds.
+- Electron desktop preview releases for macOS and Windows, with Linux packaging configured for native-platform builds.
 
 ## Who It Is For
 
@@ -84,8 +84,8 @@ Read more:
 - npm.
 - Git.
 - Rust toolchain for the native audio module.
-- macOS for the current binary preview release path.
-- Windows or Linux for source builds and platform packaging experiments.
+- macOS or Windows for current binary preview releases.
+- Linux for source builds and platform packaging experiments.
 
 Linux packaging exists in the build configuration, but Linux is not the main tested path yet.
 
@@ -102,12 +102,13 @@ The install step rebuilds native packages, downloads bundled local models where 
 
 ### Install Current Preview Release
 
-Until Apple Developer ID signing is configured, GitHub Release binaries are unsigned/ad-hoc signed macOS preview builds. They are useful for early testers, but macOS will not treat them like notarized production apps.
+Until Apple Developer ID signing and Windows Authenticode signing are configured, GitHub Release binaries are preview builds. macOS artifacts are unsigned/ad-hoc signed and Windows artifacts are unsigned, so macOS Gatekeeper or Windows SmartScreen may warn before launch.
 
 1. Open the latest [GitHub Release](https://github.com/luiz2047/OpenOffer/releases).
-2. Download the `.dmg` for your Mac:
-   - Apple Silicon: `arm64`
-   - Intel: `x64`
+2. Download the right asset:
+   - macOS Apple Silicon: `arm64.dmg`
+   - macOS Intel: `x64` / non-`arm64` `.dmg`
+   - Windows: x64 setup `.exe` or portable `.exe`
 3. Download `SHA256SUMS.txt` and verify the file before opening it:
 
    ```bash
@@ -115,7 +116,7 @@ Until Apple Developer ID signing is configured, GitHub Release binaries are unsi
    grep "  $FILE$" SHA256SUMS.txt | shasum -a 256 -c -
    ```
 
-4. Open the DMG and drag **OpenOffer** to **Applications**.
+4. On macOS, open the DMG and drag **OpenOffer** to **Applications**.
 5. If macOS blocks the preview build, remove the quarantine flag after checksum verification:
 
    ```bash
@@ -123,7 +124,9 @@ Until Apple Developer ID signing is configured, GitHub Release binaries are unsi
    open /Applications/OpenOffer.app
    ```
 
-Use this workaround only for artifacts downloaded from the OpenOffer GitHub Release.
+6. On Windows, run the x64 setup or portable `.exe`. SmartScreen warnings are expected until Windows code signing is configured.
+
+Use the macOS workaround only for artifacts downloaded from the OpenOffer GitHub Release.
 
 ### Useful Development Commands
 

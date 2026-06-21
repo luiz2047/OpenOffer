@@ -32,14 +32,15 @@ npm install
 npm run app:dev
 ```
 
-### macOS preview build
+### Desktop preview build
 
-Download the correct `.dmg` or `.zip` for your device:
+Download the correct asset for your device:
 
-- Apple Silicon: `arm64`
-- Intel: `x64`
+- macOS Apple Silicon: `arm64.dmg`
+- macOS Intel: `x64` / non-`arm64` `.dmg`
+- Windows: x64 setup `.exe` or portable `.exe`
 
-Until Apple Developer ID signing is configured, macOS artifacts are unsigned/ad-hoc signed preview builds. Verify checksums before opening the app, then open the DMG and drag **OpenOffer** to **Applications**.
+Until Apple Developer ID signing and Windows Authenticode signing are configured, desktop artifacts are preview builds. Verify checksums before opening the app. On macOS, open the DMG and drag **OpenOffer** to **Applications**. On Windows, run the x64 setup or portable `.exe`; SmartScreen warnings are expected until code signing is configured.
 
 If macOS blocks the preview build:
 
@@ -48,7 +49,7 @@ xattr -dr com.apple.quarantine /Applications/OpenOffer.app
 open /Applications/OpenOffer.app
 ```
 
-Use this workaround only for artifacts downloaded from this GitHub Release.
+Use this workaround only for macOS artifacts downloaded from this GitHub Release.
 
 ## Checksums
 
