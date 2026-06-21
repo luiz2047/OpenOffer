@@ -153,7 +153,7 @@ npm run dist:signed
 
 OpenOffer's Electron Builder config already defines Windows and Linux targets:
 
-- Windows: NSIS installer for `x64` and `ia32`, plus portable `x64`.
+- Windows: NSIS installer and portable build for `x64`.
 - Linux: AppImage `x64` and Debian package `x64`.
 
 Build these on their native runners. Do not treat macOS cross-builds as release artifacts, because OpenOffer includes platform-specific native `.node` modules.
@@ -168,6 +168,8 @@ npm run app:build:win
 ```
 
 Expected outputs land in `release/`. Windows code signing is not configured yet, so users should expect SmartScreen warnings until an Authenticode signing certificate and Windows release workflow are added.
+
+Do not publish `ia32` Windows artifacts yet. The Electron Builder config still lists the target, but `npm run app:build:win` intentionally forces `--x64` until the native module build produces every Windows arch that the installer packages.
 
 ### Linux
 
@@ -187,7 +189,7 @@ The durable shape should be a matrix workflow:
 | Runner | Command | Assets |
 | :----- | :------ | :----- |
 | `macos-14` | `npm run app:build:mac` or signed mode | `.dmg`, `.zip`, `latest-mac.yml` |
-| `windows-latest` | `npm run app:build:win` | `.exe`, portable archive |
+| `windows-latest` | `npm run app:build:win` | x64 `.exe`, x64 portable archive |
 | `ubuntu-latest` | `npm run app:build:linux` | `.AppImage`, `.deb` |
 
 Each platform should generate checksums from the files it produced. Only promote a platform from "preview" to "official" after that platform has a passing install/run smoke test.

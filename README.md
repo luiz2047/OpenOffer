@@ -151,7 +151,7 @@ Platform-specific packaging should run on the matching OS because OpenOffer ship
 
 ```bash
 npm run app:build:mac        # macOS runner, dmg + zip
-npm run app:build:win        # Windows runner, NSIS + portable
+npm run app:build:win        # Windows runner, x64 NSIS + portable
 npm run app:build:linux      # Ubuntu/Linux runner, AppImage + deb
 ```
 

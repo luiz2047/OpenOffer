@@ -288,6 +288,22 @@ jobs:
               echo "## OpenOffer ${GITHUB_REF_NAME#v}"
               echo
               echo "See CHANGELOG.md for the user-visible changes in this release."
+              echo
+              echo "### Temporary macOS installation"
+              echo
+              echo 'Download `SHA256SUMS.txt` and verify the asset before opening it:'
+              echo
+              echo '```bash'
+              echo 'FILE="OpenOffer-X.Y.Z-arm64.dmg" # or the asset you downloaded'
+              echo 'grep "  $FILE$" SHA256SUMS.txt | shasum -a 256 -c -'
+              echo '```'
+              echo
+              echo "Open the DMG, drag OpenOffer to Applications, then remove the quarantine flag if macOS blocks the unsigned preview build:"
+              echo
+              echo '```bash'
+              echo 'xattr -dr com.apple.quarantine /Applications/OpenOffer.app'
+              echo 'open /Applications/OpenOffer.app'
+              echo '```'
             } > release/RELEASE_BODY.md
           fi
 

@@ -27,7 +27,7 @@
     "yandex:prompt-eval:live:full": "npm run yandex:prompt-eval",
     "app:build": "npm run build && npm run typecheck:electron && npm run build:electron && cross-env NATIVELY_BUILD_ALL_MAC_ARCHES=1 npm run build:native && node scripts/ensure-sharp-mac-deps.js && electron-builder",
     "app:build:mac": "npm run build && npm run typecheck:electron && npm run build:electron && cross-env NATIVELY_BUILD_ALL_MAC_ARCHES=1 npm run build:native && node scripts/ensure-sharp-mac-deps.js && electron-builder --mac --publish never",
-    "app:build:win": "npm run build && npm run typecheck:electron && npm run build:electron && npm run build:native && electron-builder --win --publish never",
+    "app:build:win": "npm run build && npm run typecheck:electron && npm run build:electron && npm run build:native && electron-builder --win --x64 --publish never",
     "app:build:linux": "npm run build && npm run typecheck:electron && npm run build:electron && npm run build:native && electron-builder --linux --publish never",
     "app:build:signed": "npm run build && npm run typecheck:electron && npm run build:electron && cross-env NATIVELY_BUILD_ALL_MAC_ARCHES=1 npm run build:native && node scripts/ensure-sharp-mac-deps.js && electron-builder --config electron-builder.signed.cjs",
     "watch": "tsc -p electron/tsconfig.json --watch",
