@@ -4,6 +4,28 @@
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-06-22
+
+### Added
+
+- **Unified top search assistant**: The launcher search pill is now the single vacancy-aware assistant surface for local vacancy, stage, and meeting search plus AI actions.
+- **Vacancy proposal review**: Pasted vacancy or recruiter-stage text opens an editable review panel before any vacancy or stage is created.
+- **Safe stage attach matching**: Stage proposals now require explicit vacancy selection when AI/local matching is weak, ambiguous, missing, or stale.
+
+### Changed
+
+- **Top search positioning**: The visible search label and placeholder now present the control as an AI assistant, with English and Russian translation coverage.
+- **Vacancy workflow entry point**: Vacancy and stage rows are exposed through the top assistant while manual vacancy creation, status filters, edit forms, stage controls, and recording actions remain in the command center.
+
+### Removed
+
+- **Old vacancy agent surfaces**: Removed normal UI access to the vacancy-pane text search and bottom agent popup/button.
+
+### Tests
+
+- Added unit coverage for top-search paste intent, safe excerpts, strong/weak/ambiguous proposal target matching, and the weak-match manual-selection guard.
+- Extended the Interview Command Center Playwright flow to verify the top assistant proposal path, no accidental Enter apply, explicit stage attach, single-record apply behavior, and absence of old agent/search surfaces.
+
 ## [1.4.1] - 2026-06-21
 
 ### Added

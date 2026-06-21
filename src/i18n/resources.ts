@@ -969,6 +969,67 @@ export const resources = {
       search: {
         placeholder: 'Search or ask about meetings',
       },
+      topSearch: {
+        assistantName: 'AI Assistant',
+        inputAriaLabel: 'AI assistant search',
+        placeholder: 'Ask AI or search vacancies, stages, meetings',
+        groups: {
+          actions: 'Actions',
+          sessions: 'Sessions',
+          vacancies: 'Vacancies',
+          stages: 'Stages',
+        },
+        actions: {
+          askAi: 'Ask AI',
+          literalMeetingSearch: 'Search meetings',
+          parseVacancySource: 'Parse vacancy source',
+          addStageFromText: 'Add stage from text',
+        },
+        actionSubtitles: {
+          literalMeetingSearch: 'Search for "{{query}}"',
+          proposalReadyReview: 'Review extracted fields before anything is created',
+        },
+        item: {
+          untitled: 'Untitled',
+        },
+        proposal: {
+          parsing: 'Parsing pasted text',
+          ready: 'Proposal ready',
+          applied: 'Proposal applied',
+          noWriteUntilApply: 'No write happens until Apply is clicked',
+          confidence: '{{value}}% confidence',
+          clear: 'Clear',
+          fields: {
+            title: 'Title',
+            company: 'Company',
+            role: 'Role',
+            stage: 'Stage',
+            attachToVacancy: 'Attach to vacancy',
+          },
+          placeholders: {
+            enableApply: 'Choose vacancy to enable Apply',
+            createNewVacancy: 'Create new vacancy',
+          },
+          targetReasons: {
+            strong_ai_match: 'Matched confidently by AI.',
+            strong_local_match: 'Matched confidently from local vacancies.',
+            ambiguous_match: 'Several vacancies look similar. Choose the target before applying.',
+            weak_match: 'The match is weak. Choose the target vacancy before applying.',
+            no_match: 'No confident vacancy match. Choose the target before applying.',
+            invalid_ai_match: 'The suggested vacancy is no longer available. Choose the target before applying.',
+          },
+          actions: {
+            applying: 'Applying',
+            addStage: 'Add stage',
+            createVacancyStage: 'Create vacancy + stage',
+            createVacancy: 'Create vacancy',
+          },
+        },
+        errors: {
+          parseFailed: 'Could not parse this text.',
+          applyFailed: 'Could not apply this proposal.',
+        },
+      },
     },
   },
   ru: {
@@ -1954,6 +2015,67 @@ export const resources = {
       },
       search: {
         placeholder: 'Поиск или вопрос по встречам',
+      },
+      topSearch: {
+        assistantName: 'AI-ассистент',
+        inputAriaLabel: 'Поиск AI-ассистента',
+        placeholder: 'Спросите AI или найдите вакансии, этапы, встречи',
+        groups: {
+          actions: 'Действия',
+          sessions: 'Встречи',
+          vacancies: 'Вакансии',
+          stages: 'Этапы',
+        },
+        actions: {
+          askAi: 'Спросить AI',
+          literalMeetingSearch: 'Поиск встреч',
+          parseVacancySource: 'Разобрать текст вакансии',
+          addStageFromText: 'Добавить этап из текста',
+        },
+        actionSubtitles: {
+          literalMeetingSearch: 'Найти «{{query}}»',
+          proposalReadyReview: 'Проверьте извлеченные поля перед созданием',
+        },
+        item: {
+          untitled: 'Без названия',
+        },
+        proposal: {
+          parsing: 'Разбираем текст',
+          ready: 'Предложение готово',
+          applied: 'Предложение применено',
+          noWriteUntilApply: 'Ничего не будет создано, пока не нажмёте «Применить»',
+          confidence: '{{value}}% уверенность',
+          clear: 'Очистить',
+          fields: {
+            title: 'Название',
+            company: 'Компания',
+            role: 'Роль',
+            stage: 'Этап',
+            attachToVacancy: 'Добавить к вакансии',
+          },
+          placeholders: {
+            enableApply: 'Выберите вакансию, чтобы разрешить применение',
+            createNewVacancy: 'Создать новую вакансию',
+          },
+          targetReasons: {
+            strong_ai_match: 'AI уверенно нашёл подходящую вакансию.',
+            strong_local_match: 'Вакансия уверенно найдена среди локальных данных.',
+            ambiguous_match: 'Похоже сразу несколько вакансий. Выберите цель перед применением.',
+            weak_match: 'Совпадение слабое. Выберите вакансию перед применением.',
+            no_match: 'Нет уверенного совпадения с вакансией. Выберите цель перед применением.',
+            invalid_ai_match: 'Предложенная вакансия больше недоступна. Выберите цель перед применением.',
+          },
+          actions: {
+            applying: 'Применение',
+            addStage: 'Добавить этап',
+            createVacancyStage: 'Создать вакансию + этап',
+            createVacancy: 'Создать вакансию',
+          },
+        },
+        errors: {
+          parseFailed: 'Не удалось разобрать этот текст.',
+          applyFailed: 'Не удалось применить это предложение.',
+        },
       },
     },
   },

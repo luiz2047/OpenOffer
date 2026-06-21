@@ -11,6 +11,7 @@ import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { isMac } from '../utils/platformUtils';
 import WindowControls from './WindowControls';
 import InterviewCommandCenter, { type InterviewMeetingStartMetadata } from '../features/interviews/InterviewCommandCenter';
+import type { VacancyTopSearchContext } from '../features/interviews/topSearchHelpers';
 
 interface Meeting {
     id: string;
@@ -60,6 +61,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
     const [, setIsCalendarConnected] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [showNotification, setShowNotification] = useState(false);
+    const [vacancySearchContext, setVacancySearchContext] = useState<VacancyTopSearchContext | null>(null);
 
     // Global search state (for AI chat overlay)
     const [isGlobalChatOpen, setIsGlobalChatOpen] = useState(false);
@@ -303,6 +305,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                 {/* Center: Spotlight-style Search Pill */}
                 <TopSearchPill
                     meetings={meetings}
+                    vacancyContext={selectedMeeting ? null : vacancySearchContext}
                     onAIQuery={(query) => {
                         analytics.trackCommandExecuted('ai_query_search');
                         setSubmittedGlobalQuery(query);
@@ -605,6 +608,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                                 onOpenMeeting={handleOpenMeeting}
                                 onOpenSettings={onOpenSettings}
                                 onCalendarConnected={setIsCalendarConnected}
+                                onSearchContextChange={setVacancySearchContext}
                             />                        </motion.div>
                     )}
                 </AnimatePresence>

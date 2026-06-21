@@ -16,7 +16,6 @@ import {
   Plus,
   RefreshCw,
   RotateCcw,
-  Search,
   Trash2,
   UserRound,
   X,
@@ -48,6 +47,7 @@ import type {
   VacancyDossierPayload,
 } from '../../types/interviews';
 import { applicationApi, interviewApi, stageApi } from './api';
+import type { TopSearchResultRow, VacancyTopSearchContext } from './topSearchHelpers';
 
 interface MeetingSummary {
   id: string;
@@ -86,20 +86,19 @@ interface InterviewCommandCenterProps {
   onOpenMeeting: (meeting: MeetingSummary) => void;
   onOpenSettings: (tab?: string) => void;
   onCalendarConnected: (connected: boolean) => void;
+  onSearchContextChange?: (context: VacancyTopSearchContext | null) => void;
 }
 
 const STATUS_OPTIONS: InterviewStatus[] = ['active', 'applied', 'screening', 'interviewing', 'offer', 'rejected', 'withdrawn', 'archived'];
 const APPLICATION_STATUS_OPTIONS: ApplicationStatus[] = ['lead_found', 'applied', 'screening', 'interviewing', 'offer', 'rejected', 'withdrawn', 'archived'];
 const PRIORITY_OPTIONS: InterviewPriority[] = ['normal', 'high', 'low'];
 const DETAIL_TABS = ['Vacancy', 'Stages'] as const;
-const AGENT_STEPS = ['read', 'search', 'extract', 'stage', 'match', 'proposal'] as const;
 const STAGE_TYPE_OPTIONS: InterviewStageType[] = ['recruiter_screen', 'technical_screen', 'system_design', 'leadership', 'final', 'offer_security', 'custom'];
 const STAGE_STATUS_OPTIONS: InterviewStageStatus[] = ['draft', 'scheduled', 'done', 'waiting_feedback', 'passed', 'rejected', 'canceled', 'archived'];
 const STAGE_FORMAT_OPTIONS: InterviewStageFormat[] = ['online', 'onsite', 'phone', 'async', 'unknown'];
 
 type DetailTab = 'Vacancy' | 'Stages' | 'Prep' | 'Retro' | 'Questions';
 type DraftStatus = 'synced' | 'dirty' | 'saved' | 'failed';
-type AgentStep = typeof AGENT_STEPS[number] | 'apply';
 type VacancyStatusFilter = 'active' | 'all' | ApplicationStatus;
 
 interface VacancyListItem {
@@ -127,19 +126,8 @@ const DETAIL_TAB_I18N_KEY: Record<typeof DETAIL_TABS[number], string> = {
   Stages: 'interviews.detailTabs.stages',
 };
 
-const AGENT_STEP_I18N_KEY: Record<AgentStep, string> = {
-  read: 'interviews.agent.steps.read',
-  search: 'interviews.agent.steps.search',
-  extract: 'interviews.agent.steps.extract',
-  stage: 'interviews.agent.steps.stage',
-  match: 'interviews.agent.steps.match',
-  proposal: 'interviews.agent.steps.proposal',
-  apply: 'interviews.agent.steps.apply',
-};
-
 const DRAFT_PREFIX = 'openoffer:interviews:draft';
 const PANE_LAYOUT_STORAGE_KEY = 'openoffer:interviews:pane-layout:v1';
-const AGENT_INPUT_MAX_CHARS = 50000;
 const INACTIVE_APPLICATION_STATUSES = new Set<ApplicationStatus>(['rejected', 'withdrawn', 'archived']);
 const PANE_LAYOUT_LIMITS = {
   calendarMin: 220,
@@ -312,14 +300,6 @@ function joinLines(value?: string[] | null): string {
   return (value ?? []).join('\n');
 }
 
-function normalizeMatchValue(value?: string | null): string {
-  return String(value ?? '').trim().toLowerCase();
-}
-
-function wait(ms: number): Promise<void> {
-  return new Promise(resolve => window.setTimeout(resolve, ms));
-}
-
 function statusFromInterview(status: InterviewStatus): ApplicationStatus {
   return status === 'active' ? 'lead_found' : status;
 }
@@ -403,32 +383,6 @@ function groupVacanciesFromInterviews(interviews: InterviewListItem[]): VacancyL
     const right = b.startsAt ?? Number.MAX_SAFE_INTEGER;
     return left - right || b.updatedAt.localeCompare(a.updatedAt);
   });
-}
-
-function findMatchingApplication(preview: ApplicationIntakeResult | null, vacancies: VacancyListItem[]): VacancyListItem | null {
-  if (!preview) return null;
-  const aiMatchId = preview.existingApplicationMatch?.applicationId;
-  if (aiMatchId) {
-    const matched = vacancies.find(item => item.id === aiMatchId);
-    if (matched) return matched;
-  }
-  const company = normalizeMatchValue(preview.application.company);
-  const title = normalizeMatchValue(preview.application.title);
-  const role = normalizeMatchValue(preview.application.roleTitle);
-  const vacancyUrl = normalizeMatchValue(preview.application.vacancyUrl);
-  return vacancies.find(item => {
-    const itemCompany = normalizeMatchValue(item.company);
-    const itemTitle = normalizeMatchValue(item.title);
-    const itemRole = normalizeMatchValue(item.roleTitle);
-    const itemVacancyUrl = normalizeMatchValue(item.vacancyUrl);
-    const stageTitles = item.stages.map(stage => normalizeMatchValue(stage.stage));
-    return Boolean(
-      (vacancyUrl && itemVacancyUrl === vacancyUrl)
-      || (company && role && itemCompany === company && itemRole === role)
-      || (company && title && itemCompany === company && itemTitle === title)
-      || (company && title && itemCompany === company && stageTitles.includes(title)),
-    );
-  }) ?? null;
 }
 
 function groupRequirementLines(lines: string[], defaultLabel: string): Array<{ label: string; items: string[] }> {
@@ -638,6 +592,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   onOpenMeeting,
   onOpenSettings,
   onCalendarConnected,
+  onSearchContextChange,
 }) => {
   const { t } = useTranslation();
   const [interviews, setInterviews] = useState<InterviewListItem[]>([]);
@@ -652,17 +607,12 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [rawSourceExpanded, setRawSourceExpanded] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>('Vacancy');
-  const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<VacancyStatusFilter>('active');
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<InterviewCreatePayload>(initialCreateForm);
   const [createCalendarProvider, setCreateCalendarProvider] = useState<'none' | 'google' | 'macos'>('none');
   const [intakePreview, setIntakePreview] = useState<ApplicationIntakeResult | null>(null);
   const [parseWarnings, setParseWarnings] = useState<string[]>([]);
-  const [agentOpen, setAgentOpen] = useState(false);
-  const [agentText, setAgentText] = useState('');
-  const [agentPreview, setAgentPreview] = useState<ApplicationIntakeResult | null>(null);
-  const [agentSteps, setAgentSteps] = useState<AgentStep[]>([]);
   const [dossierDraft, setDossierDraft] = useState(initialDossierDraft);
   const [applicationDraft, setApplicationDraft] = useState(() => applicationDraftFromDetail(null));
   const [applicationSaveStatus, setApplicationSaveStatus] = useState<DraftStatus>('synced');
@@ -817,18 +767,75 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   }, [statusFilter, vacancyItems]);
 
   const filteredVacancies = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return statusFilteredVacancies;
-    return statusFilteredVacancies.filter(item => [
-      item.title,
-      item.company,
-      item.roleTitle,
-      item.stageTitle,
-      item.source,
-      item.vacancyUrl,
-      ...item.stages.map(stage => stage.stage),
-    ].some(value => String(value ?? '').toLowerCase().includes(needle)));
-  }, [query, statusFilteredVacancies]);
+    return statusFilteredVacancies;
+  }, [statusFilteredVacancies]);
+
+  const topSearchRows = useMemo<TopSearchResultRow[]>(() => {
+    const rows: TopSearchResultRow[] = [];
+    for (const application of applications) {
+      const stageRows = application.stages
+        .filter(stage => stage.status !== 'archived' && !stage.archivedAt)
+        .map(stage => ({
+          id: stage.id,
+          kind: 'stage' as const,
+          applicationId: application.id,
+          title: stage.title,
+          company: application.company,
+          roleTitle: application.roleTitle,
+          source: application.source,
+          vacancyUrl: application.vacancyUrl,
+          stageTitle: stage.title,
+          startsAt: stage.startsAt,
+          endsAt: stage.endsAt,
+          timezone: stage.timezone,
+          updatedAt: stage.updatedAt,
+          stageType: stage.stageType,
+          status: stage.status,
+        }));
+      rows.push({
+        id: application.id,
+        kind: 'vacancy',
+        title: application.title,
+        company: application.company,
+        roleTitle: application.roleTitle,
+        source: application.source,
+        vacancyUrl: application.vacancyUrl,
+        status: application.status,
+        priority: application.priority,
+        selectedInterviewId: legacyIdForApplication(application),
+        selectedStageId: application.selectedStageId,
+        startsAt: stageRows[0]?.startsAt ?? null,
+        stageTitle: stageRows[0]?.title ?? null,
+        stageCount: stageRows.length,
+        linkedMeetingCount: application.linkedMeetings?.length ?? 0,
+        questionCount: 0,
+        updatedAt: application.updatedAt,
+        stages: stageRows,
+      });
+      rows.push(...stageRows);
+    }
+    return rows;
+  }, [applications]);
+
+  const openTopSearchRow = useCallback((row: TopSearchResultRow) => {
+    const application = row.kind === 'stage'
+      ? applications.find(item => item.id === row.applicationId)
+      : applications.find(item => item.id === row.id);
+    if (!application) return;
+    const stage = row.kind === 'stage'
+      ? application.stages.find(item => item.id === row.id)
+      : application.stages.find(item => item.id === application.selectedStageId) ?? application.stages[0] ?? null;
+    const legacyId = stage?.legacyInterviewEventId ?? legacyIdForApplication(application);
+    setDetailTab(row.kind === 'stage' ? 'Stages' : 'Vacancy');
+    if (legacyId) {
+      setSelectedId(legacyId);
+    } else {
+      setApplicationDetail(application);
+      setApplicationDraft(applicationDraftFromDetail(application));
+      setStageDrafts(Object.fromEntries(application.stages.map(item => [item.id, stageDraftFromStage(item)])));
+      setStageSaveStatus(Object.fromEntries(application.stages.map(item => [item.id, 'synced' as DraftStatus])));
+    }
+  }, [applications]);
 
   const upcomingAgenda = useMemo(() => {
     return upcomingEvents
@@ -859,9 +866,6 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   }, [interviews, selectedDate]);
 
   const selectedDayCount = selectedDayEvents.length + selectedDayInterviews.length;
-  const agentMatchedVacancy = useMemo(() => {
-    return findMatchingApplication(agentPreview, vacancyItems);
-  }, [agentPreview, vacancyItems]);
   const stages = applicationDetail?.stages ?? [];
   const activeStages = stages.filter(stage => stage.status !== 'archived' && !stage.archivedAt);
   const archivedStages = stages.filter(stage => stage.status === 'archived' || stage.archivedAt);
@@ -882,6 +886,55 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       setBusy(false);
     }
   };
+
+  const previewTopSearchIntake = useCallback((input: Parameters<typeof applicationApi.parseIntake>[0]) => {
+    return applicationApi.parseIntake(input);
+  }, []);
+
+  const applyTopSearchIntake = useCallback(async (
+    intake: ApplicationIntakeResult,
+    options?: { selectedApplicationId?: string | null },
+  ) => {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await applicationApi.createFromIntake(intake, options);
+      await loadInterviews();
+      setSelectedId(result.legacyInterview?.id ?? result.application.legacyInterviewEventId ?? null);
+      return result;
+    } catch (err: any) {
+      setError(err?.message || 'Action failed.');
+      throw err;
+    } finally {
+      setBusy(false);
+    }
+  }, [loadInterviews]);
+
+  const topSearchContext = useMemo<VacancyTopSearchContext>(() => ({
+    isActive: true,
+    selectedApplicationId: applicationDetail?.id ?? null,
+    selectedStageId: applicationDetail?.selectedStageId ?? null,
+    rows: topSearchRows,
+    candidateApplications: vacancyItems
+      .filter(item => isActiveApplication(item.status))
+      .map(item => ({
+        id: item.id,
+        title: item.title,
+        company: item.company,
+        roleTitle: item.roleTitle,
+      })),
+    onOpenRow: openTopSearchRow,
+    onPreviewIntake: previewTopSearchIntake,
+    onApplyIntake: applyTopSearchIntake,
+  }), [applicationDetail?.id, applicationDetail?.selectedStageId, applyTopSearchIntake, openTopSearchRow, previewTopSearchIntake, topSearchRows, vacancyItems]);
+
+  useEffect(() => {
+    onSearchContextChange?.(topSearchContext);
+  }, [onSearchContextChange, topSearchContext]);
+
+  useEffect(() => {
+    return () => onSearchContextChange?.(null);
+  }, [onSearchContextChange]);
 
   const updateDraft = <T extends Record<string, string>>(
     kind: 'dossier' | 'prep' | 'retro',
@@ -974,48 +1027,6 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       setParseWarnings([]);
       await loadInterviews();
       setSelectedId(legacyId ?? result.application.legacyInterviewEventId ?? null);
-    });
-  };
-
-  const runAgent = async () => {
-    await run(async () => {
-      setAgentPreview(null);
-      setAgentSteps([]);
-      const revealStep = async (step: AgentStep, delayMs = 180) => {
-        setAgentSteps(prev => prev.includes(step) ? prev : [...prev, step]);
-        if (delayMs > 0) await wait(delayMs);
-      };
-      await revealStep('read', 160);
-      await revealStep('search', 220);
-      const candidateApplicationIds = vacancyItems.map(item => item.id);
-      await revealStep('extract', 220);
-      const preview = await applicationApi.parseIntake({
-        text: agentText,
-        useAi: true,
-        task: 'agent_actions',
-        candidateApplicationIds,
-      });
-      if (preview.stage) await revealStep('stage', 180);
-      await revealStep('match', 160);
-      await revealStep('proposal', 0);
-      setAgentPreview(preview);
-    });
-  };
-
-  const applyAgentProposal = async () => {
-    if (!agentPreview) return;
-    await run(async () => {
-      setAgentSteps(prev => Array.from(new Set([...prev, 'apply'])));
-      const selectedApplicationId = agentMatchedVacancy?.id && agentPreview.stage
-        ? agentMatchedVacancy.id
-        : null;
-      const result = await applicationApi.createFromIntake(agentPreview, { selectedApplicationId });
-      await loadInterviews();
-      setSelectedId(result.legacyInterview?.id ?? result.application.legacyInterviewEventId ?? null);
-      setAgentText('');
-      setAgentPreview(null);
-      setAgentSteps([]);
-      setAgentOpen(false);
     });
   };
 
@@ -1558,17 +1569,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         </div>
 
         <div className="border-b border-white/[0.07] p-3">
-          <div className="flex min-h-11 items-center gap-2 rounded-md border border-white/[0.08] bg-black/20 px-3">
-            <Search size={15} className="text-text-tertiary" />
-            <input
-              aria-label={t('interviews.searchPlaceholder')}
-              value={query}
-              onChange={event => setQuery(event.target.value)}
-              placeholder={t('interviews.searchPlaceholder')}
-              className="min-h-11 w-full bg-transparent text-[13px] outline-none placeholder:text-text-tertiary"
-            />
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
             {([
               ['active', t('interviews.filters.active')],
               ['all', t('interviews.filters.all')],
@@ -2287,81 +2288,6 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
           </div>
         </div>
       )}
-      <div className={`fixed bottom-4 z-30 ${agentOpen ? 'right-4 w-[min(360px,calc(100vw-32px))]' : 'left-4 w-auto'}`}>
-        {agentOpen ? (
-          <div className="rounded-md border border-white/[0.08] bg-[#101214] p-3 shadow-2xl">
-            <div className="mb-2 flex items-center justify-between">
-              <div className="text-[13px] font-semibold">{t('interviews.agent.title')}</div>
-              <button type="button" className={iconButtonClass} onClick={() => setAgentOpen(false)} aria-label={t('common.close')}><X size={14} /></button>
-            </div>
-            {agentSteps.length > 0 && (
-              <div className="mb-3 space-y-1.5">
-                {agentSteps.map(step => (
-                  <div key={step} className="flex items-center gap-2 text-[11px] text-text-secondary">
-                    <span className={`h-1.5 w-1.5 rounded-full ${step === 'apply' ? 'bg-emerald-300' : 'bg-cyan-300'}`} />
-                    <span>{t(AGENT_STEP_I18N_KEY[step])}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            <textarea
-              value={agentText}
-              onChange={event => {
-                setAgentText(event.target.value);
-                setAgentPreview(null);
-                setAgentSteps([]);
-              }}
-              className={`${inputClass} h-[120px] resize-none`}
-              maxLength={AGENT_INPUT_MAX_CHARS}
-              placeholder={t('interviews.agent.placeholder')}
-            />
-            <div className="mt-1 text-right text-[10px] text-text-tertiary">
-              {t('interviews.agent.characterCount', { count: agentText.length, limit: AGENT_INPUT_MAX_CHARS })}
-            </div>
-            {agentPreview && (
-              <div className="mt-3 rounded-md border border-cyan-300/20 bg-cyan-300/[0.06] p-3 text-[12px]">
-                <div className="font-semibold text-cyan-100">{t('interviews.agent.proposalReady')}</div>
-                <div className="mt-1 text-text-secondary">{agentPreview.application.title || agentPreview.application.company || t('interviews.agent.untitled')}</div>
-                <div className="mt-2 space-y-1.5 text-text-tertiary">
-                  <div>{t('interviews.agent.confidence', { value: Math.round(agentPreview.confidence * 100) })}</div>
-                  {agentPreview.stage && (
-                    <div>{t('interviews.agent.detectedStage', { title: agentPreview.stage.title ?? t('interviews.detail.stage') })}</div>
-                  )}
-                  {agentMatchedVacancy?.id && agentPreview.stage ? (
-                    <div className="text-cyan-100">{t('interviews.agent.attachToExisting', { title: agentMatchedVacancy.title })}</div>
-                  ) : (
-                    <div>{agentPreview.stage ? t('interviews.agent.createVacancyAndStage') : t('interviews.agent.createVacancyOnly')}</div>
-                  )}
-                  {agentPreview.warnings.length > 0 && (
-                    <div>{t('interviews.agent.warnings', { value: agentPreview.warnings.join(', ') })}</div>
-                  )}
-                </div>
-              </div>
-            )}
-            <div className="mt-3 flex justify-end">
-              <button
-                type="button"
-                onClick={agentPreview ? applyAgentProposal : runAgent}
-                disabled={busy || (!agentPreview && !agentText.trim())}
-                className={primaryButtonClass}
-              >
-                {agentPreview
-                  ? agentMatchedVacancy?.id && agentPreview.stage
-                    ? t('interviews.agent.addStage')
-                    : agentPreview.stage
-                      ? t('interviews.agent.createVacancyStage')
-                      : t('interviews.agent.createVacancy')
-                  : t('interviews.agent.run')}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button type="button" onClick={() => setAgentOpen(true)} className={`${secondaryButtonClass} bg-[#101214] shadow-xl`}>
-            <MessageSquareText size={15} />
-            {t('interviews.agent.title')}
-          </button>
-        )}
-      </div>
     </div>
   );
 };
