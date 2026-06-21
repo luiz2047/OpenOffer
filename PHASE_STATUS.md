@@ -7,7 +7,7 @@ This file tracks public launch readiness, not historical implementation phases.
 - Public source version: `1.4.0`.
 - Primary story: local-first recruiter chat and vacancy text to interview process.
 - Source development path: ready.
-- Official signed binary release: workflow prepared, pending Apple signing/notarization secrets and release run.
+- Binary release path: unsigned macOS preview artifacts can ship now; official signed/notarized artifacts remain pending Apple signing/notarization secrets.
 - Discussions: should be enabled in GitHub settings before launch posts point users there.
 - Funding: no public funding link is configured until a maintainer-owned account is intentionally added.
 
@@ -24,7 +24,7 @@ This file tracks public launch readiness, not historical implementation phases.
 - [x] GitHub Discussions enabled.
 - [x] Repository topics added.
 - [x] Starter issues created.
-- [ ] First official release published or explicitly announced as source-only.
+- [ ] First GitHub Release published as unsigned macOS preview or official signed release.
 - [ ] Social preview image configured in GitHub settings.
 
 ## Do Not Use As Current Product Guidance

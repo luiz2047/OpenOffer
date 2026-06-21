@@ -8,7 +8,7 @@ The goal is not to be a generic chatbot wrapper. The goal is to help users turn 
 
 - Make the recruiter-chat-to-process demo the primary first-run story.
 - Keep the README, release docs, issue templates, and contribution guide aligned with the current product.
-- Publish the first official GitHub Release path once signing secrets are configured.
+- Publish the first GitHub Release as an unsigned macOS preview, then replace it with signed/notarized artifacts once signing secrets are configured.
 - Add contributor-oriented labels and starter issues.
 - Improve focused CI around docs, i18n, build, Electron contracts, provider boundaries, and Interview Command Center behavior.
 
@@ -18,7 +18,7 @@ The goal is not to be a generic chatbot wrapper. The goal is to help users turn 
 - Clearer first-run provider setup for Ollama, Local Whisper, GigaSTT, Yandex AI Studio, and OpenAI-compatible endpoints.
 - More Russian local STT diagnostics and test fixtures.
 - Stage-level transcript, retro, and follow-up workflows.
-- Release QA checklist with signed macOS artifact verification and screenshots.
+- Release QA checklist with preview install verification now and signed macOS artifact verification once Apple credentials are configured.
 - Good-first-issue docs for local setup, demo recording, screenshots, and translation packs.
 
 ## Later

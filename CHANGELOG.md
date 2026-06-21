@@ -11,7 +11,7 @@
 - **Vacancy workflow editing contract**: Added typed application update/list filters plus stage create, update, archive, restore, calendar-event, and recording-attach contracts across service, IPC, preload, renderer API, and shared types.
 - **Stage-first command center controls**: Vacancy details now expose editable application fields, direct stage creation/editing, stage-level calendar actions, stage-level recording attachment, archived-stage grouping, and desktop pane resizing.
 - **Community launch entry point**: Added public README, release, contributor, maintainer, AGPL, roadmap, and recruiter-chat demo docs for the first OpenOffer community release.
-- **GitHub Release publishing**: Added signed macOS release publication with curated release notes, checksum generation, and artifact bundling for GitHub Releases.
+- **GitHub Release publishing**: Added macOS GitHub Release publication with curated release notes, checksum generation, artifact bundling, unsigned preview fallback, and signed/notarized mode once Apple Developer ID secrets are configured.
 
 ### Changed
 

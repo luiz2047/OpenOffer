@@ -37,7 +37,7 @@ Demo media belongs under [`assets/demo/`](assets/demo/README.md); the README sho
 - LLM provider routing for text, vision/screenshot, and meeting assistance.
 - Local SQLite-backed session history and retrieval.
 - English and Russian interface locales plus custom translation packs.
-- Electron desktop builds for macOS and Windows development paths.
+- Electron desktop builds for macOS, with Windows and Linux packaging configured for native-platform builds.
 
 ## Who It Is For
 
@@ -84,7 +84,8 @@ Read more:
 - npm.
 - Git.
 - Rust toolchain for the native audio module.
-- macOS or Windows for the primary desktop path.
+- macOS for the current binary preview release path.
+- Windows or Linux for source builds and platform packaging experiments.
 
 Linux packaging exists in the build configuration, but Linux is not the main tested path yet.
 
@@ -98,6 +99,31 @@ npm run app:dev
 ```
 
 The install step rebuilds native packages, downloads bundled local models where needed, prepares `sqlite-vec`, and patches Electron metadata.
+
+### Install Current Preview Release
+
+Until Apple Developer ID signing is configured, GitHub Release binaries are unsigned/ad-hoc signed macOS preview builds. They are useful for early testers, but macOS will not treat them like notarized production apps.
+
+1. Open the latest [GitHub Release](https://github.com/luiz2047/OpenOffer/releases).
+2. Download the `.dmg` for your Mac:
+   - Apple Silicon: `arm64`
+   - Intel: `x64`
+3. Download `SHA256SUMS.txt` and verify the file before opening it:
+
+   ```bash
+   FILE="OpenOffer-1.4.0-arm64.dmg" # or the asset you downloaded
+   grep "  $FILE$" SHA256SUMS.txt | shasum -a 256 -c -
+   ```
+
+4. Open the DMG and drag **OpenOffer** to **Applications**.
+5. If macOS blocks the preview build, remove the quarantine flag after checksum verification:
+
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/OpenOffer.app
+   open /Applications/OpenOffer.app
+   ```
+
+Use this workaround only for artifacts downloaded from the OpenOffer GitHub Release.
 
 ### Useful Development Commands
 
@@ -121,7 +147,15 @@ npm run app:build
 
 This runs the frontend build, Electron build, native audio build, Sharp checks, and Electron Builder.
 
-Signed macOS release builds need Apple Developer ID credentials and GitHub release secrets. See [OpenOffer release process](docs/RELEASE.md).
+Platform-specific packaging should run on the matching OS because OpenOffer ships native `.node` modules:
+
+```bash
+npm run app:build:mac        # macOS runner, dmg + zip
+npm run app:build:win        # Windows runner, NSIS + portable
+npm run app:build:linux      # Ubuntu/Linux runner, AppImage + deb
+```
+
+Signed macOS release builds still need Apple Developer ID credentials and GitHub release secrets. Until then, the release workflow publishes unsigned macOS preview artifacts as prereleases. See [OpenOffer release process](docs/RELEASE.md).
 
 ## Local and BYOK Providers
 
@@ -159,8 +193,8 @@ OpenOffer is a source-first public beta:
 
 - Free and open-source under AGPL-3.0.
 - No OpenOffer-hosted account, license server, trial, subscription gate, or metered hosted quota.
-- macOS and Windows are the primary desktop targets.
-- GitHub Release automation for signed macOS artifacts is wired, but the first official binary release still depends on configured Apple signing/notarization secrets and a release run.
+- macOS preview binaries are published from GitHub Releases as unsigned/ad-hoc signed prereleases until Apple signing/notarization secrets are configured.
+- macOS and Windows are the primary desktop targets; Linux packaging is configured but not the main tested path yet.
 - Historical Natively-era documents are kept under `docs/engineering/` and `.github/releases/` for provenance only.
 
 ## Roadmap
@@ -171,7 +205,7 @@ The near-term roadmap is community-launch focused:
 - Improve first-run local provider setup.
 - Harden Russian local STT diagnostics.
 - Expand focused E2E and contract tests around Interview Command Center.
-- Publish signed macOS release artifacts once release secrets are configured.
+- Replace unsigned macOS preview releases with signed and notarized artifacts once Apple Developer ID secrets are configured.
 - Add more good-first-issue lanes for docs, localization, provider setup, release QA, and privacy hardening.
 
 See [ROADMAP.md](ROADMAP.md) for details.
