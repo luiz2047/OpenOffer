@@ -353,8 +353,9 @@ jobs:
           }
 
           foreach ($file in $files) {
-            Copy-Item -LiteralPath $file.FullName -Destination release-artifacts-windows
-            Write-Host "Prepared Windows asset: $($file.Name)"
+            $assetName = $file.Name -replace '\s+', '-'
+            Copy-Item -LiteralPath $file.FullName -Destination (Join-Path release-artifacts-windows $assetName)
+            Write-Host "Prepared Windows asset: $assetName"
           }
 
       - name: Upload Windows artifacts
