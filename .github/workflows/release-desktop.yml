@@ -402,7 +402,7 @@ jobs:
           cat SHA256SUMS.txt
 
       - name: Publish GitHub Release assets
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           body_path: release-body/RELEASE_BODY.md
           fail_on_unmatched_files: true
