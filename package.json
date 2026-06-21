@@ -255,7 +255,7 @@
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.0",
-    "cross-env": "^7.0.3",
+    "cross-env": "^10.1.0",
     "dotenv": "^17.3.1",
     "electron": "^33.2.0",
     "electron-builder": "^26.8.1",
