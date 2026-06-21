@@ -1,0 +1,63 @@
+name: Community Quality
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check public docs
+        run: npm run public-docs:check
+
+      - name: Check interface translations
+        run: |
+          npm run i18n:check
+          npm run test:i18n
+
+      - name: Typecheck and build
+        run: |
+          npx tsc --noEmit
+          npm run typecheck:electron
+          npm run build
+          npm run build:electron
+
+      - name: Run curated contract tests
+        run: |
+          node --test \
+            electron/services/__tests__/CredentialStorage.test.mjs \
+            electron/services/__tests__/InterviewCommandCenterHardening.test.mjs \
+            electron/services/__tests__/InterviewIpcWiring.test.mjs \
+            electron/services/__tests__/OpenOfferCommercialRemoval.test.mjs \
+            electron/llm/__tests__/ContextLeakGuards.test.mjs \
+            electron/llm/__tests__/ProviderRouter.test.mjs
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium
+
+      - name: Run recruiter-chat browser smoke
+        env:
+          OPENOFFER_E2E_CI_SMOKE: '1'
+          ELECTRON_APP_PORT: '5173'
+        run: npx playwright test tests/e2e/interview-command-center.spec.ts --project=electron-chrome

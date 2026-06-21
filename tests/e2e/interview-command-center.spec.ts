@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 
 const CI = process.env.CI === 'true';
+const ALLOW_CI_SMOKE = process.env.OPENOFFER_E2E_CI_SMOKE === '1';
 const APP_PORT = parseInt(process.env.ELECTRON_APP_PORT ?? '5173', 10);
 
 async function gotoApp(page: Page) {
@@ -11,7 +12,7 @@ async function gotoApp(page: Page) {
 
 test.describe('Interview Command Center', () => {
   test.beforeEach(async ({ page }) => {
-    if (CI) {
+    if (CI && !ALLOW_CI_SMOKE) {
       test.skip();
       return;
     }

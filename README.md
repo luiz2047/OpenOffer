@@ -4,100 +4,49 @@
 
 # OpenOffer
 
-Local-first, free, open-source assistant for interviews, career work, meetings, and work notes.
+Local-first, open-source workspace for recruiter chats, job-search processes, interviews, and meeting notes.
 
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=flat-square)](LICENSE)
+[![Community Quality](https://github.com/luiz2047/OpenOffer/actions/workflows/community-quality.yml/badge.svg)](https://github.com/luiz2047/OpenOffer/actions/workflows/community-quality.yml)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-blueviolet?style=flat-square)](#system-requirements)
-[![Status](https://img.shields.io/badge/Status-public%20source-success?style=flat-square)](#project-status)
+[![Version](https://img.shields.io/badge/Version-1.4.0-success?style=flat-square)](#project-status)
 
 </div>
 
-OpenOffer is a desktop AI assistant you can run from source, inspect, and adapt. It is built for sensitive live workflows: technical interviews, job-search preparation, professional calls, lectures, and follow-up notes.
+OpenOffer helps you turn messy career context into a local process you control. Paste a recruiter chat, vacancy text, calendar note, or interview transcript, and keep the resulting vacancy dossier, stage timeline, prep brief, questions, retro, and recordings together on your machine.
 
-You choose which model and speech providers to connect. Local providers are the preferred privacy path; bring-your-own-key cloud providers are optional compatibility.
+The project is built for sensitive workflows: technical interviews, job-search preparation, recruiter conversations, professional calls, lectures, and follow-up notes. Local providers are the preferred privacy path; bring-your-own-key cloud providers are optional.
 
-## Table of Contents
+## First Demo
 
-- [Why OpenOffer](#why-openoffer)
-- [What Works Today](#what-works-today)
-- [Privacy Model](#privacy-model)
-- [For Russian-Speaking Developers](#for-russian-speaking-developers)
-- [Quick Start](#quick-start)
-- [Local and BYOK Providers](#local-and-byok-providers)
-- [Development](#development)
-- [Project Status](#project-status)
-- [Responsible Use](#responsible-use)
-- [Roadmap](#roadmap)
-- [Attribution](#attribution)
-- [Contributing](#contributing)
-- [License](#license)
-- [FAQ](#faq)
+OpenOffer's current wedge is simple:
 
-## Why OpenOffer
+1. Paste a redacted recruiter message or vacancy text.
+2. Let OpenOffer propose the vacancy, stage, schedule, meeting link, prep context, and follow-up tasks.
+3. Keep transcripts, notes, questions, retros, and recordings attached to the right process locally.
 
-Interview transcripts, resumes, job descriptions, screenshots, meeting notes, and negotiation context are private. Most AI assistants make those workflows convenient by making a vendor the center of the system.
-
-OpenOffer takes the opposite starting point:
-
-- **Local-first by default:** sessions, notes, settings, reference files, and local history live on your device.
-- **Open source:** the public project is inspectable and licensed under AGPL-3.0.
-- **Provider choice:** use local models, self-hosted endpoints, or BYOK cloud APIs.
-- **Career-work focus:** technical interviews, live calls, meeting notes, follow-ups, and preparation contexts are first-class workflows.
-- **No paid OpenOffer gate:** no subscription tier or license check is required by the public build.
-
-OpenOffer v1.1 adds the first job-search operating-system slice: a local interview command center for tracking active processes, scheduled interviews, prep context, questions, retros, and linked meeting recordings.
+See the full walkthrough in [Recruiter Chat to Process](docs/demo/recruiter-chat-to-process.md).
 
 ## What Works Today
 
-OpenOffer is an Electron desktop app with live capture, model routing, local storage, and mode-based assistance.
+- Interview Command Center for active vacancies, interview stages, prep briefs, questions, retros, and linked recordings.
+- Recruiter/vacancy text parsing into either a new vacancy or a stage on an existing process.
+- Live microphone and system-audio capture for interviews and meetings.
+- Speech-to-text provider routing, including local and BYOK cloud options.
+- LLM provider routing for text, vision/screenshot, and meeting assistance.
+- Local SQLite-backed session history and retrieval.
+- English and Russian interface locales plus custom translation packs.
+- Electron desktop builds for macOS and Windows development paths.
 
-### Interview Command Center
+## Who It Is For
 
-- Open into an Interview OS workspace instead of a product landing page.
-- Track active vacancies as the center of the workspace, with inactive/rejected/archived processes kept out of the daily list.
-- Add interview stages to a vacancy from pasted HH/Getmatch/Telegram/calendar text, including scheduled times and meeting links.
-- Let the agent parse recruiter chat, compare it with active vacancies, and propose either a new vacancy or a stage on an existing one.
-- Keep vacancy dossier, prep brief, question bank, AI-first retro, manual retro notes, and linked recordings together.
-- Link recordings to the relevant interview stage so transcripts, retros, and follow-up context stay attached to the right call.
-- Sync with configured Google Calendar or macOS Calendar sources from the calendar rail without exposing setup controls on the main screen.
+OpenOffer is especially useful for developers who are actively interviewing and want an inspectable assistant instead of a hosted black box.
 
-### Live Interview and Meeting Assistance
-
-- Capture microphone and system audio during live sessions.
-- Stream speech-to-text into the desktop interface.
-- Keep rolling conversational context while the session is active.
-- Ask for concise suggestions, summaries, follow-up questions, or draft responses.
-
-### Technical Interview Support
-
-- Capture coding problems or technical prompts from the screen.
-- Use screen capture with vision-capable providers where configured.
-- Generate hints, explanations, code reasoning, and complexity notes.
-- Use technical-interview modes and reference files to keep answers grounded in the role and context.
-
-### Career and Work Modes
-
-- Use built-in modes for technical interviews, behavioral interviews, recruiting, sales, lectures, team meetings, and general work.
-- Add reference files such as resumes, job descriptions, notes, scorecards, syllabi, or project context.
-- Keep mode-specific notes and answer style separate across workflows.
-
-### Local History and Recall
-
-- Store meeting/session data locally.
-- Use local SQLite-backed history and retrieval where configured.
-- Search or revisit prior notes without relying on an OpenOffer cloud account.
-
-### Local and BYOK Model Routing
-
-- Run local models through Ollama or compatible local endpoints.
-- Connect cloud providers with your own keys when you choose to send data to them.
-- Use provider routing for text, vision/screenshot, and speech workflows.
+It is intentionally friendly to Russian-speaking job-search workflows: Telegram/HH/Getmatch-style recruiter text, mixed Russian/English interviews, local STT experiments, and BYOK provider setups are first-class contribution areas.
 
 ## Privacy Model
 
-OpenOffer's privacy model is simple: local first, explicit provider use when you opt in.
-
-### Stays on your device by default
+OpenOffer starts local-first:
 
 - Audio captures
 - Screen captures
@@ -108,106 +57,74 @@ OpenOffer's privacy model is simple: local first, explicit provider use when you
 - Local SQLite data
 - Local embeddings and retrieval state
 
-### Can leave your device only when configured
+Data leaves your device only when you configure a provider that needs it.
 
-Data can be sent to providers you configure, such as:
+Examples:
 
-- AI providers: OpenAI, Anthropic, Google Gemini, Groq, DeepSeek, Yandex AI Studio, Ollama-compatible endpoints, or OpenAI-compatible/self-hosted endpoints.
-- Speech providers: Local Whisper, GigaSTT, OpenAI Whisper, Deepgram, ElevenLabs, Google, Azure, IBM Watson, Soniox, or Groq Whisper.
-- Search providers such as Tavily when web research is enabled.
-- GitHub release infrastructure for update checks.
-
-Each provider has its own privacy policy and retention behavior. Review provider terms before sending sensitive material.
+| Provider type | Examples |
+| :------------ | :------- |
+| Local model | Ollama, LM Studio, LocalAI, vLLM, OpenAI-compatible local endpoints |
+| Cloud LLM | OpenAI, Anthropic, Google Gemini, Groq, DeepSeek, Yandex AI Studio, OpenAI-compatible endpoints |
+| Speech-to-text | Local Whisper, GigaSTT, OpenAI Whisper, Deepgram, ElevenLabs, Google, Azure, IBM Watson, Soniox, Groq Whisper |
+| Search | Tavily, when web research is enabled |
 
 Read more:
 
 - [Privacy Policy](PRIVACY.md)
 - [Security Policy](SECURITY.md)
+- [AGPL FAQ](docs/AGPL_FAQ.md)
 - [Notice and upstream attribution](NOTICE.md)
-
-## For Russian-Speaking Developers
-
-OpenOffer is especially useful if you want an inspectable interview assistant that can run with local or self-hosted speech infrastructure.
-
-Коротко: OpenOffer задуман как локальный open-source помощник для собеседований, подготовки, рабочих звонков и заметок. Главная идея v0.1 - не отправлять резюме, JD, экран, аудио и историю разговоров в неизвестный сервис по умолчанию. Вы сами выбираете: локальные модели и локальное STT, self-hosted endpoint или BYOK cloud provider.
-
-Recommended local path:
-
-1. Run OpenOffer from source.
-2. Configure a local speech provider such as Local Whisper or GigaSTT.
-3. Use Ollama or another local/OpenAI-compatible endpoint for private model responses.
-4. Add resume, job description, and interview notes as local reference files.
-
-The dedicated local-STT guide is being refreshed for the standalone OpenOffer repo. Until then, treat Local Whisper and GigaSTT as the current local speech-provider paths in the app.
-
-For the shipped interview workspace architecture, see [Interview Command Center](docs/engineering/interview-command-center.md).
-
-OpenOffer includes built-in English and Russian interface locales plus data-only
-custom translation packs from the app-data translations folder. Interface
-language is independent of transcription language and AI response language. See
-[Interface Translations](docs/translations.md) for pack rules and the current
-localization boundary.
 
 ## Quick Start
 
 ### System Requirements
 
-- Node.js 22 LTS recommended. Node 20 may work, but Node 22 is the preferred baseline for current local development.
+- Node.js 22 LTS recommended.
 - npm.
 - Git.
 - Rust toolchain for the native audio module.
 - macOS or Windows for the primary desktop path.
 
-Linux packaging exists in the build configuration, but Linux support is not the main tested path yet. Contributions are welcome.
+Linux packaging exists in the build configuration, but Linux is not the main tested path yet.
 
-### Clone and Install
+### Run From Source
 
 ```bash
 git clone https://github.com/luiz2047/OpenOffer.git
 cd OpenOffer
 npm install
+npm run app:dev
 ```
 
 The install step rebuilds native packages, downloads bundled local models where needed, prepares `sqlite-vec`, and patches Electron metadata.
 
-### Run in Development
+### Useful Development Commands
 
 ```bash
-npm run app:dev
+npm run app:dev              # Vite + Electron
+npm run app:dev:fast         # reuse the last Electron build
+npm run build                # renderer typecheck + Vite build
+npm run build:electron       # Electron main/preload build
+npm run typecheck:electron
+npm run i18n:check
+npm run test:i18n
+npm run test
+npm run public-docs:check
 ```
 
-This starts Vite on port 5180 and launches Electron after the dev server is ready.
-Use `npm run app:dev:fast` when you only changed renderer code and want to reuse the last Electron build. If you changed `electron/` or `preload`, run `npm run build:electron` first or use `npm run app:dev`.
-
-### Build the App
+### Build the Desktop App
 
 ```bash
 npm run app:build
 ```
 
-This runs the frontend build, Electron typecheck/build, native audio build, Sharp dependency checks, and Electron Builder.
+This runs the frontend build, Electron build, native audio build, Sharp checks, and Electron Builder.
 
-### Useful Checks
-
-```bash
-npm run typecheck:electron
-npx tsc --noEmit
-npm run build
-npm run build:electron
-npm run test
-```
-
-For a focused Electron smoke, run:
-
-```bash
-npm run test:e2e:openoffer
-```
+Signed macOS release builds need Apple Developer ID credentials and GitHub release secrets. See [OpenOffer release process](docs/RELEASE.md).
 
 ## Local and BYOK Providers
 
-You only need one speech provider and one model provider to get started.
-
-### Recommended Local Stack
+You only need one speech provider and one model provider to start.
 
 | Need | Recommended path |
 | :--- | :--------------- |
@@ -217,40 +134,11 @@ You only need one speech provider and one model provider to get started.
 | Local history and recall | SQLite + local retrieval |
 | Private screen analysis | Local vision-capable model where available |
 
-### Optional BYOK Cloud Providers
-
-| Provider type | Examples |
-| :------------ | :------- |
-| LLMs | OpenAI, Anthropic, Google Gemini, Groq, DeepSeek, Yandex AI Studio, OpenAI-compatible endpoints |
-| Speech-to-text | OpenAI Whisper, Deepgram, ElevenLabs, Google, Azure, IBM Watson, Soniox |
-| Search | Tavily |
-| Local models | Ollama, LocalAI, LM Studio, vLLM, other OpenAI-compatible endpoints |
-
-Cloud providers are compatibility options, not the core requirement. The public OpenOffer build does not meter, proxy, resell, or bill for provider usage.
-
 Yandex AI Studio needs both an API key and folder ID. See [Yandex AI Studio setup](docs/YANDEX_AI_STUDIO_SETUP.md).
 
-For contributor-side Russian prompt reliability checks, see [Yandex Russian prompt eval](docs/testing/YANDEX_RUSSIAN_PROMPT_EVAL.md).
+For local speech setup, see [Local STT setup](docs/LOCAL_STT_OPENOFFER_SETUP.md).
 
-## Development
-
-### Common Commands
-
-```bash
-npm run app:dev          # run Vite + Electron in development
-npm run app:dev:fast     # run without rebuilding Electron; requires an existing dist-electron build
-npm run build            # clean, typecheck frontend, and build Vite output
-npm run build:electron   # build Electron main/preload code
-npm run typecheck:electron
-npm run build:native     # build native audio module
-npm run i18n:check       # verify translated interface keys and hardcoded-copy guardrails
-npm run test:i18n        # run focused interface localization tests
-npm run test:answer-style-yandex
-npm run test             # node/electron test gate through repo script
-npm run app:build        # production package build
-```
-
-### Project Layout
+## Project Layout
 
 | Path | Purpose |
 | :--- | :------ |
@@ -262,83 +150,59 @@ npm run app:build        # production package build
 | `tests/` | E2E and fixture-based tests |
 | `assets/` | App icons and package resources |
 
-### Current Docs
-
-- [Documentation index](docs/README.md)
-- [Browser companion README](openoffer-browser/README.md)
-- [Release notes guide](docs/RELEASE.md)
-
 ## Project Status
 
-OpenOffer is public source at version `1.2.0`.
+Current public version: `1.4.0`.
 
-Current baseline:
+OpenOffer is a source-first public beta:
 
-- Free and open-source public build.
-- No OpenOffer-hosted account, license server, trial, or subscription gate.
-- Local-first data model.
-- Local and BYOK provider support.
+- Free and open-source under AGPL-3.0.
+- No OpenOffer-hosted account, license server, trial, subscription gate, or metered hosted quota.
 - macOS and Windows are the primary desktop targets.
-- Old Natively-era engineering documents are preserved under `docs/engineering/` for provenance, not as current product guidance.
-
-OpenOffer-native screenshots and release artifacts should be refreshed from the standalone project. Old Natively-branded demos are intentionally not used as current product proof.
-
-## Responsible Use
-
-OpenOffer is intended for:
-
-- Learning and interview preparation.
-- Accessibility and note-taking.
-- Professional meeting support.
-- Personal productivity.
-- Local experimentation with AI-assisted career workflows.
-
-Users are responsible for complying with workplace policies, academic rules, interview guidelines, and local laws. OpenOffer is not positioned as a bypass tool for proctoring, recording, or policy enforcement systems.
+- GitHub Release automation for signed macOS artifacts is wired, but the first official binary release still depends on configured Apple signing/notarization secrets and a release run.
+- Historical Natively-era documents are kept under `docs/engineering/` and `.github/releases/` for provenance only.
 
 ## Roadmap
 
-OpenOffer's long-term direction is an open-source job-search operating system. The current v0.1 wedge is the local-first interview and work assistant.
+The near-term roadmap is community-launch focused:
 
-Near-term:
-
-- Refresh OpenOffer-native screenshots and demo material.
+- Make the recruiter-chat-to-process demo impossible to miss.
 - Improve first-run local provider setup.
-- Harden Russian local STT setup and diagnostics.
-- Keep removing stale Natively-era public surfaces.
-- Improve OpenOffer-focused E2E coverage.
+- Harden Russian local STT diagnostics.
+- Expand focused E2E and contract tests around Interview Command Center.
+- Publish signed macOS release artifacts once release secrets are configured.
+- Add more good-first-issue lanes for docs, localization, provider setup, release QA, and privacy hardening.
 
-Next product slices:
-
-- Better resume/JD preparation flows.
-- Stage-level transcript, retro, and follow-up workflows.
-- Follow-up drafting and offer/negotiation workflows.
-- Job-search monitoring and application pipeline tools.
-- Cleaner release packaging and update metadata for the standalone repository.
-
-## Attribution
-
-OpenOffer is a forked and rebranded continuation of earlier Natively-era work. Historical references remain in the repository for attribution, provenance, and license continuity only. They do not indicate an active Natively product tier, hosted OpenOffer service, subscription, trial, or paid gate in this public build.
-
-See [NOTICE.md](NOTICE.md) for the current attribution statement.
+See [ROADMAP.md](ROADMAP.md) for details.
 
 ## Contributing
 
-Contributions are welcome, especially in:
+The best first contributions are small and concrete:
 
-- Local speech providers and Russian transcription support.
-- Local model setup.
-- Privacy and security hardening.
-- Electron reliability.
-- Documentation and onboarding.
-- OpenOffer-native screenshots, release QA, and E2E coverage.
+- Try the recruiter-chat demo and report where the process feels unclear.
+- Add redacted workflow examples for HH, Getmatch, Telegram, or calendar text.
+- Improve Russian copy, i18n coverage, or local STT setup docs.
+- Tighten provider setup diagnostics.
+- Add focused smoke tests for existing workflows.
+- Improve release QA and screenshots.
 
-Start with [CONTRIBUTING.md](CONTRIBUTING.md). For security reports, use [SECURITY.md](SECURITY.md).
+Start with [CONTRIBUTING.md](CONTRIBUTING.md). Maintainer expectations are in [MAINTAINERS.md](MAINTAINERS.md).
+
+## Responsible Use
+
+OpenOffer is intended for learning, interview preparation, accessibility, note-taking, professional meeting support, and local experimentation with AI-assisted career workflows.
+
+Users are responsible for following workplace policies, academic rules, interview guidelines, recording-consent rules, and local laws. OpenOffer is not positioned as a bypass tool for proctoring, recording, or policy enforcement systems.
+
+## Attribution
+
+OpenOffer is a forked and rebranded continuation of earlier Natively-era work. Historical references remain for attribution, provenance, and license continuity only. They do not indicate an active Natively product tier, hosted OpenOffer service, subscription, trial, or paid gate in this public build.
+
+See [NOTICE.md](NOTICE.md) for the current attribution statement.
 
 ## License
 
-OpenOffer is licensed under the GNU Affero General Public License v3.0.
-
-See [LICENSE](LICENSE) for the full license text.
+OpenOffer is licensed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE) and [AGPL FAQ](docs/AGPL_FAQ.md).
 
 ## FAQ
 
@@ -354,22 +218,10 @@ No. The public build does not create an OpenOffer account, validate licenses, me
 
 That is the preferred privacy path. Use a local speech provider and a local model provider such as Ollama or a self-hosted OpenAI-compatible endpoint. Some workflows, especially vision or high-quality model responses, depend on the local models you have available.
 
-### Does OpenOffer work with Zoom, Teams, Google Meet, and other apps?
-
-OpenOffer captures desktop audio and microphone input through the local desktop app. The exact behavior depends on OS permissions, audio device routing, and the providers you configure.
-
 ### Can I use it for technical interviews?
 
 OpenOffer includes technical-interview and screen-context workflows. You are responsible for following the rules of the interview, assessment platform, employer, school, or event.
 
-### Is OpenOffer a Cluely clone?
-
-No. OpenOffer overlaps with the broad category of live AI assistants, but the project goal is different: local-first, open-source, inspectable career and work assistance with no OpenOffer paid gate.
-
-### Where are the old Natively docs?
-
-Archived engineering notes are under `docs/engineering/`. Treat them as historical background, not current OpenOffer product guidance.
-
 ### Where should I ask questions?
 
-Use GitHub issues or discussions in the OpenOffer repository.
+Use GitHub Discussions for questions and GitHub Issues for reproducible bugs or scoped feature requests.

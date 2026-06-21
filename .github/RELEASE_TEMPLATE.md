@@ -1,43 +1,45 @@
 ## Summary
 
-Short one-line description of the release.
+One short paragraph explaining who should upgrade and why.
 
-## What's New
+## Highlights
 
-- Feature one description
-- Feature two description
-- Feature three description
-
-## Improvements
-
-- Performance improvement
-- UX refinement
-- Internal optimization
+- Recruiter/job-search workflow:
+- Interview or meeting workflow:
+- Local/provider/privacy improvement:
+- Contributor or documentation improvement:
 
 ## Fixes
 
-- Fixed issue with stealth activation
-- Resolved crash on startup
-- Corrected UI alignment issue
+- TBD
 
-## Technical
+## Verification
 
-- Dependency updates
-- Refactored updater logic
+- Source checks:
+- macOS artifact verification:
+- Known gaps:
 
-## macOS Installation (Signed Build)
+## Installation
 
-Download the correct architecture `.dmg` or `.zip` file for your device (Apple Silicon or Intel).
+### From source
 
-- **For Apple Silicon (M1/M2/M3/M4):** Download the `arm64` build.
-- **For Intel Macs:** Download the `x64` build.
+```bash
+git clone https://github.com/luiz2047/OpenOffer.git
+cd OpenOffer
+git checkout vX.Y.Z
+npm install
+npm run app:dev
+```
 
-Open the downloaded file, drag **OpenOffer** to your **Applications** folder, and launch it.
+### macOS signed build
 
-## ⚠️Windows Installation (Unsigned Build)
+Download the correct `.dmg` or `.zip` for your device:
 
-When running the installer on Windows, you might see a "Windows protected your PC" warning from Microsoft Defender SmartScreen saying it prevented an unrecognized app from starting. 
+- Apple Silicon: `arm64`
+- Intel: `x64`
 
-Since this is an unsigned build, this is expected. You can safely ignore it by clicking **More info** and then **Run anyway**.
+Open the DMG, drag **OpenOffer** to **Applications**, and launch it.
 
-\\ refer to change.md for detailed changes
+## Checksums
+
+Add checksums for uploaded assets before publishing a release.

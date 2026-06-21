@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 💬 Need Support or Have a Question?
+  - name: Questions and workflow discussion
     url: https://github.com/luiz2047/openoffer/discussions
-    about: Please ask and answer questions here rather than creating an issue.
+    about: Ask usage questions, share workflow examples, and discuss ideas before opening an issue.
