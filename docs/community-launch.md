@@ -66,6 +66,12 @@ Recommended topics:
 8. [`i18n: review Russian copy in Interview Command Center`](https://github.com/luiz2047/OpenOffer/issues/15)
    Labels: `good first issue`, `area: i18n`, `ru`
 
+9. [`Docs: add screenshot capture checklist for launch assets`](https://github.com/luiz2047/OpenOffer/issues/17)
+   Labels: `good first issue`, `area: docs`, `area: onboarding`
+
+10. [`Testing: extend recruiter-chat CI smoke with screenshot evidence`](https://github.com/luiz2047/OpenOffer/issues/18)
+    Labels: `help wanted`, `area: interview-workspace`
+
 ## Launch Drafts
 
 ### GitHub Discussion

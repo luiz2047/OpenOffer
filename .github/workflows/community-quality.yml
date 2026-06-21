@@ -52,3 +52,12 @@ jobs:
             electron/services/__tests__/OpenOfferCommercialRemoval.test.mjs \
             electron/llm/__tests__/ContextLeakGuards.test.mjs \
             electron/llm/__tests__/ProviderRouter.test.mjs
+
+      - name: Install Playwright browser
+        run: npx playwright install chromium
+
+      - name: Run recruiter-chat browser smoke
+        env:
+          OPENOFFER_E2E_CI_SMOKE: '1'
+          ELECTRON_APP_PORT: '5173'
+        run: npx playwright test tests/e2e/interview-command-center.spec.ts --project=electron-chrome
