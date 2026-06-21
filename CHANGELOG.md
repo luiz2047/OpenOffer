@@ -4,6 +4,29 @@
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-06-21
+
+### Added
+
+- **Combined desktop release gate**: GitHub Releases now build macOS and Windows artifacts in one tag workflow, then publish a single release only after both native runners pass.
+- **Windows preview artifacts**: Release builds now include unsigned x64 Windows setup and portable `.exe` artifacts alongside macOS DMG/ZIP assets.
+- **Public dashboard screenshot**: The README now shows the Interview Command Center dashboard immediately near the top of the page, before the longer product explanation.
+- **Demo screenshot set**: Added a public demo image set for the command center, recruiter intake, stage timeline, vacancy dossier, settings, modes, profile intelligence, and live assistant overlay.
+
+### Changed
+
+- **Release notes format**: Release copy now follows a user-facing structure with highlights, artifact/install guidance, verification, checksums, and known constraints.
+- **Release docs**: README and release docs now describe the current macOS plus Windows preview release path and make unsigned-artifact warnings explicit.
+- **Settings and screenshot surfaces**: Polished public screenshot surfaces across settings, provider configuration, profile intelligence, help, and command center UI states.
+
+### Fixed
+
+- **Intake smoke expectation**: Updated the Playwright intake classification smoke expectation to match the current recruiter-chat extraction behavior.
+
+### Tests
+
+- Verified the combined desktop release workflow with a manual GitHub Actions dispatch on `main`; macOS and Windows artifacts uploaded successfully while the publish job correctly skipped outside a tag run.
+
 ## [1.4.0] - 2026-06-19
 
 ### Added
