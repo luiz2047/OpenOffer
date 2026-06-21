@@ -39,8 +39,8 @@ OpenOffer should propose:
    ```
 
 2. Open the Interview Command Center.
-3. Paste the sample input into the recruiter/vacancy intake flow.
-4. Confirm whether OpenOffer should create a new vacancy or attach a stage to an existing vacancy.
+3. Open the top search assistant with `Cmd+K` on macOS or `Ctrl+K` on Windows/Linux, then paste the sample input.
+4. Review the editable proposal and explicitly choose whether OpenOffer should create a new vacancy or attach a stage to an existing vacancy.
 5. Review the generated prep brief and question bank.
 6. After a test call or mock transcript, link the recording/transcript to the stage and write a retro.
 

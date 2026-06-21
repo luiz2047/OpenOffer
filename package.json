@@ -1,6 +1,6 @@
 {
   "name": "openoffer",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "private": true,
   "main": "dist-electron/electron/main.js",
   "description": "Local-first open-source workspace for job-search processes, interviews, recruiter chats, and meeting notes.",

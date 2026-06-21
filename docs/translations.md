@@ -15,7 +15,7 @@ Interface language is separate from:
 The current localized shell covers:
 
 - Settings navigation and core General language controls;
-- Launcher shell, onboarding popovers, and calendar refresh feedback;
+- Launcher shell, top search assistant, onboarding popovers, and calendar refresh feedback;
 - Interview Command Center shell for the first-screen calendar/interview workflow;
 - live overlay warnings, quick actions, screenshot attachment copy, and input placeholder;
 - first-run permissions onboarding shell.
@@ -67,7 +67,7 @@ translations/
 
 ## Key Rules
 
-- Use dot-separated keys grouped by product surface: `common`, `settings`, `launcher`, `interviews`, `overlay`, `onboarding`, `search`.
+- Use dot-separated keys grouped by product surface: `common`, `settings`, `launcher`, `interviews`, `topSearch`, `overlay`, `onboarding`, `search`.
 - Keep values plain text. Do not add HTML.
 - Keep interpolation placeholders identical across languages, for example `{{count}}` or `{{version}}`.
 - Use i18next plural suffixes for count strings: `_one`, `_few`, `_many`, `_other` as needed.

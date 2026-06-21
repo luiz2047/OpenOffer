@@ -335,6 +335,34 @@ test.describe('Interview Command Center', () => {
         applicationIntakeParse: async (input: any) => {
           const text = typeof input === 'string' ? input : input?.text ?? '';
           const candidateId = Array.isArray(input?.candidateApplicationIds) ? input.candidateApplicationIds[0] : null;
+          if (/Ambiguous stage update/i.test(text)) {
+            return result({
+              classification: 'stage_update_for_existing_vacancy',
+              confidence: 0.81,
+              application: {
+                title: 'Acme Backend interview',
+                company: 'Acme Edited',
+                roleTitle: 'Backend Developer',
+                description: 'The parser found a stage update but did not confidently identify the target vacancy.',
+                source: 'Email',
+                rawSourceText: text,
+                requirements: [],
+                risks: [],
+                questionsToAsk: [],
+              },
+              stage: {
+                title: 'Ambiguous recruiter sync',
+                stageType: 'recruiter_screen',
+                startsAt: 1_804_000_000_000,
+                endsAt: 1_804_003_600_000,
+                timezone: 'Europe/Moscow',
+                meetingUrl: 'https://meet.example/ambiguous',
+                status: 'scheduled',
+              },
+              warnings: [],
+              missingFields: [],
+            });
+          }
           if (/Synthetic (second )?stage update/i.test(text) && candidateId) {
             const second = /second/i.test(text);
             return result({
@@ -593,6 +621,7 @@ test.describe('Interview Command Center', () => {
   });
 
   test('manual process flow covers vacancy edit, stage edit, recording, archive, and pane resize', async ({ page }) => {
+    test.setTimeout(60_000);
     await gotoApp(page);
 
     const commandCenter = page.getByTestId('interview-command-center');
@@ -603,18 +632,19 @@ test.describe('Interview Command Center', () => {
     await expect(commandCenter.getByText('No events for this day.')).toBeVisible();
     await commandCenter.getByRole('button', { name: 'Previous week' }).click();
     await expect(commandCenter.getByText('No events for this day.')).toBeVisible();
-    await page.getByRole('button', { name: /^Agent$/ }).click();
-    const agentInput = page.locator('textarea[maxlength="50000"]');
-    await expect(agentInput).toBeVisible();
-    await expect(page.getByText('0/50000')).toBeVisible();
-    await agentInput.fill('Synthetic recruiter note for Acme Backend Developer.');
-    await page.getByRole('button', { name: 'Parse' }).click();
-    await expect(page.getByText('Reading pasted text')).toBeVisible();
-    await expect(page.getByText('Checking current vacancies')).toBeVisible();
-    await expect(page.getByText('Extracting company, role, and summary')).toBeVisible();
-    await expect(page.getByText('Comparing with active vacancies')).toBeVisible();
-    await expect(page.getByText('Proposal ready')).toBeVisible();
-    await page.getByRole('button', { name: 'Close' }).click();
+    await expect(page.getByRole('button', { name: /^Agent$/ })).toHaveCount(0);
+    await expect(commandCenter.getByLabel('Search vacancies, stages, source')).toHaveCount(0);
+    await page.keyboard.press('Control+K');
+    const topSearchInput = page.getByTestId('top-search-input');
+    await expect(topSearchInput).toBeVisible();
+    await topSearchInput.fill('Synthetic recruiter note for Acme Backend Developer vacancy requirements salary company role.');
+    await page.getByTestId('top-search-row-action').filter({ hasText: 'Parse vacancy source' }).click();
+    await expect(page.getByTestId('top-search-proposal')).toContainText('Proposal ready');
+    await page.keyboard.press('Enter');
+    const accidentalPayload = await page.evaluate(() => (window as any).__openOfferTestState.lastCreateFromIntakePayload);
+    expect(accidentalPayload).toBeFalsy();
+    await page.keyboard.press('Control+K');
+    await expect(page.getByTestId('top-search-proposal')).toHaveCount(0);
 
     await page.getByRole('button', { name: /^New Vacancy$/ }).click();
     await page.getByLabel('Source text').fill(`HH vacancy for Backend Developer at Acme.
@@ -640,12 +670,11 @@ test.describe('Interview Command Center', () => {
     await applicationFields.getByRole('button', { name: 'Save' }).click();
     await expect.poll(async () => page.evaluate(() => (window as any).__openOfferTestState.applications[0].company)).toBe('Acme Edited');
 
-    await page.getByRole('button', { name: /^Agent$/ }).click();
-    const stageAgentInput = page.locator('textarea[maxlength="50000"]');
-    await stageAgentInput.fill('Synthetic stage update for existing saved vacancy.');
-    await page.getByRole('button', { name: 'Parse' }).click();
-    await expect(page.getByText(/Will add the stage to .Acme Backend interview./)).toBeVisible();
-    await page.getByRole('button', { name: 'Add stage' }).click();
+    await page.keyboard.press('Control+K');
+    await page.getByTestId('top-search-input').fill('Synthetic stage update for existing saved vacancy.');
+    await page.getByTestId('top-search-row-action').filter({ hasText: 'Add stage from text' }).click();
+    await expect(page.getByTestId('top-search-proposal')).toContainText('Proposal ready');
+    await page.getByTestId('top-search-apply-proposal').click();
     await page.getByRole('button', { name: 'Stages', exact: true }).click();
     await expect(page.getByText('Tech screening')).toBeVisible();
     await expect(page.getByText('1 active process')).toBeVisible();
@@ -670,12 +699,11 @@ test.describe('Interview Command Center', () => {
     expect(startPayload.applicationId).toBe('app_1');
     expect(startPayload.interviewStageId).toBe('stage_2');
 
-    await page.getByRole('button', { name: /^Agent$/ }).click();
-    const secondStageAgentInput = page.locator('textarea[maxlength="50000"]');
-    await secondStageAgentInput.fill('Synthetic second stage update for existing saved vacancy.');
-    await page.getByRole('button', { name: 'Parse' }).click();
-    await expect(page.getByText(/Will add the stage to .Acme Backend interview./)).toBeVisible();
-    await page.getByRole('button', { name: 'Add stage' }).nth(1).click();
+    await page.keyboard.press('Control+K');
+    await page.getByTestId('top-search-input').fill('Synthetic second stage update for existing saved vacancy.');
+    await page.getByTestId('top-search-row-action').filter({ hasText: 'Add stage from text' }).click();
+    await expect(page.getByTestId('top-search-proposal')).toContainText('Proposal ready');
+    await page.getByTestId('top-search-apply-proposal').click();
     await expect(page.getByText('2 stages', { exact: true }).first()).toBeVisible();
     const secondAgentPayload = await page.evaluate(() => (window as any).__openOfferTestState.lastCreateFromIntakePayload);
     expect(secondAgentPayload.selectedApplicationId).toBe('app_1');
@@ -702,5 +730,41 @@ test.describe('Interview Command Center', () => {
     await expect(page.getByTestId('interview-stage-card').filter({ hasText: 'Final interview' }).getByRole('button', { name: 'Start recording' })).toHaveCount(0);
     await page.getByTestId('interview-stage-card').filter({ hasText: 'Final interview' }).getByTitle('Restore stage').click();
     await expect(page.getByTestId('interview-stage-card').filter({ hasText: 'Final interview' }).getByRole('button', { name: 'Start recording' })).toBeVisible();
+
+    await page.evaluate(() => {
+      const state = (window as any).__openOfferTestState;
+      const original = state.applications[0];
+      const originalInterview = state.interviews.find((row: any) => row.applicationId === original.id);
+      state.applications.push({
+        ...original,
+        id: 'app_ambiguous',
+        legacyInterviewEventId: 'interview_ambiguous',
+        selectedStageId: null,
+        stages: [],
+        linkedMeetings: [],
+      });
+      state.interviews.push({
+        ...originalInterview,
+        id: 'interview_ambiguous',
+        applicationId: 'app_ambiguous',
+        selectedStageId: null,
+        stage: 'Recruiter screen',
+        stageType: 'recruiter_screen',
+        startsAt: null,
+        endsAt: null,
+      });
+    });
+    await commandCenter.getByTitle('Refresh').click();
+    await page.keyboard.press('Control+K');
+    await page.getByTestId('top-search-input').fill('Ambiguous stage update for Acme Backend Developer interview schedule.');
+    await page.getByTestId('top-search-row-action').filter({ hasText: 'Add stage from text' }).click();
+    const ambiguousProposal = page.getByTestId('top-search-proposal');
+    await expect(ambiguousProposal).toContainText('Several vacancies look similar');
+    const ambiguousApply = page.getByTestId('top-search-apply-proposal');
+    await expect(ambiguousApply).toBeDisabled();
+    await ambiguousProposal.getByLabel('Attach to vacancy').selectOption('app_1');
+    await expect(ambiguousApply).toBeEnabled();
+    await page.keyboard.press('Enter');
+    await expect(page.getByText('Ambiguous recruiter sync')).toHaveCount(0);
   });
 });

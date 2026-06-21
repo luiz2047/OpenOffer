@@ -9,7 +9,7 @@ Local-first, open-source workspace for recruiter chats, job-search processes, in
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=flat-square)](LICENSE)
 [![Community Quality](https://github.com/luiz2047/OpenOffer/actions/workflows/community-quality.yml/badge.svg)](https://github.com/luiz2047/OpenOffer/actions/workflows/community-quality.yml)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-blueviolet?style=flat-square)](#system-requirements)
-[![Version](https://img.shields.io/badge/Version-1.4.1-success?style=flat-square)](#project-status)
+[![Version](https://img.shields.io/badge/Version-1.5.0-success?style=flat-square)](#project-status)
 
 <img src="assets/demo/openoffer-01-command-center.png" alt="OpenOffer dashboard showing vacancies, interview stages, prep, and linked workflow context" width="960" />
 
@@ -35,6 +35,7 @@ Demo media and capture rules live under [`assets/demo/`](assets/demo/README.md).
 ## What Works Today
 
 - Interview Command Center for active vacancies, interview stages, prep briefs, questions, retros, and linked recordings.
+- Top search AI assistant for vacancy/stage lookup, meeting search, and reviewed recruiter/vacancy intake proposals.
 - Recruiter/vacancy text parsing into either a new vacancy or a stage on an existing process.
 - Live microphone and system-audio capture for interviews and meetings.
 - Speech-to-text provider routing, including local and BYOK cloud options.
@@ -116,7 +117,7 @@ Until Apple Developer ID signing and Windows Authenticode signing are configured
 3. Download `SHA256SUMS.txt` and verify the file before opening it:
 
    ```bash
-   FILE="OpenOffer-1.4.1-arm64.dmg" # or the asset you downloaded
+   FILE="OpenOffer-1.5.0-arm64.dmg" # or the asset you downloaded
    grep "  $FILE$" SHA256SUMS.txt | shasum -a 256 -c -
    ```
 
@@ -201,7 +202,7 @@ For local speech setup, see [Local STT setup](docs/LOCAL_STT_OPENOFFER_SETUP.md)
 
 ## Project Status
 
-Current public version: `1.4.1`.
+Current public version: `1.5.0`.
 
 OpenOffer is a source-first public beta:
 

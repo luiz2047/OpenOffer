@@ -1,6 +1,6 @@
 # Interview Command Center
 
-OpenOffer opens into a local-first job-search workspace. The current shape is vacancy-centered: the left rail is the calendar/day agenda, the center column is active vacancies, the bottom widget is the agent, and the right pane shows the selected vacancy with its stages, prep, retro, and questions.
+OpenOffer opens into a local-first job-search workspace. The current shape is vacancy-centered: the top search pill is the AI assistant/search surface, the left rail is the calendar/day agenda, the center column is active vacancies, and the right pane shows the selected vacancy with its stages, prep, retro, and questions.
 
 ## Data Model
 
@@ -43,12 +43,12 @@ Calendar support uses the existing Google Calendar manager plus `MacCalendarMana
 - left calendar rail with week navigation and selected-day links to calendar events or scheduled interview stages;
 - compact synchronization control that opens calendar settings when no source is configured;
 - middle active-vacancy list built from `applications`, with legacy `interview_events` only as fallback;
-- bottom mini-agent chat that shows visible work steps, parses pasted recruiter/vacancy/calendar text, asks the service for candidate application matching, and applies one proposal button;
+- top search assistant bridge that searches vacancies, stages, and meetings, parses pasted recruiter/vacancy/calendar text, reviews editable proposals, and applies only from the explicit proposal button;
 - right detail pane with `Vacancy`, `Stages`, `Prep`, `Retro`, and `Questions` tabs;
 - stage cards that show schedule, status, meeting URL, and recordings scoped to that exact stage;
 - local draft recovery for vacancy, prep, and retro editors under `openoffer:interviews:draft:*`, cleared after successful save.
 
-The agent flow intentionally trusts the backend `existingApplicationMatch` when it names an active application id. The renderer only falls back to exact company/title/role/URL matching when no AI match is returned.
+The assistant flow only auto-attaches a stage proposal when the backend match is strong or the local vacancy match is unambiguous. Weak, stale, missing, or ambiguous matches require an explicit vacancy selection before applying.
 
 ## Verification
 
@@ -62,4 +62,4 @@ Targeted coverage:
 - `InterviewCalendarWriteContract.test.mjs`: Google/macOS outbound event creation and renderer/IPC contract.
 - `InterviewTaxonomy.test.mjs`: Obsidian workflow mapping.
 - `MacCalendarManagerContract.test.mjs`: local macOS calendar bridge contract.
-- `tests/e2e/interview-command-center.spec.ts`: visible agent steps, single-button proposal apply, active application center list, add-stage-to-existing-vacancy behavior, per-stage recording counts, calendar week navigation, compact raw-source rendering, prep/questions/retro flow.
+- `tests/e2e/interview-command-center.spec.ts`: top assistant proposal review, no accidental Enter apply, active application center list, add-stage-to-existing-vacancy behavior, old agent/search surface removal, per-stage recording counts, calendar week navigation, compact raw-source rendering, prep/questions/retro flow.
