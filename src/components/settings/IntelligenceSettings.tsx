@@ -1,34 +1,35 @@
 import { Brain, Check, Loader2, Wifi, WifiOff } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 // Label + one-line description + group for each Intelligence OS flag. Keyed by flag key;
 // an unknown key falls back to the raw key so a newly-added flag still renders.
-const FLAG_META: Record<string, { label: string; desc: string; group: string }> = {
+const FLAG_META: Record<string, { labelKey: string; descKey: string; groupKey: string }> = {
   // Memory
-  hindsightMemory: { label: 'Долгосрочная память', desc: 'Главный переключатель памяти между встречами (Hindsight). Требует настроенный сервер выше.', group: 'Память' },
-  hindsightPostMeetingRetain: { label: 'Запоминать встречи', desc: 'Сохраняет саммари каждой встречи после завершения для будущего recall.', group: 'Память' },
-  hindsightLiveRecall: { label: 'Вспоминать в ответах', desc: 'Для вопросов о прошлом ("что мы обсуждали в прошлый раз?") добавляет память прошлых встреч в ответ.', group: 'Память' },
-  durableMemoryWindow: { label: 'Устойчивая память сессии', desc: 'Сохраняет дальний follow-up контекст на всю сессию вместо короткого rolling window.', group: 'Память' },
-  conversationMemoryV2: { label: 'Follow-up в диалоге', desc: 'Разрешает короткие follow-up команды ("сделай короче") через предыдущие реплики этой сессии.', group: 'Память' },
+  hindsightMemory: { labelKey: 'intelligenceSettings.flags.hindsightMemory.label', descKey: 'intelligenceSettings.flags.hindsightMemory.desc', groupKey: 'memory' },
+  hindsightPostMeetingRetain: { labelKey: 'intelligenceSettings.flags.hindsightPostMeetingRetain.label', descKey: 'intelligenceSettings.flags.hindsightPostMeetingRetain.desc', groupKey: 'memory' },
+  hindsightLiveRecall: { labelKey: 'intelligenceSettings.flags.hindsightLiveRecall.label', descKey: 'intelligenceSettings.flags.hindsightLiveRecall.desc', groupKey: 'memory' },
+  durableMemoryWindow: { labelKey: 'intelligenceSettings.flags.durableMemoryWindow.label', descKey: 'intelligenceSettings.flags.durableMemoryWindow.desc', groupKey: 'memory' },
+  conversationMemoryV2: { labelKey: 'intelligenceSettings.flags.conversationMemoryV2.label', descKey: 'intelligenceSettings.flags.conversationMemoryV2.desc', groupKey: 'memory' },
   // Search
-  globalSearchV2: { label: 'Поиск по прошлым встречам', desc: 'Настоящий локальный поиск по сохраненным встречам с ранжированием, без повторного запуска AI.', group: 'Поиск' },
-  inMeetingSearchV2: { label: 'Поиск по текущей встрече', desc: 'Ищет фразу в live-транскрипте встречи с таймкодами.', group: 'Поиск' },
-  meetingMemoryV2: { label: 'Структурная память встречи', desc: 'Извлекает темы, решения и action items в каждую сохраненную встречу для более точного поиска.', group: 'Поиск' },
+  globalSearchV2: { labelKey: 'intelligenceSettings.flags.globalSearchV2.label', descKey: 'intelligenceSettings.flags.globalSearchV2.desc', groupKey: 'search' },
+  inMeetingSearchV2: { labelKey: 'intelligenceSettings.flags.inMeetingSearchV2.label', descKey: 'intelligenceSettings.flags.inMeetingSearchV2.desc', groupKey: 'search' },
+  meetingMemoryV2: { labelKey: 'intelligenceSettings.flags.meetingMemoryV2.label', descKey: 'intelligenceSettings.flags.meetingMemoryV2.desc', groupKey: 'search' },
   // Answer quality
-  profileTreeV2: { label: 'Более сильный голос кандидата', desc: 'Сохраняет первое лицо ("я сделал...") и не дает ассистенту раскрывать себя в профильных вопросах.', group: 'Качество ответов' },
-  answerDiversityGuard: { label: 'Полировка формы ответа', desc: 'Нормализует итоговую форму ответа и снижает повторяющиеся шаблонные формулировки.', group: 'Качество ответов' },
+  profileTreeV2: { labelKey: 'intelligenceSettings.flags.profileTreeV2.label', descKey: 'intelligenceSettings.flags.profileTreeV2.desc', groupKey: 'answerQuality' },
+  answerDiversityGuard: { labelKey: 'intelligenceSettings.flags.answerDiversityGuard.label', descKey: 'intelligenceSettings.flags.answerDiversityGuard.desc', groupKey: 'answerQuality' },
   // Lecture & diagrams
-  lectureIntelligenceV2: { label: 'Конспекты лекций', desc: 'Генерирует структурные заметки, карточки и экзаменационные вопросы в режиме лекции.', group: 'Лекции и диаграммы' },
-  diagramIntelligence: { label: 'Диаграммы', desc: 'Генерирует диаграммы (Mermaid) по вопросу в режиме лекции.', group: 'Лекции и диаграммы' },
+  lectureIntelligenceV2: { labelKey: 'intelligenceSettings.flags.lectureIntelligenceV2.label', descKey: 'intelligenceSettings.flags.lectureIntelligenceV2.desc', groupKey: 'lectureDiagrams' },
+  diagramIntelligence: { labelKey: 'intelligenceSettings.flags.diagramIntelligence.label', descKey: 'intelligenceSettings.flags.diagramIntelligence.desc', groupKey: 'lectureDiagrams' },
   // Advanced / shadow (observe-only — included for transparency)
-  trace: { label: 'Диагностический trace', desc: 'Записывает trace маршрутизации для каждого ответа без содержимого. Только для диагностики.', group: 'Расширенное' },
-  contextRouterV2: { label: 'Context router (shadow)', desc: 'Считает routing-решение нового поколения только для телеметрии — пока не меняет ответы.', group: 'Расширенное' },
-  liveTranscriptBrain: { label: 'Live-transcript brain (shadow)', desc: 'Оценивает движок live-транскрипта только для телеметрии — пока не меняет ответы.', group: 'Расширенное' },
-  promptAssemblerV2: { label: 'Prompt assembler v2 (shadow)', desc: 'Оценивает prompt-builder нового поколения только для телеметрии — пока не меняет ответы.', group: 'Расширенное' },
-  intelligenceOsEnabled: { label: 'Intelligence OS (umbrella)', desc: 'Зарезервированный общий флаг. Сам по себе не влияет — включайте конкретные функции выше.', group: 'Расширенное' },
+  trace: { labelKey: 'intelligenceSettings.flags.trace.label', descKey: 'intelligenceSettings.flags.trace.desc', groupKey: 'advanced' },
+  contextRouterV2: { labelKey: 'intelligenceSettings.flags.contextRouterV2.label', descKey: 'intelligenceSettings.flags.contextRouterV2.desc', groupKey: 'advanced' },
+  liveTranscriptBrain: { labelKey: 'intelligenceSettings.flags.liveTranscriptBrain.label', descKey: 'intelligenceSettings.flags.liveTranscriptBrain.desc', groupKey: 'advanced' },
+  promptAssemblerV2: { labelKey: 'intelligenceSettings.flags.promptAssemblerV2.label', descKey: 'intelligenceSettings.flags.promptAssemblerV2.desc', groupKey: 'advanced' },
+  intelligenceOsEnabled: { labelKey: 'intelligenceSettings.flags.intelligenceOsEnabled.label', descKey: 'intelligenceSettings.flags.intelligenceOsEnabled.desc', groupKey: 'advanced' },
 };
 
-const GROUP_ORDER = ['Память', 'Поиск', 'Качество ответов', 'Лекции и диаграммы', 'Расширенное'];
+const GROUP_ORDER = ['memory', 'search', 'answerQuality', 'lectureDiagrams', 'advanced'];
 
 interface FlagRow { key: string; enabled: boolean; setting: string; env: string; default: boolean }
 interface HindsightCfg { baseUrl: string; hasApiKey: boolean; autoStart: boolean; serverCommand: string; llmProvider: string; available: boolean }
@@ -46,6 +47,7 @@ const Toggle: React.FC<{ on: boolean; disabled?: boolean; onClick: () => void }>
 );
 
 export const IntelligenceSettings: React.FC = () => {
+  const { t } = useTranslation();
   const [flags, setFlags] = useState<FlagRow[]>([]);
   const [cfg, setCfg] = useState<HindsightCfg | null>(null);
   const [baseUrl, setBaseUrl] = useState('');
@@ -69,16 +71,16 @@ export const IntelligenceSettings: React.FC = () => {
     try {
       const res = await fn();
       if (res && res.enabled === false) {
-        setTryOut({ kind, text: 'Функция выключена — сначала включите ее переключатель выше.' });
+        setTryOut({ kind, text: t('intelligenceSettings.featureOff') });
         return;
       }
       const payload = res?.notes ?? res?.diagram ?? res?.results ?? res;
       const text = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
-      setTryOut({ kind, text: text && text !== 'null' ? text : 'Нет результата — активна ли встреча с транскриптом?' });
+      setTryOut({ kind, text: text && text !== 'null' ? text : t('intelligenceSettings.noResult') });
     } catch (e: any) {
-      setTryOut({ kind, text: `Ошибка: ${e?.message || 'error'}` });
+      setTryOut({ kind, text: `${t('intelligenceSettings.errorPrefix')}: ${e?.message || 'error'}` });
     } finally { setTryBusy(null); }
-  }, []);
+  }, [t]);
 
   const refresh = useCallback(async () => {
     try {
@@ -132,7 +134,7 @@ export const IntelligenceSettings: React.FC = () => {
   const grouped = useMemo(() => {
     const byGroup: Record<string, FlagRow[]> = {};
     for (const row of flags) {
-      const g = FLAG_META[row.key]?.group || 'Расширенное';
+      const g = FLAG_META[row.key]?.groupKey || 'advanced';
       (byGroup[g] ||= []).push(row);
     }
     return byGroup;
@@ -147,45 +149,45 @@ export const IntelligenceSettings: React.FC = () => {
     <div className="space-y-6 max-w-2xl">
       <div className="flex items-center gap-2">
         <Brain size={18} className="text-accent-primary" />
-        <h2 className="text-base font-semibold text-text-primary">Интеллект</h2>
+        <h2 className="text-base font-semibold text-text-primary">{t('intelligenceSettings.title')}</h2>
       </div>
 
       {/* ── Long-term memory (Hindsight) ─────────────────────────── */}
       <section className="rounded-xl border border-border-subtle bg-bg-item-active/30 p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-medium text-text-primary">Сервер долгосрочной памяти</div>
-            <div className="text-xs text-text-secondary">Памяти между встречами нужен сервер Hindsight — локальный или облачный.</div>
+            <div className="text-sm font-medium text-text-primary">{t('intelligenceSettings.memoryServerTitle')}</div>
+            <div className="text-xs text-text-secondary">{t('intelligenceSettings.memoryServerDescription')}</div>
           </div>
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs ${healthy ? 'bg-green-500/15 text-green-400' : 'bg-bg-item-active text-text-secondary'}`}>
-            {healthy ? <Wifi size={12} /> : <WifiOff size={12} />}{healthy ? 'Подключено' : 'Не запущено'}
+            {healthy ? <Wifi size={12} /> : <WifiOff size={12} />}{healthy ? t('intelligenceSettings.connected') : t('intelligenceSettings.notRunning')}
           </span>
         </div>
 
         <label className="block">
-          <span className="text-xs text-text-secondary">URL сервера</span>
+          <span className="text-xs text-text-secondary">{t('intelligenceSettings.serverUrl')}</span>
           <input
             type="text"
             value={baseUrl}
             onChange={(e) => setBaseUrl(e.target.value)}
-            placeholder="http://localhost:8888  (локально)  или URL Hindsight Cloud"
+            placeholder={t('intelligenceSettings.serverUrlPlaceholder')}
             className="mt-1 w-full rounded-lg bg-bg-input px-3 py-2 text-sm text-text-primary outline-none ring-1 ring-border-subtle focus:ring-accent-primary"
           />
         </label>
 
         <label className="block">
-          <span className="text-xs text-text-secondary">API-ключ {cfg?.hasApiKey ? '(сохранен — оставьте пустым, чтобы сохранить текущий)' : '(только Cloud)'}</span>
+          <span className="text-xs text-text-secondary">{t('intelligenceSettings.apiKey', { state: cfg?.hasApiKey ? t('intelligenceSettings.apiKeySavedState') : t('intelligenceSettings.apiKeyCloudState') })}</span>
           <input
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
-            placeholder={cfg?.hasApiKey ? '••••••••  сохранено' : 'необязательно — для Hindsight Cloud'}
+            placeholder={cfg?.hasApiKey ? `•••••••• ${t('intelligenceSettings.apiKeySavedPlaceholder')}` : t('intelligenceSettings.apiKeyCloudPlaceholder')}
             className="mt-1 w-full rounded-lg bg-bg-input px-3 py-2 text-sm text-text-primary outline-none ring-1 ring-border-subtle focus:ring-accent-primary"
           />
         </label>
 
         <label className="flex items-center justify-between">
-          <span className="text-sm text-text-primary">Автоматически запускать локальный сервер, если он установлен</span>
+          <span className="text-sm text-text-primary">{t('intelligenceSettings.autoStartLocal')}</span>
           <Toggle on={autoStart} onClick={() => setAutoStart((v) => !v)} />
         </label>
 
@@ -197,7 +199,7 @@ export const IntelligenceSettings: React.FC = () => {
             className="rounded-lg bg-accent-primary px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50 inline-flex items-center gap-1.5"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : savedAt ? <Check size={14} /> : null}
-            {savedAt ? 'Сохранено' : 'Сохранить'}
+            {savedAt ? t('intelligenceSettings.saved') : t('common.save')}
           </button>
           <button
             type="button"
@@ -206,27 +208,27 @@ export const IntelligenceSettings: React.FC = () => {
             className="rounded-lg bg-bg-item-active px-3 py-1.5 text-sm text-text-primary hover:bg-bg-item-active/70 disabled:opacity-50 inline-flex items-center gap-1.5"
           >
             {testing ? <Loader2 size={14} className="animate-spin" /> : null}
-            Проверить подключение
+            {t('intelligenceSettings.testConnection')}
           </button>
         </div>
         <p className="text-[11px] text-text-secondary">
-          Локальный режим хранит память на этом устройстве. Cloud отправляет саммари встреч на серверы Hindsight — это компромисс приватности для local-first приложения.
+          {t('intelligenceSettings.privacyNote')}
         </p>
       </section>
 
       {/* ── Функции интеллекта ────────────────────────────────── */}
       <section className="space-y-4">
-        <div className="text-sm font-medium text-text-primary">Функции интеллекта</div>
+        <div className="text-sm font-medium text-text-primary">{t('intelligenceSettings.featuresTitle')}</div>
         {GROUP_ORDER.filter((g) => grouped[g]?.length).map((group) => (
           <div key={group} className="space-y-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{group}</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{t(`intelligenceSettings.groups.${group}`)}</div>
             {grouped[group].map((row) => {
               const meta = FLAG_META[row.key];
               return (
                 <div key={row.key} className="flex items-start justify-between gap-4 rounded-lg px-3 py-2 hover:bg-bg-item-active/40">
                   <div className="min-w-0">
-                    <div className="text-sm text-text-primary">{meta?.label || row.key}</div>
-                    {meta?.desc ? <div className="text-xs text-text-secondary">{meta.desc}</div> : null}
+                    <div className="text-sm text-text-primary">{meta ? t(meta.labelKey) : row.key}</div>
+                    {meta ? <div className="text-xs text-text-secondary">{t(meta.descKey)}</div> : null}
                   </div>
                   <Toggle on={row.enabled} onClick={() => onToggleFlag(row)} />
                 </div>
@@ -239,8 +241,8 @@ export const IntelligenceSettings: React.FC = () => {
       {/* ── Предпросмотр на текущей встрече ────────────── */}
       <section className="rounded-xl border border-border-subtle bg-bg-item-active/30 p-4 space-y-3">
         <div>
-          <div className="text-sm font-medium text-text-primary">Попробовать</div>
-          <div className="text-xs text-text-secondary">Работает с транскриптом текущей встречи. Сначала включите нужный переключатель выше и начните встречу.</div>
+          <div className="text-sm font-medium text-text-primary">{t('intelligenceSettings.tryTitle')}</div>
+          <div className="text-xs text-text-secondary">{t('intelligenceSettings.tryDescription')}</div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -249,7 +251,7 @@ export const IntelligenceSettings: React.FC = () => {
             onClick={() => runTry('lecture', () => window.electronAPI.generateLectureNotes?.())}
             className="rounded-lg bg-bg-item-active px-3 py-1.5 text-sm text-text-primary hover:bg-bg-item-active/70 disabled:opacity-40 inline-flex items-center gap-1.5"
           >
-            {tryBusy === 'lecture' ? <Loader2 size={14} className="animate-spin" /> : null} Конспект лекции
+            {tryBusy === 'lecture' ? <Loader2 size={14} className="animate-spin" /> : null} {t('intelligenceSettings.lectureNotes')}
           </button>
           <button
             type="button"
@@ -257,7 +259,7 @@ export const IntelligenceSettings: React.FC = () => {
             onClick={() => runTry('diagram', () => window.electronAPI.generateDiagram?.())}
             className="rounded-lg bg-bg-item-active px-3 py-1.5 text-sm text-text-primary hover:bg-bg-item-active/70 disabled:opacity-40 inline-flex items-center gap-1.5"
           >
-            {tryBusy === 'diagram' ? <Loader2 size={14} className="animate-spin" /> : null} Диаграмма
+            {tryBusy === 'diagram' ? <Loader2 size={14} className="animate-spin" /> : null} {t('intelligenceSettings.diagram')}
           </button>
         </div>
         <div className="flex items-center gap-2">
@@ -265,7 +267,7 @@ export const IntelligenceSettings: React.FC = () => {
             type="text"
             value={searchQ}
             onChange={(e) => setSearchQ(e.target.value)}
-            placeholder="Поиск по текущей встрече…"
+            placeholder={t('intelligenceSettings.searchPlaceholder')}
             disabled={!flagOn('inMeetingSearchV2')}
             className="flex-1 rounded-lg bg-bg-input px-3 py-2 text-sm text-text-primary outline-none ring-1 ring-border-subtle focus:ring-accent-primary disabled:opacity-40"
           />
@@ -275,7 +277,7 @@ export const IntelligenceSettings: React.FC = () => {
             onClick={() => runTry('search', () => window.electronAPI.searchInMeeting?.(searchQ.trim()))}
             className="rounded-lg bg-bg-item-active px-3 py-1.5 text-sm text-text-primary hover:bg-bg-item-active/70 disabled:opacity-40 inline-flex items-center gap-1.5"
           >
-            {tryBusy === 'search' ? <Loader2 size={14} className="animate-spin" /> : null} Поиск
+            {tryBusy === 'search' ? <Loader2 size={14} className="animate-spin" /> : null} {t('intelligenceSettings.search')}
           </button>
         </div>
         {tryOut ? (

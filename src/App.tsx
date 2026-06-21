@@ -592,7 +592,7 @@ const App: React.FC = () => {
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.15 }}
-                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-[2px]"
                       onClick={(e) => { if (e.target === e.currentTarget) setIsModesOpen(false); }}
                     >
                       <motion.div
@@ -610,7 +610,7 @@ const App: React.FC = () => {
                           transformOrigin: 'center',
                           boxShadow: '0 30px 80px -20px rgba(0,0,0,0.65), 0 16px 40px -12px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)',
                         }}
-                        className="w-[820px] h-[600px] max-w-[95vw] max-h-[90vh] rounded-2xl overflow-hidden border border-white/10 bg-[#141414]"
+                        className="h-[calc(100vh_-_48px)] max-h-[820px] w-[calc(100vw_-_48px)] max-w-[1100px] rounded-xl overflow-hidden border border-white/10 bg-[#141414]"
                       >
                         <ModesSettings onClose={() => setIsModesOpen(false)} isPremium={false} isLoaded={true} isTrialActive={false} />
                       </motion.div>
@@ -625,7 +625,7 @@ const App: React.FC = () => {
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.15 }}
-                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-[2px]"
                       onClick={(e) => { if (e.target === e.currentTarget) setIsProfileOpen(false); }}
                     >
                       <motion.div
@@ -643,7 +643,7 @@ const App: React.FC = () => {
                           transformOrigin: 'center',
                           boxShadow: '0 30px 80px -20px rgba(0,0,0,0.65), 0 16px 40px -12px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)',
                         }}
-                        className="w-[820px] h-[600px] max-w-[95vw] max-h-[90vh] rounded-2xl overflow-hidden border border-white/10 bg-[#141414]"
+                        className="h-[calc(100vh_-_48px)] max-h-[820px] w-[calc(100vw_-_48px)] max-w-[1100px] rounded-xl overflow-hidden border border-white/10 bg-[#141414]"
                       >
                         <ProfileIntelligenceSettings
                           onClose={() => setIsProfileOpen(false)}

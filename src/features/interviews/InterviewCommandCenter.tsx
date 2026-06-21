@@ -471,6 +471,10 @@ function applicationStatusLabelKey(status: ApplicationStatus): string {
   return status === 'lead_found' ? 'interviews.status.active' : `interviews.status.${status}`;
 }
 
+function intakeClassificationLabelKey(classification: ApplicationIntakeResult['classification']): string {
+  return `interviews.agent.intakeClassification.${classification}`;
+}
+
 function statusLabelKey(status: InterviewStatus, item?: Pick<InterviewListItem, 'stage' | 'startsAt' | 'selectedStageId'> | null): string {
   if (status === 'active') {
     return item?.stage || item?.startsAt || item?.selectedStageId
@@ -1893,7 +1897,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                               <div className="h-px flex-1 bg-white/[0.08]" />
                             </div>
                           )}
-                          <div data-testid="interview-stage-card" className={`rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04] ${isArchived ? 'opacity-70' : ''}`}>
+                          <div data-testid="interview-stage-card" className={`rounded-md bg-[#101214] p-3 ring-1 ring-white/[0.04] ${isArchived ? 'opacity-70' : ''}`}>
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <div className="text-[14px] font-semibold text-text-primary">{stage.title}</div>
@@ -1928,7 +1932,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                                 )}
                               </div>
                             </div>
-                            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                            <div className="mt-3 grid grid-cols-1 gap-2.5 md:grid-cols-2">
                               <Field label={t('interviews.detail.title')}>
                                 <input className={inputClass} value={stageDraft.title} onChange={event => updateStageDraft(stage.id, 'title', event.target.value)} />
                               </Field>
@@ -1966,11 +1970,11 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                               </Field>
                               <div className="md:col-span-2">
                                 <Field label={t('interviews.detail.sourceText')}>
-                                  <textarea className={`${inputClass} min-h-[88px] resize-y`} value={stageDraft.rawSourceText} onChange={event => updateStageDraft(stage.id, 'rawSourceText', event.target.value)} />
+                                  <textarea className={`${inputClass} min-h-[68px] resize-y`} value={stageDraft.rawSourceText} onChange={event => updateStageDraft(stage.id, 'rawSourceText', event.target.value)} />
                                 </Field>
                               </div>
                             </div>
-                            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                               <div className="text-[11px] text-text-tertiary">
                                 {stageSaveStatus[stage.id] === 'dirty'
                                   ? t('interviews.detail.draftChanged')
@@ -1984,7 +1988,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                                 {t('common.save')}
                               </button>
                             </div>
-                            <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-3">
+                            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
                               <InfoTile icon={<FileText size={15} />} label={t('interviews.detail.stageRecordings')} value={`${stageMeetings.length}`} valueTestId="stage-recording-count" />
                               <InfoTile icon={<CalendarDays size={15} />} label={t('interviews.detail.calendarSync')} value={stage.calendarSyncStatus} />
                               <InfoTile icon={<CircleDot size={15} />} label={t('interviews.detail.stageStatus')} value={t(`interviews.stageStatus.${stage.status}`)} />
@@ -2219,7 +2223,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0 text-[11px] text-text-tertiary">
                     {intakePreview
-                      ? `${intakePreview.classification} · ${Math.round(intakePreview.confidence * 100)}%`
+                      ? `${t(intakeClassificationLabelKey(intakePreview.classification))} · ${t('interviews.agent.confidence', { value: Math.round(intakePreview.confidence * 100) })}`
                       : t('interviews.detail.unparsedSource')}
                     {parseWarnings.length > 0 ? ` · ${parseWarnings.join(', ')}` : ''}
                   </div>
@@ -2283,7 +2287,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
           </div>
         </div>
       )}
-      <div className="fixed bottom-4 right-4 z-[350] w-[min(360px,calc(100vw-32px))]">
+      <div className={`fixed bottom-4 z-30 ${agentOpen ? 'right-4 w-[min(360px,calc(100vw-32px))]' : 'left-4 w-auto'}`}>
         {agentOpen ? (
           <div className="rounded-md border border-white/[0.08] bg-[#101214] p-3 shadow-2xl">
             <div className="mb-2 flex items-center justify-between">
