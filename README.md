@@ -25,8 +25,10 @@ OpenOffer's current wedge is simple:
 2. Let OpenOffer propose the vacancy, stage, schedule, meeting link, prep context, and follow-up tasks.
 3. Keep transcripts, notes, questions, retros, and recordings attached to the right process locally.
 
+![OpenOffer creating an editable ExampleAI vacancy process from a fictional recruiter chat](assets/demo/recruiter-chat-to-process.png)
+
 See the full walkthrough in [Recruiter Chat to Process](docs/demo/recruiter-chat-to-process.md).
-Demo media belongs under [`assets/demo/`](assets/demo/README.md); the README should embed it only after a real screenshot, GIF, or video has been captured from fictional data.
+Demo media and capture rules live under [`assets/demo/`](assets/demo/README.md).
 
 ## What Works Today
 

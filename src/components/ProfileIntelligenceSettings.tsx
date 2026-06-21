@@ -6,6 +6,7 @@ import {
 import { ProfileVisualizer } from '../premium';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 
 const spring = { type: "spring" as const, stiffness: 100, damping: 20 };
 
@@ -503,6 +504,7 @@ const StarRating = ({ value, size = 11 }: { value: number; size?: number }) => {
 };
 
 export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }) {
+    const { t } = useTranslation();
     const isLight = useResolvedTheme() === 'light';
 
     // Profile Engine State
@@ -602,11 +604,11 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                     </div>
                     <div>
                         <div className="flex items-center gap-2.5 mb-1.5">
-                            <h2 className="text-[22px] font-bold text-text-primary leading-none" style={{ letterSpacing: '-0.025em' }}>Профильный интеллект</h2>
-                            <span className="pi-beta-badge">БЕТА</span>
+                            <h2 className="text-[22px] font-bold text-text-primary leading-none" style={{ letterSpacing: '-0.025em' }}>{t('profileIntelligenceSettings.title')}</h2>
+                            <span className="pi-beta-badge">{t('common.beta')}</span>
                         </div>
                         <p className="text-[13px] text-text-secondary" style={{ letterSpacing: '-0.005em' }}>
-                            Управляйте персоной, карьерной историей и активным описанием вакансии
+                            {t('profileIntelligenceSettings.subtitle')}
                         </p>
                     </div>
                 </div>
@@ -614,7 +616,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                     <button
                         onClick={onClose}
                         className="pi-close-btn"
-                        aria-label="Закрыть"
+                        aria-label={t('common.close')}
                     >
                         <X size={18} strokeWidth={2} />
                     </button>
@@ -626,9 +628,9 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                 <div className="max-w-3xl mx-auto p-5 pb-12">
                     <div className="space-y-6">
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, ...spring }} className="mb-4 pt-2">
-                            <h3 className="text-lg font-bold text-text-primary tracking-tight">Профессиональная идентичность</h3>
+                            <h3 className="text-lg font-bold text-text-primary tracking-tight">{t('profileIntelligenceSettings.professionalIdentity')}</h3>
                             <p className="text-[13px] text-text-secondary mt-1">
-                                Этот движок строит интеллектуальное представление вашей карьеры и графа навыков.
+                                {t('profileIntelligenceSettings.professionalIdentityDescription')}
                             </p>
                         </motion.div>
 
@@ -646,10 +648,10 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         </div>
                                                         <div>
                                                             <h4 className="text-sm font-bold text-text-primary tracking-tight">
-                                                                {profileData?.identity?.name || 'Узел идентичности неактивен'}
+                                                                {profileData?.identity?.name || t('profileIntelligenceSettings.inactiveIdentity')}
                                                             </h4>
                                                             <p className="text-xs text-text-secondary mt-0.5 tracking-wide">
-                                                                {profileData?.identity?.email || 'Загрузите резюме, чтобы начать построение профиля.'}
+                                                                {profileData?.identity?.email || t('profileIntelligenceSettings.uploadResumePrompt')}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -658,22 +660,22 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         {profileStatus.hasProfile && (
                                                             <button
                                                                 onClick={async () => {
-                                                                    if (!confirm('Удалить построенную персону? Это уничтожит все структурированные данные timeline.')) return;
+                                                                    if (!confirm(t('profileIntelligenceSettings.deleteConfirm'))) return;
                                                                     try {
                                                                         await window.electronAPI?.profileDelete?.();
                                                                         setProfileStatus({ hasProfile: false, profileMode: false });
                                                                         setProfileData(null);
-                                                                    } catch (e) { console.error('Не удалось удалить профиль:', e); }
+                                                                    } catch (e) { console.error('Failed to delete profile:', e); }
                                                                 }}
                                                                 className="text-[12px] font-medium text-text-tertiary hover:text-red-500 transition-colors px-3 py-1.5 rounded-full hover:bg-red-500/10"
                                                             >
-                                                                Отключить
+                                                                {t('profileIntelligenceSettings.disable')}
                                                             </button>
                                                         )}
 
                                                         {/* High-fidelity Toggle */}
                                                         <div className="flex items-center gap-2 bg-bg-input px-3 py-1.5 rounded-full border border-border-subtle">
-                                                            <span className="text-xs font-medium text-text-secondary">Движок персоны</span>
+                                                            <span className="text-xs font-medium text-text-secondary">{t('profileIntelligenceSettings.personaEngine')}</span>
                                                             <div
                                                                 onClick={async () => {
                                                                     if (!profileStatus.hasProfile) return;
@@ -682,7 +684,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                         await window.electronAPI?.profileSetMode?.(newState);
                                                                         setProfileStatus(prev => ({ ...prev, profileMode: newState }));
                                                                     } catch (e) {
-                                                                        console.error('Не удалось переключить режим профиля:', e);
+                                                                        console.error('Failed to toggle profile mode:', e);
                                                                     }
                                                                 }}
                                                                 className={`w-9 h-5 rounded-full relative transition-colors ${!profileStatus.hasProfile ? 'opacity-40 cursor-not-allowed bg-bg-toggle-switch' : profileStatus.profileMode ? 'bg-accent-primary' : 'bg-bg-toggle-switch border border-border-muted'}`}
@@ -701,7 +703,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         <span className="text-[20px] font-bold text-text-primary tracking-tight leading-none mb-1">{profileData?.experienceCount || 0}</span>
                                                         <div className="flex items-center gap-1.5">
                                                             <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" />
-                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Опыт</span>
+                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">{t('profileIntelligenceSettings.experienceMetric')}</span>
                                                         </div>
                                                     </div>
 
@@ -711,7 +713,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         <span className="text-[20px] font-bold text-text-primary tracking-tight leading-none mb-1">{profileData?.projectCount || 0}</span>
                                                         <div className="flex items-center gap-1.5">
                                                             <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)]" />
-                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Проекты</span>
+                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">{t('profileIntelligenceSettings.projectsMetric')}</span>
                                                         </div>
                                                     </div>
 
@@ -721,7 +723,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                         <span className="text-[20px] font-bold text-text-primary tracking-tight leading-none mb-1">{profileData?.nodeCount || 0}</span>
                                                         <div className="flex items-center gap-1.5">
                                                             <div className="w-1.5 h-1.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.4)]" />
-                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">Узлы</span>
+                                                            <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-widest">{t('profileIntelligenceSettings.nodesMetric')}</span>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -734,13 +736,13 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                     // legacy/array shape.
                                                     const raw = profileData?.skills;
                                                     const CATS: { key: string; label: string }[] = [
-                                                        { key: 'languages', label: 'Языки' },
-                                                        { key: 'frameworks', label: 'Фреймворки' },
-                                                        { key: 'cloud', label: 'Облако' },
-                                                        { key: 'databases', label: 'Базы данных' },
-                                                        { key: 'ml', label: 'AI / ML' },
-                                                        { key: 'devops', label: 'DevOps' },
-                                                        { key: 'tools', label: 'Инструменты' },
+                                                        { key: 'languages', label: t('profileIntelligenceSettings.skillCategories.languages') },
+                                                        { key: 'frameworks', label: t('profileIntelligenceSettings.skillCategories.frameworks') },
+                                                        { key: 'cloud', label: t('profileIntelligenceSettings.skillCategories.cloud') },
+                                                        { key: 'databases', label: t('profileIntelligenceSettings.skillCategories.databases') },
+                                                        { key: 'ml', label: t('profileIntelligenceSettings.skillCategories.ml') },
+                                                        { key: 'devops', label: t('profileIntelligenceSettings.skillCategories.devops') },
+                                                        { key: 'tools', label: t('profileIntelligenceSettings.skillCategories.tools') },
                                                     ];
                                                     const chip = (skill: string, i: number) => (
                                                         <span key={i} className="text-[10px] font-medium text-text-secondary px-2 py-1 rounded-md border border-border-subtle bg-bg-input">
@@ -767,7 +769,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                     if (flat.length === 0) return null;
                                                     return (
                                                         <div className="mt-5">
-                                                            <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-2">Главные навыки</div>
+                                                            <div className="text-[10px] font-bold text-text-primary uppercase tracking-wide mb-2">{t('profileIntelligenceSettings.topSkills')}</div>
                                                             <div className="flex flex-wrap gap-1.5">
                                                                 {flat.slice(0, 15).map((s: string, i: number) => chip(s, i))}
                                                             </div>
@@ -788,10 +790,10 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                     </div>
                                                     <div className="min-w-0 flex-1">
                                                         <h4 className="text-[15px] font-bold text-text-primary mb-1 tracking-tight flex items-center flex-wrap gap-1.5">
-                                                            <span>{profileStatus.hasProfile ? 'Заменить исходный документ' : 'Инициализировать базу знаний'}</span>
+                                                            <span>{profileStatus.hasProfile ? t('profileIntelligenceSettings.replaceSource') : t('profileIntelligenceSettings.initializeKnowledgeBase')}</span>
                                                         </h4>
                                                         <p className="text-xs text-text-secondary leading-relaxed pr-2">
-                                                            Передайте файл резюме, чтобы заполнить движок интеллекта.
+                                                            {t('profileIntelligenceSettings.resumeCardDescription')}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -812,10 +814,10 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                 const data = await window.electronAPI?.profileGetProfile?.();
                                                                 if (data) setProfileData(data);
                                                             } else {
-                                                                setProfileError(result?.error || 'Загрузка не удалась');
+                                                                setProfileError(result?.error || t('profileIntelligenceSettings.uploadFailed'));
                                                             }
                                                         } catch (e: any) {
-                                                            setProfileError(e.message || 'Загрузка не удалась');
+                                                            setProfileError(e.message || t('profileIntelligenceSettings.uploadFailed'));
                                                         } finally {
                                                             setProfileUploading(false);
                                                         }
@@ -823,7 +825,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                     disabled={profileUploading}
                                                     className={`pi-upload-pill${profileStatus.hasProfile ? ' pi-upload-pill--secondary' : ''}`}
                                                     aria-busy={profileUploading}
-                                                    aria-label={profileUploading ? 'Обработка резюме' : 'Выбрать файл резюме'}
+                                                    aria-label={profileUploading ? t('profileIntelligenceSettings.processingResume') : t('profileIntelligenceSettings.selectResumeFile')}
                                                 >
                                                     {profileUploading && <span className="pi-upload-pill__fill" aria-hidden="true" />}
                                                     <span className="pi-upload-pill__content">
@@ -832,8 +834,8 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                             : <Upload size={14} strokeWidth={2.5} />}
                                                         <span className="pi-upload-pill__label">
                                                             {profileUploading
-                                                                ? 'Обработка · анализ структурной семантики…'
-                                                                : profileStatus.hasProfile ? 'Заменить файл резюме' : 'Выбрать файл резюме'}
+                                                                ? t('profileIntelligenceSettings.processingLabel')
+                                                                : profileStatus.hasProfile ? t('profileIntelligenceSettings.replaceResumeFile') : t('profileIntelligenceSettings.chooseResumeFile')}
                                                         </span>
                                                     </span>
                                                     <span className="pi-upload-pill__ring">
@@ -861,7 +863,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                     </div>
                                                     <div className="min-w-0 flex-1">
                                                         <h4 className="text-[15px] font-bold text-text-primary mb-1 tracking-tight flex items-center flex-wrap gap-1.5">
-                                                            <span>{profileData?.hasActiveJD ? `${profileData.activeJD?.title} @ ${profileData.activeJD?.company}` : 'Загрузить описание вакансии'}</span>
+                                                            <span>{profileData?.hasActiveJD ? `${profileData.activeJD?.title} @ ${profileData.activeJD?.company}` : t('profileIntelligenceSettings.uploadJobDescription')}</span>
                                                         </h4>
                                                         {profileData?.hasActiveJD ? (
                                                             <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -876,7 +878,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                             </div>
                                                         ) : (
                                                             <p className="text-xs text-text-secondary leading-relaxed pr-2">
-                                                                Загрузите JD, чтобы включить настройку персоны и исследование компании.
+                                                                {t('profileIntelligenceSettings.jobDescriptionEmpty')}
                                                             </p>
                                                         )}
                                                     </div>
@@ -889,7 +891,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                                                                 setCompanyDossier(null);
                                                             }}
                                                             className="shrink-0 mt-0.5 px-2.5 py-2 rounded-full text-xs text-text-tertiary hover:text-red-500 hover:bg-red-500/10 transition-all border border-transparent hover:border-red-500/20"
-                                                            aria-label="Удалить описание вакансии"
+                                                            aria-label={t('profileIntelligenceSettings.deleteJobDescription')}
                                                         >
                                                             <Trash2 size={14} />
                                                         </button>

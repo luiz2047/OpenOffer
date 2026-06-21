@@ -623,7 +623,7 @@ test.describe('Interview Command Center', () => {
 Зарплата: 400-500k.
   This long source text intentionally contains enough vacancy and recruiter context to verify that the detail pane does not render the entire raw paste by default. It should stay available for review, but the primary UI should stay compact for normal daily use.`);
     await page.getByRole('button', { name: 'Extract fields' }).click();
-    await expect(page.getByText(/vacancy_only/)).toBeVisible();
+    await expect(page.getByText(/New vacancy detected/)).toBeVisible();
     await page.getByRole('button', { name: 'Create vacancy' }).click();
 
     await expect(page.getByText('Acme Backend interview').first()).toBeVisible();

@@ -4,6 +4,7 @@ import { CODEX_CLI_MODEL, CODEX_CLI_MODEL_PRESETS, codexCliSelectorId, STANDARD_
 import { validateCurl } from '../../lib/curl-validator';
 import { ProviderCard } from './ProviderCard';
 import { sanitizeDefaultModel } from '../../lib/legacyStateMigration';
+import { useTranslation } from 'react-i18next';
 
 const CODEX_SERVICE_TIERS = ['default', 'fast', 'flex'] as const;
 const CODEX_MODEL_REASONING_EFFORTS = ['low', 'medium', 'high', 'xhigh'] as const;
@@ -12,7 +13,7 @@ const CODEX_MODEL_REASONING_EFFORTS = ['low', 'medium', 'high', 'xhigh'] as cons
 // (powers of two used across the LiteLLM model registry). '' = Auto: resolve
 // each model's real budget from the proxy's /model/info, fallback 8192.
 const LITELLM_MAX_TOKENS_OPTIONS: ModelOption[] = [
-    { id: '', name: 'Авто (по модели)' },
+    { id: '', name: 'Auto (from model)' },
     { id: '4096', name: '4,096 (4K)' },
     { id: '8192', name: '8,192 (8K)' },
     { id: '16384', name: '16,384 (16K)' },
@@ -62,11 +63,11 @@ interface TaskModelPolicy {
     updatedAt: string;
 }
 
-const TASK_MODEL_ROWS: Array<{ task: AiTask; title: string; description: string }> = [
-    { task: 'vacancy_intake', title: 'Вакансии из текста', description: 'Парсинг вакансий, HR-сообщений и встреч.' },
-    { task: 'scraping', title: 'AI-скрапинг', description: 'Извлечение данных со страниц и источников.' },
-    { task: 'retro', title: 'Ретро по собеседованию', description: 'Оценка созвона по транскрипту.' },
-    { task: 'agent_actions', title: 'Агентные действия', description: 'Действия помощника с вакансиями и этапами.' },
+const TASK_MODEL_ROWS: Array<{ task: AiTask }> = [
+    { task: 'vacancy_intake' },
+    { task: 'scraping' },
+    { task: 'retro' },
+    { task: 'agent_actions' },
 ];
 
 const DEFAULT_ANSWER_STYLE_PACKS: AnswerStylePackOption[] = [
@@ -83,10 +84,11 @@ interface ModelSelectProps {
     options: ModelOption[];
     onChange: (value: string) => void;
     placeholder?: string;
+    emptyLabel?: string;
     className?: string;
 }
 
-const ModelSelect: React.FC<ModelSelectProps> = ({ value, options, onChange, placeholder = "Выберите модель", className = "" }) => {
+const ModelSelect: React.FC<ModelSelectProps> = ({ value, options, onChange, placeholder = 'Choose a model', emptyLabel = 'No models available', className = "" }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -133,7 +135,7 @@ const ModelSelect: React.FC<ModelSelectProps> = ({ value, options, onChange, pla
                             </button>
                         ))}
                         {options.length === 0 && (
-                            <div className="px-3 py-2 text-xs text-gray-500 italic">Нет доступных моделей</div>
+                            <div className="px-3 py-2 text-xs text-gray-500 italic">{emptyLabel}</div>
                         )}
                     </div>
                 </div>
@@ -169,7 +171,7 @@ const CodexCliModelField: React.FC<{
                     onChange(modelId);
                     onSelect(modelId);
                 }}
-                placeholder="Пресет"
+                placeholder="Preset"
                 className="py-2"
             />
         </div>
@@ -177,6 +179,7 @@ const CodexCliModelField: React.FC<{
 );
 
 export const AIProvidersSettings: React.FC = () => {
+    const { t } = useTranslation();
     // --- Standard Providers ---
     const [apiKey, setApiKey] = useState('');
     const [groqApiKey, setGroqApiKey] = useState('');
@@ -856,21 +859,23 @@ export const AIProvidersSettings: React.FC = () => {
 
     return (
         <div className="space-y-5 animated fadeIn pb-10">
-            {/* Модель по умолчанию для чата */}
+            {/* Default chat model */}
             <div className="space-y-5">
                 <div>
-                    <h3 className="text-sm font-bold text-text-primary mb-1">Модель по умолчанию для чата</h3>
-                    <p className="text-xs text-text-secondary mb-2">Основная модель для новых чатов. Остальные настроенные модели используются как резервные.</p>
+                    <h3 className="text-sm font-bold text-text-primary mb-1">{t('aiProvidersSettings.defaultModelTitle')}</h3>
+                    <p className="text-xs text-text-secondary mb-2">{t('aiProvidersSettings.defaultModelDescription')}</p>
                 </div>
 
                 <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle flex items-center justify-between">
                     <div>
-                        <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-0">Активная модель</label>
-                        <p className="text-[10px] text-text-secondary">Сразу применяется к новым чатам.</p>
+                        <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-0">{t('aiProvidersSettings.activeModel')}</label>
+                        <p className="text-[10px] text-text-secondary">{t('aiProvidersSettings.activeModelDescription')}</p>
                     </div>
                     <ModelSelect
                         value={defaultModel}
                         options={availableModelOptions}
+                        placeholder={t('aiProvidersSettings.modelSelectPlaceholder')}
+                        emptyLabel={t('aiProvidersSettings.noModelsAvailable')}
                         onChange={(val) => {
                             setDefaultModel(val);
                             if (taskModelPolicy) {
@@ -889,11 +894,11 @@ export const AIProvidersSettings: React.FC = () => {
                 <div className="bg-bg-item-surface rounded-xl p-5 border border-border-subtle space-y-4">
                     <div className="flex items-start justify-between gap-4">
                         <div>
-                            <h3 className="text-sm font-bold text-text-primary mb-1">Модели для задач</h3>
-                            <p className="text-xs text-text-secondary">По умолчанию эти задачи используют активную модель чата. Закрепите отдельную модель только там, где это нужно.</p>
+                            <h3 className="text-sm font-bold text-text-primary mb-1">{t('aiProvidersSettings.taskModelsTitle')}</h3>
+                            <p className="text-xs text-text-secondary">{t('aiProvidersSettings.taskModelsDescription')}</p>
                         </div>
                         <span className="shrink-0 rounded border border-border-subtle bg-bg-input px-2 py-1 text-[10px] font-medium text-text-secondary">
-                            {taskPolicySaving ? 'Сохранение...' : 'Авто'}
+                            {taskPolicySaving ? t('aiProvidersSettings.saving') : t('aiProvidersSettings.auto')}
                         </span>
                     </div>
                     <div className="space-y-3">
@@ -924,22 +929,24 @@ export const AIProvidersSettings: React.FC = () => {
                             return (
                                 <div key={row.task} className="grid grid-cols-1 gap-3 rounded-lg border border-border-subtle bg-bg-card/60 p-3 md:grid-cols-[1fr_190px_240px] md:items-center">
                                     <div className="min-w-0">
-                                        <div className="text-xs font-semibold text-text-primary">{row.title}</div>
-                                        <div className="mt-0.5 text-[10px] text-text-secondary">{row.description}</div>
+                                        <div className="text-xs font-semibold text-text-primary">{t(`aiProvidersSettings.taskRows.${row.task}.title`)}</div>
+                                        <div className="mt-0.5 text-[10px] text-text-secondary">{t(`aiProvidersSettings.taskRows.${row.task}.description`)}</div>
                                     </div>
                                     <select
                                         value={mode}
                                         onChange={(event) => updateTask(event.target.value as TaskModelMode)}
                                         className="w-full rounded-lg border border-border-subtle bg-bg-input px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-accent-primary"
                                     >
-                                        <option value="default">Как активная модель</option>
-                                        <option value="auto">Авто по задаче</option>
-                                        <option value="pinned">Закрепить модель</option>
+                                        <option value="default">{t('aiProvidersSettings.modeDefault')}</option>
+                                        <option value="auto">{t('aiProvidersSettings.modeAuto')}</option>
+                                        <option value="pinned">{t('aiProvidersSettings.modePinned')}</option>
                                     </select>
                                     <ModelSelect
                                         value={pinnedModel}
                                         options={availableModelOptions}
                                         onChange={(modelId) => updateTask('pinned', modelId)}
+                                        placeholder={t('aiProvidersSettings.modelSelectPlaceholder')}
+                                        emptyLabel={t('aiProvidersSettings.noModelsAvailable')}
                                         className={mode === 'pinned' ? '' : 'opacity-60'}
                                     />
                                 </div>
@@ -948,25 +955,25 @@ export const AIProvidersSettings: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Быстрые ответы */}
+                {/* Fast responses */}
                 <div
                     className={`bg-bg-item-surface rounded-xl p-5 border border-border-subtle flex items-center justify-between gap-4 ${!canUseFastMode ? 'opacity-50 grayscale' : ''}`}
-                    title={!canUseFastMode ? "Сначала настройте Groq или Codex CLI" : ""}
+                    title={!canUseFastMode ? t('aiProvidersSettings.fastResponsesDisabledTitle') : ""}
                 >
                     <div className="flex-1">
                         <div className="flex items-center gap-2">
-                            <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-0">Быстрые ответы</label>
-                            <span className="bg-orange-500/10 text-orange-500 text-[9px] font-bold px-1.5 py-0.5 rounded border border-orange-500/20">НОВОЕ</span>
+                            <label className="block text-xs font-medium text-text-primary uppercase tracking-wide mb-0">{t('aiProvidersSettings.fastResponsesTitle')}</label>
+                            <span className="bg-orange-500/10 text-orange-500 text-[9px] font-bold px-1.5 py-0.5 rounded border border-orange-500/20">{t('aiProvidersSettings.newBadge')}</span>
                         </div>
-                        <p className="text-[10px] text-text-secondary mt-0.5">Очень быстрые ответы через быструю модель Codex CLI или Groq. Отключите режим, чтобы использовать обычную выбранную модель.</p>
+                        <p className="text-[10px] text-text-secondary mt-0.5">{t('aiProvidersSettings.fastResponsesDescription')}</p>
                         {!canUseFastMode && (
-                            <p className="text-[10px] text-orange-500 mt-0.5 font-medium">Требуется настроенный Groq или Codex CLI.</p>
+                            <p className="text-[10px] text-orange-500 mt-0.5 font-medium">{t('aiProvidersSettings.fastResponsesRequires')}</p>
                         )}
                     </div>
                     <div
                         onClick={async () => {
                             if (!canUseFastMode) {
-                                alert("Сначала настройте Groq или Codex CLI, чтобы включить быстрые ответы.");
+                                alert(t('aiProvidersSettings.fastResponsesDisabledAlert'));
                                 return;
                             }
                             const newState = !fastResponseMode;
@@ -982,11 +989,11 @@ export const AIProvidersSettings: React.FC = () => {
                 </div>
             </div>
 
-            {/* Облачные провайдеры */}
+            {/* Cloud providers */}
             <div className="space-y-5">
                 <div>
-                    <h3 className="text-sm font-bold text-text-primary mb-1">Облачные провайдеры</h3>
-                    <p className="text-xs text-text-secondary mb-2">Добавьте API-ключи, чтобы открыть облачные AI-модели.</p>
+                    <h3 className="text-sm font-bold text-text-primary mb-1">{t('aiProvidersSettings.cloudProvidersTitle')}</h3>
+                    <p className="text-xs text-text-secondary mb-2">{t('aiProvidersSettings.cloudProvidersDescription')}</p>
                 </div>
 
                 <div className="space-y-4">
