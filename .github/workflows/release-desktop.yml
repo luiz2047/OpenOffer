@@ -45,7 +45,7 @@ jobs:
       artifact_label: ${{ steps.release_mode.outputs.artifact_label }}
     steps:
       - name: Checkout (with submodules)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
@@ -309,7 +309,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout (with submodules)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
