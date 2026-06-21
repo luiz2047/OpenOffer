@@ -26,6 +26,7 @@ OpenOffer's current wedge is simple:
 3. Keep transcripts, notes, questions, retros, and recordings attached to the right process locally.
 
 See the full walkthrough in [Recruiter Chat to Process](docs/demo/recruiter-chat-to-process.md).
+Demo media belongs under [`assets/demo/`](assets/demo/README.md); the README should embed it only after a real screenshot, GIF, or video has been captured from fictional data.
 
 ## What Works Today
 

@@ -66,7 +66,7 @@ const TASK_MODEL_ROWS: Array<{ task: AiTask; title: string; description: string 
     { task: 'vacancy_intake', title: 'Вакансии из текста', description: 'Парсинг вакансий, HR-сообщений и встреч.' },
     { task: 'scraping', title: 'AI-скрапинг', description: 'Извлечение данных со страниц и источников.' },
     { task: 'retro', title: 'Ретро по собеседованию', description: 'Оценка созвона по транскрипту.' },
-    { task: 'agent_actions', title: 'Агентные действия', description: 'Действия помощника в Vacancy OS.' },
+    { task: 'agent_actions', title: 'Агентные действия', description: 'Действия помощника с вакансиями и этапами.' },
 ];
 
 const DEFAULT_ANSWER_STYLE_PACKS: AnswerStylePackOption[] = [

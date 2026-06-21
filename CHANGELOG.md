@@ -1,454 +1,457 @@
-    # OpenOffer Changelog
+# OpenOffer Changelog
 
-    > Historical releases below preserve the pre-rebrand Natively-era record for provenance. OpenOffer is the current public identity; hosted/cloud/paid gate language from earlier entries is legacy context only.
+> Historical releases below preserve the pre-rebrand Natively-era record for provenance. OpenOffer is the current public identity; hosted/cloud/paid gate language from earlier entries is legacy context only.
 
-    ## [Unreleased]
+## [Unreleased]
 
-    ## [1.4.0] - 2026-06-19
+## [1.4.0] - 2026-06-19
 
-    ### Added
+### Added
 
-    - **Vacancy workflow editing contract**: Added typed application update/list filters plus stage create, update, archive, restore, calendar-event, and recording-attach contracts across service, IPC, preload, renderer API, and shared types.
-    - **Stage-first command center controls**: Vacancy details now expose editable application fields, direct stage creation/editing, stage-level calendar actions, stage-level recording attachment, archived-stage grouping, and desktop pane resizing.
+- **Vacancy workflow editing contract**: Added typed application update/list filters plus stage create, update, archive, restore, calendar-event, and recording-attach contracts across service, IPC, preload, renderer API, and shared types.
+- **Stage-first command center controls**: Vacancy details now expose editable application fields, direct stage creation/editing, stage-level calendar actions, stage-level recording attachment, archived-stage grouping, and desktop pane resizing.
+- **Community launch entry point**: Added public README, release, contributor, maintainer, AGPL, roadmap, and recruiter-chat demo docs for the first OpenOffer community release.
+- **GitHub Release publishing**: Added signed macOS release publication with curated release notes, checksum generation, and artifact bundling for GitHub Releases.
 
-    ### Changed
+### Changed
 
-    - **Legacy compatibility sync**: Application and stage updates now keep mapped legacy interview rows compatible transactionally while preserving legacy-only interviews and unmapped stages.
-    - **Settings layout constraints**: Refined the Settings shell dimensions so the panel stays bounded on compact viewports.
+- **Legacy compatibility sync**: Application and stage updates now keep mapped legacy interview rows compatible transactionally while preserving legacy-only interviews and unmapped stages.
+- **Settings layout constraints**: Refined the Settings shell dimensions so the panel stays bounded on compact viewports.
+- **Vacancy navigation copy**: Renamed the visible `Vacancy OS` label to plain vacancy wording in the command center and provider task settings.
 
-    ### Fixed
+### Fixed
 
-    - **Archive semantics**: Archived applications and stages now filter consistently, application restore clears legacy archive state, and stage restore is an explicit action instead of an accidental status-edit side effect.
-    - **Provider failure handling**: Stage calendar writes preserve the local schedule when an external provider fails after local save.
+- **Archive semantics**: Archived applications and stages now filter consistently, application restore clears legacy archive state, and stage restore is an explicit action instead of an accidental status-edit side effect.
+- **Provider failure handling**: Stage calendar writes preserve the local schedule when an external provider fails after local save.
 
-    ### Tests
+### Tests
 
-    - Added repository, service, IPC wiring, source hardening, i18n, and Playwright coverage for application filters, stage create/update/archive/restore, legacy sync, calendar write contracts, direct stage creation, stage recording links, pane resizing, and compact Settings bounds.
+- Added repository, service, IPC wiring, source hardening, i18n, and Playwright coverage for application filters, stage create/update/archive/restore, legacy sync, calendar write contracts, direct stage creation, stage recording links, pane resizing, and compact Settings bounds.
 
-    ## [1.3.0] - 2026-06-18
+## [1.3.0] - 2026-06-18
 
-    ### Added
+### Added
 
-    - **Vacancy-first interview workspace**: Active vacancies now use application and stage entities, so a vacancy can show every linked interview stage, recording, transcript, retro evaluation, and meeting attachment without duplicating the vacancy.
-    - **AI intake for long recruiter chats**: The agent can parse longer pasted conversations, preserve the final scheduling messages for AI extraction, match stages to existing vacancies, and propose one clear action before applying it.
-    - **Task-specific AI model policy**: Settings now exposes default and per-task model choices for chat, vacancy intake, scraping, retro analysis, and agent actions, seeded from configured provider models when possible.
-    - **AI retro evaluation**: Linked recordings can produce a first-pass AI retro from transcript text before the user adds their own call notes.
+- **Vacancy-first interview workspace**: Active vacancies now use application and stage entities, so a vacancy can show every linked interview stage, recording, transcript, retro evaluation, and meeting attachment without duplicating the vacancy.
+- **AI intake for long recruiter chats**: The agent can parse longer pasted conversations, preserve the final scheduling messages for AI extraction, match stages to existing vacancies, and propose one clear action before applying it.
+- **Task-specific AI model policy**: Settings now exposes default and per-task model choices for chat, vacancy intake, scraping, retro analysis, and agent actions, seeded from configured provider models when possible.
+- **AI retro evaluation**: Linked recordings can produce a first-pass AI retro from transcript text before the user adds their own call notes.
 
-    ### Changed
+### Changed
 
-    - **Interview command center polish**: Simplified the main layout around the selected day, active vacancy list, vacancy detail, stage list, compact agent widget, and lightweight calendar sync state.
-    - **Calendar and meeting linkage**: Meeting records now carry application and stage ids, and legacy interview rows backfill those links so existing recordings remain visible in the new vacancy view.
-    - **Public app copy**: Removed the stale What's New section from the About surface.
+- **Interview command center polish**: Simplified the main layout around the selected day, active vacancy list, vacancy detail, stage list, compact agent widget, and lightweight calendar sync state.
+- **Calendar and meeting linkage**: Meeting records now carry application and stage ids, and legacy interview rows backfill those links so existing recordings remain visible in the new vacancy view.
+- **Public app copy**: Removed the stale What's New section from the About surface.
 
-    ### Fixed
+### Fixed
 
-    - **Recruiter chat parsing**: AI intake now recovers company, role, accepted slot, and meeting URL from dialogue-style recruiter messages such as Ozon Tech stage invitations.
-    - **Stage recording scope**: Recordings displayed inside a stage are scoped to that stage instead of leaking counts from the whole vacancy.
-    - **Status sync**: Archiving or status-changing a legacy interview keeps the mapped vacancy status in sync.
+- **Recruiter chat parsing**: AI intake now recovers company, role, accepted slot, and meeting URL from dialogue-style recruiter messages such as Ozon Tech stage invitations.
+- **Stage recording scope**: Recordings displayed inside a stage are scoped to that stage instead of leaking counts from the whole vacancy.
+- **Status sync**: Archiving or status-changing a legacy interview keeps the mapped vacancy status in sync.
 
-    ### Tests
+### Tests
 
-    - Added service, IPC, task-model, parser, retro-evaluation, and Playwright coverage for vacancy matching, long pasted chats, stage linkage, task model resolution, raw text collapse, calendar navigation, recording attachment, and AI retro states.
+- Added service, IPC, task-model, parser, retro-evaluation, and Playwright coverage for vacancy matching, long pasted chats, stage linkage, task model resolution, raw text collapse, calendar navigation, recording attachment, and AI retro states.
 
-    ## [1.2.0] - 2026-06-18
+## [1.2.0] - 2026-06-18
 
-    ### Added
+### Added
 
-    - **Interface localization layer**: Added English and Russian interface locales, data-only custom translation packs from the app-data folder, a Settings language selector, Electron settings persistence, preload events, i18next runtime wiring, and source-level guardrails for translated UI copy.
+- **Interface localization layer**: Added English and Russian interface locales, data-only custom translation packs from the app-data folder, a Settings language selector, Electron settings persistence, preload events, i18next runtime wiring, and source-level guardrails for translated UI copy.
 
-    ### Changed
+### Changed
 
-    - **Localized core app surfaces**: Migrated the launcher, top pill, settings shell, onboarding permission toaster, and interview command center copy to the translation catalog while keeping transcription language and AI response language as separate preferences.
-    - **Translation contribution docs**: Documented the supported locale boundary, key conventions, interpolation/plural rules, custom pack validation limits, and refresh workflow.
+- **Localized core app surfaces**: Migrated the launcher, top pill, settings shell, onboarding permission toaster, and interview command center copy to the translation catalog while keeping transcription language and AI response language as separate preferences.
+- **Translation contribution docs**: Documented the supported locale boundary, key conventions, interpolation/plural rules, custom pack validation limits, and refresh workflow.
 
-    ### Tests
+### Tests
 
-    - Added translation catalog parity tests, locale resolution coverage, custom pack validation tests, IPC wiring guards, and a hardcoded-copy scanner for migrated surfaces.
-    - Refreshed source-level UI reachability tests so they assert against translation keys instead of stale English literals.
+- Added translation catalog parity tests, locale resolution coverage, custom pack validation tests, IPC wiring guards, and a hardcoded-copy scanner for migrated surfaces.
+- Refreshed source-level UI reachability tests so they assert against translation keys instead of stale English literals.
 
-    ## [1.1.0] - 2026-06-18
+## [1.1.0] - 2026-06-18
 
-    ### What's New
+### What's New
 
-    - **Interview OS command center**: Reworked the startup launcher into a workbench for active job-search processes, with a left-side interview calendar, pipeline list, readiness scoring, vacancy dossier, prep brief, question bank, retro notes, and linked meeting recordings.
-    - **Calendar-backed interview scheduling**: Added interview creation and writeback paths for Google Calendar and macOS Calendar, plus local calendar status and meeting-link contracts.
-    - **LiteLLM AI Gateway**: Added LiteLLM as a built-in provider, giving access to 100+ LLM providers (AWS Bedrock, Google Vertex AI, Azure, Cohere, and more) through a single OpenAI-compatible proxy. Configure the proxy URL and optional virtual key under Settings → AI Providers → LiteLLM Proxy; models are auto-discovered from the proxy and listed with a `litellm/` prefix. Max output tokens default to **Auto** — each model's real output budget is read from the proxy's `/model/info` registry (fallback 8,192) — with a manual dropdown override (4K–1M). Routes through the same data-scope gating, rate-limiting, and abort-aware streaming as every other cloud provider.
+- **Interview OS command center**: Reworked the startup launcher into a workbench for active job-search processes, with a left-side interview calendar, pipeline list, readiness scoring, vacancy dossier, prep brief, question bank, retro notes, and linked meeting recordings.
+- **Calendar-backed interview scheduling**: Added interview creation and writeback paths for Google Calendar and macOS Calendar, plus local calendar status and meeting-link contracts.
+- **LiteLLM AI Gateway**: Added LiteLLM as a built-in provider, giving access to 100+ LLM providers (AWS Bedrock, Google Vertex AI, Azure, Cohere, and more) through a single OpenAI-compatible proxy. Configure the proxy URL and optional virtual key under Settings → AI Providers → LiteLLM Proxy; models are auto-discovered from the proxy and listed with a `litellm/` prefix. Max output tokens default to **Auto** — each model's real output budget is read from the proxy's `/model/info` registry (fallback 8,192) — with a manual dropdown override (4K–1M). Routes through the same data-scope gating, rate-limiting, and abort-aware streaming as every other cloud provider.
 
-    ### Changed
+### Changed
 
-    - **Public app surfaces**: Removed creator, donation, Buy Me a Coffee, and inherited personal-brand surfaces from startup, support, help, and about flows.
-    - **Interview data safety**: Hardened interview payload validation and expanded telemetry/log privacy canaries so prep notes, vacancy text, salary data, retro notes, and interview questions are not emitted as raw content.
+- **Public app surfaces**: Removed creator, donation, Buy Me a Coffee, and inherited personal-brand surfaces from startup, support, help, and about flows.
+- **Interview data safety**: Hardened interview payload validation and expanded telemetry/log privacy canaries so prep notes, vacancy text, salary data, retro notes, and interview questions are not emitted as raw content.
 
-    ### Tests
+### Tests
 
-    - Added a Playwright E2E flow for manual interview creation, prep, questions, retro capture, and recording linking.
-    - Added service and contract coverage for interview repositories, IPC wiring, taxonomy, calendar writeback, macOS Calendar integration, and privacy redaction.
+- Added a Playwright E2E flow for manual interview creation, prep, questions, retro capture, and recording linking.
+- Added service and contract coverage for interview repositories, IPC wiring, taxonomy, calendar writeback, macOS Calendar integration, and privacy redaction.
 
-    ## [1.0.2] - 2026-06-17
+## [1.0.2] - 2026-06-17
 
-    ### Added
+### Added
 
-    - **OpenOffer brand asset pipeline**: Added a checked-in SVG source, generated PNG/ICO/ICNS assets, and a `brand:assets` script with regression coverage for key packaged icon dimensions.
+- **OpenOffer brand asset pipeline**: Added a checked-in SVG source, generated PNG/ICO/ICNS assets, and a `brand:assets` script with regression coverage for key packaged icon dimensions.
 
-    ### Changed
+### Changed
 
-    - **OpenOffer logo rollout**: Replaced the remaining inherited Natively logo files used by the app, browser extension, public README, and packaged desktop builds with the approved OpenOffer mark.
+- **OpenOffer logo rollout**: Replaced the remaining inherited Natively logo files used by the app, browser extension, public README, and packaged desktop builds with the approved OpenOffer mark.
 
-    ## [1.0.1] - 2026-06-17
+## [1.0.1] - 2026-06-17
 
-    ### Added
+### Added
 
-    - **YandexGPT provider support**: Added Yandex AI Studio credentials, model discovery, response handling, and provider routing so OpenOffer can run interview assistance through YandexGPT models.
-    - **Prompt packs and answer styles**: Added model-aware prompt pack selection with Russian Yandex defaults plus universal answer styles for strict, detailed, and hint-style responses.
-    - **Yandex prompt evaluation tools**: Added dry-run and live smoke scripts, ML engineer mock interview fixtures, and setup docs for checking Russian prompt behavior before shipping prompt changes.
-    - **Fast local dev commands**: Added no-rebuild Electron launch scripts, including a screen-permission bypass helper for local macOS TCC troubleshooting.
+- **YandexGPT provider support**: Added Yandex AI Studio credentials, model discovery, response handling, and provider routing so OpenOffer can run interview assistance through YandexGPT models.
+- **Prompt packs and answer styles**: Added model-aware prompt pack selection with Russian Yandex defaults plus universal answer styles for strict, detailed, and hint-style responses.
+- **Yandex prompt evaluation tools**: Added dry-run and live smoke scripts, ML engineer mock interview fixtures, and setup docs for checking Russian prompt behavior before shipping prompt changes.
+- **Fast local dev commands**: Added no-rebuild Electron launch scripts, including a screen-permission bypass helper for local macOS TCC troubleshooting.
 
-    ### Changed
+### Changed
 
-    - **AI provider settings UX**: Made the Yandex settings panel fit the app bounds and surfaced prompt/answer-style controls in the model selector.
-    - **Environment setup**: Added `.env.example` and documented Yandex AI Studio configuration for local testing.
+- **AI provider settings UX**: Made the Yandex settings panel fit the app bounds and surfaced prompt/answer-style controls in the model selector.
+- **Environment setup**: Added `.env.example` and documented Yandex AI Studio configuration for local testing.
 
-    ### Fixed
+### Fixed
 
-    - **Prompt persistence**: Fixed answer-style and prompt-pack resolution across startup, model switching, and preferred model changes.
-    - **Local macOS packaging**: Re-sealed ad-hoc signed macOS apps after native module signing so local DMGs verify cleanly.
+- **Prompt persistence**: Fixed answer-style and prompt-pack resolution across startup, model switching, and preferred model changes.
+- **Local macOS packaging**: Re-sealed ad-hoc signed macOS apps after native module signing so local DMGs verify cleanly.
 
-    ## [1.0.0] - 2026-06-15
+## [1.0.0] - 2026-06-15
 
-    ### Added
+### Added
 
-    - **OpenOffer public identity**: Rebranded the public package, README, release metadata, and app-facing copy for the OpenOffer fork.
-    - **GigaSTT local runtime support**: Added managed GigaSTT status checks, runtime wiring, and settings feedback for stable Russian local transcription.
+- **OpenOffer public identity**: Rebranded the public package, README, release metadata, and app-facing copy for the OpenOffer fork.
+- **GigaSTT local runtime support**: Added managed GigaSTT status checks, runtime wiring, and settings feedback for stable Russian local transcription.
 
-    ### Changed
+### Changed
 
-    - **Commercial paths removed**: Removed hosted API, Pro, license, trial, quota, commercial gate, and upgrade flows from the public build.
-    - **Public build tests refreshed**: Replaced obsolete commercial tests with coverage for the public OpenOffer contracts that still exist.
+- **Commercial paths removed**: Removed hosted API, Pro, license, trial, quota, commercial gate, and upgrade flows from the public build.
+- **Public build tests refreshed**: Replaced obsolete commercial tests with coverage for the public OpenOffer contracts that still exist.
 
-    ### Fixed
+### Fixed
 
-    - **OpenAI realtime STT**: Updated transcription setup to the GA `transcription_session.update` schema.
-    - **Streaming finalization**: Prevented queued token batches from landing after a final answer.
-    - **Java code verification**: Fixed generated wrappers for non-static inner `Solution` classes.
-    - **External links**: Kept macOS system-settings links platform-gated while allowing safe HTTPS help/provider URLs.
+- **OpenAI realtime STT**: Updated transcription setup to the GA `transcription_session.update` schema.
+- **Streaming finalization**: Prevented queued token batches from landing after a final answer.
+- **Java code verification**: Fixed generated wrappers for non-static inner `Solution` classes.
+- **External links**: Kept macOS system-settings links platform-gated while allowing safe HTTPS help/provider URLs.
 
-    ## [2.7.0] - 2026-06-05
+## [2.7.0] - 2026-06-05
 
-    ### What's New
+### What's New
 
-    - **Profile Intelligence Router (v2)**: Advanced domain classification (Coding, System Design, Behavioral, Negotiation) propagating constraints directly to LLM streaming paths.
-    - **DeepSeek AI Support**: Native integration of DeepSeek's advanced reasoning models via custom cURL OpenAI-compatible API providers.
-    - **Two New Meeting UI Themes**: Beautiful Liquid Glass and Modern Dark themes to completely redefine the real-time overlay visual experience.
-    - **Answer-Type Constraints & Follow-Up Resolver**: Context-aware follow-up resolution with strict output formatting layout constraints (short, detailed, bulleted, code-only).
-    - **Eager Code UI Expansion**: Growth-holds CSS elements to eagerly size overlays before React code-block mounting to prevent layout shifts.
-    - **PI Latency Tracer (`PiLatencyTracer`)**: Telemetry to track reasoning, validation, and routing latencies to guarantee sub-500ms responsiveness.
-    - **Evidence Validator & Live Deadlines**: Cross-validates claims made in meetings and displays real-time countdowns for live assessment deadlines.
-    - **Single-Click In-App Updates**: Seamless update loops directly inside the desktop application.
+- **Profile Intelligence Router (v2)**: Advanced domain classification (Coding, System Design, Behavioral, Negotiation) propagating constraints directly to LLM streaming paths.
+- **DeepSeek AI Support**: Native integration of DeepSeek's advanced reasoning models via custom cURL OpenAI-compatible API providers.
+- **Two New Meeting UI Themes**: Beautiful Liquid Glass and Modern Dark themes to completely redefine the real-time overlay visual experience.
+- **Answer-Type Constraints & Follow-Up Resolver**: Context-aware follow-up resolution with strict output formatting layout constraints (short, detailed, bulleted, code-only).
+- **Eager Code UI Expansion**: Growth-holds CSS elements to eagerly size overlays before React code-block mounting to prevent layout shifts.
+- **PI Latency Tracer (`PiLatencyTracer`)**: Telemetry to track reasoning, validation, and routing latencies to guarantee sub-500ms responsiveness.
+- **Evidence Validator & Live Deadlines**: Cross-validates claims made in meetings and displays real-time countdowns for live assessment deadlines.
+- **Single-Click In-App Updates**: Seamless update loops directly inside the desktop application.
 
-    ### Improvements & Fixes
+### Improvements & Fixes
 
-    - **Audio Stack & TCC Permission Hardening**: Hardened credentials management by eliminating racing set-provider IPCs and resolved macOS system audio process tapping/TCC permission gates to guarantee robust capture streams.
-    - **Production-Grade API Audit (server.js)**:
-      - Resolved ElevenLabs open -> session_started audio gap on failover/reconnect.
-      - Fixed mic-only billing bypass with active/recent system presence checks.
-      - Fixed stream-abort billing leaks by moving billing triggers to the stream `finally` block.
-      - Patched language regex prompt injection security vulnerablities on `/v1/chat/completions`.
-      - Implemented webhook processing retries with 3-attempt exponential backoff.
-      - Fixed fallback-seconds double counting on STT reconnect-after-failover.
-      - Integrated HTTP keep-alive connection pooling via undici agent.
-      - Resolved DNS lookup cache thrashing during key-rotation reconnect storms.
-      - Sanitized admin endpoint `provider-health` key leak.
-      - Added a 34-unit test suite (`unit-fixes.test.mjs`) to verify server logic.
+- **Audio Stack & TCC Permission Hardening**: Hardened credentials management by eliminating racing set-provider IPCs and resolved macOS system audio process tapping/TCC permission gates to guarantee robust capture streams.
+- **Production-Grade API Audit (server.js)**:
+  - Resolved ElevenLabs open -> session_started audio gap on failover/reconnect.
+  - Fixed mic-only billing bypass with active/recent system presence checks.
+  - Fixed stream-abort billing leaks by moving billing triggers to the stream `finally` block.
+  - Patched language regex prompt injection security vulnerablities on `/v1/chat/completions`.
+  - Implemented webhook processing retries with 3-attempt exponential backoff.
+  - Fixed fallback-seconds double counting on STT reconnect-after-failover.
+  - Integrated HTTP keep-alive connection pooling via undici agent.
+  - Resolved DNS lookup cache thrashing during key-rotation reconnect storms.
+  - Sanitized admin endpoint `provider-health` key leak.
+  - Added a 34-unit test suite (`unit-fixes.test.mjs`) to verify server logic.
 
-    ## [2.6.0] - 2026-05-15
+## [2.6.0] - 2026-05-15
 
-    ### What's New
+### What's New
 
-    - **Phone Link Integration**: Connect iOS or Android devices as remote mics or companion screens.
-    - **TinyPrompts™ Engine**: System prompts optimized for local SLMs (Ollama, Qwen 2.5:4B, Llama 3.2).
-    - **Codex CLI Integration**: Sandboxed code execution and terminal tasks via `gpt-5.3-codex`.
-    - **Auto-Calendar Sync**: Calendar connectors (Google Calendar, Outlook) for prep context.
-    - **Smart Task Sync**: Auto-extract action items and export to Jira, Linear, or Asana.
-    - **Speaker Identification**: Real-time speaker diarization tagging transcript names.
+- **Phone Link Integration**: Connect iOS or Android devices as remote mics or companion screens.
+- **TinyPrompts™ Engine**: System prompts optimized for local SLMs (Ollama, Qwen 2.5:4B, Llama 3.2).
+- **Codex CLI Integration**: Sandboxed code execution and terminal tasks via `gpt-5.3-codex`.
+- **Auto-Calendar Sync**: Calendar connectors (Google Calendar, Outlook) for prep context.
+- **Smart Task Sync**: Auto-extract action items and export to Jira, Linear, or Asana.
+- **Speaker Identification**: Real-time speaker diarization tagging transcript names.
 
-    ### Improvements & Fixes
+### Improvements & Fixes
 
-    - **Advanced Stealth Features**: Activity Monitor evasion, process name disguising, and strict timeout management.
-    - **Scroll & Layout**: Scroll keybinds for mouse-free navigation and horizontal layout code line rendering fixes.
-    - **OpenAI Realtime GA**: Upgraded OpenAI realtime streaming STT connection to the new GA session schema.
+- **Advanced Stealth Features**: Activity Monitor evasion, process name disguising, and strict timeout management.
+- **Scroll & Layout**: Scroll keybinds for mouse-free navigation and horizontal layout code line rendering fixes.
+- **OpenAI Realtime GA**: Upgraded OpenAI realtime streaming STT connection to the new GA session schema.
 
-    ## [2.5.0] - 2026-04-25
+## [2.5.0] - 2026-04-25
 
-    ### What's New
+### What's New
 
-    - **Modes Manager**: Toggle between 7 tailored personas (General, Technical Interview, Looking for Work, Sales, Recruiting, Team Meet, and Lecture) with custom templates.
-    - **Custom Context & Notes**: Paste up to 8,000 characters of instructions, crib sheets, or credentials, auto-injected as XML blocks.
-    - **10-Minute Free Trial**: Free trial system with HWID+IP anti-abuse protections.
-    - **Permissions Onboarding Toaster**: macOS/Windows onboarding toaster for TCC permissions.
+- **Modes Manager**: Toggle between 7 tailored personas (General, Technical Interview, Looking for Work, Sales, Recruiting, Team Meet, and Lecture) with custom templates.
+- **Custom Context & Notes**: Paste up to 8,000 characters of instructions, crib sheets, or credentials, auto-injected as XML blocks.
+- **10-Minute Free Trial**: Free trial system with HWID+IP anti-abuse protections.
+- **Permissions Onboarding Toaster**: macOS/Windows onboarding toaster for TCC permissions.
 
-    ### Improvements & Fixes
+### Improvements & Fixes
 
-    - **STT Connection Pools & Key Pools**: Round-robin pools (up to 6 keys for Deepgram and ElevenLabs), failover logic, and shadow-probe watchdogs.
-    - **Bluetooth/AirPods Conflict Resolution**: Autodetects macOS CoreAudio conflicts and switches to built-in mic.
-    - **Reliable Screenshot Capture**: Hardened multi-screenshot capture with `Cmd+Shift+Enter` single-trigger analysis.
-    - **Dodo Webhook Billing Hardening**: Refactored payment processing webhook endpoints, splitting them into `/webhooks/dodo/api` and `/webhooks/dodo/pro`.
+- **STT Connection Pools & Key Pools**: Round-robin pools (up to 6 keys for Deepgram and ElevenLabs), failover logic, and shadow-probe watchdogs.
+- **Bluetooth/AirPods Conflict Resolution**: Autodetects macOS CoreAudio conflicts and switches to built-in mic.
+- **Reliable Screenshot Capture**: Hardened multi-screenshot capture with `Cmd+Shift+Enter` single-trigger analysis.
+- **Dodo Webhook Billing Hardening**: Refactored payment processing webhook endpoints, splitting them into `/webhooks/dodo/api` and `/webhooks/dodo/pro`.
 
-    ## [2.4.0] - 2026-04-10
+## [2.4.0] - 2026-04-10
 
-    ### What's New & Improvements
+### What's New & Improvements
 
-    - **Permissions Check IPC**: IPC bridges for TCC and audio check.
-    - **Log Forwarding**: Added `open-log-file` and console logging forwarding to `~/Documents/natively_debug.log`.
-    - **Tavily Multi-Key Search Pool**: Tavily search key pool supporting up to 11 keys with round-robin rotation, automatic credit tracking, and exhaustion alerts.
-    - **Ad Campaigns Engine**: Cooldown logic and targeting for Pro upgrade campaigns.
+- **Permissions Check IPC**: IPC bridges for TCC and audio check.
+- **Log Forwarding**: Added `open-log-file` and console logging forwarding to `~/Documents/natively_debug.log`.
+- **Tavily Multi-Key Search Pool**: Tavily search key pool supporting up to 11 keys with round-robin rotation, automatic credit tracking, and exhaustion alerts.
+- **Ad Campaigns Engine**: Cooldown logic and targeting for Pro upgrade campaigns.
 
-    ## [2.0.7] - 2026-03-20
+## [2.0.7] - 2026-03-20
 
-    ### What's New
-    
-    - **Single-Trigger Analysis**: Added a new global keybind (`Cmd+Shift+Enter`) for "Capture and Process" to instantly take a screenshot and run AI analysis.
-    - **Tavily Search Integration**: Replaced Google Custom Search Engine with the Tavily Search API. Features advanced depth and raw content extraction for vastly improved RAG and Company Research.
-    - **Enhanced Company Dossiers**: Massively expanded the Premium Profile Intelligence UI. Now includes interview difficulty badges, a 5-star work culture grid with sub-dimensions, employee reviews with sentiment analysis, critics/complaints tracking, and core benefits pills.
+### What's New
 
-    ### Improvements
-    
-    - **AI Language Strict Enforcement**: Rewrote the AI language enforcement pipeline. Native languages (Spanish, French, etc.) are now strongly prioritized over system prompt defaults using a triple-layer strict injection, guaranteeing the AI never incorrectly defaults back to English.
-    - **Model Selection Accuracy**: Rewrote `LLMHelper` routing logic to guarantee your specifically selected cloud provider model (e.g., `gpt-4o`, `claude-3-5-sonnet`) is rigorously respected during vision fallbacks, multimodal processing, and streaming.
-    - **Robust AI Fallbacks**: Added Gemini Flash and local Ollama models to the structured generation fallback chains, ensuring features like resume parsing work continuously even when primary models face rate limits or outages.
-    - **Smoother Animations**: Mac window transitions now utilize zero-opacity pre-hiding to eliminate jarring animation flashes during rapid screenshot captures.
-    
-    ### Fixes
-    
-    - Fixed a bug where custom cURL endpoints and the "What to Say" auto-suggestion path would occasionally bypass the user's language preferences.
-    - Fixed the OpenAI API validation ping by upgrading the deprecated connection test model to `gpt-4o-mini`.
-    - Fixed UI sync issues where the AI response language dropdown could fall out of sync with the backend upon an IPC failure via a new optimistic playback system.
-    - Removed unused dead user interface components and completely sanitized legacy template variables from core system prompts.
+- **Single-Trigger Analysis**: Added a new global keybind (`Cmd+Shift+Enter`) for "Capture and Process" to instantly take a screenshot and run AI analysis.
+- **Tavily Search Integration**: Replaced Google Custom Search Engine with the Tavily Search API. Features advanced depth and raw content extraction for vastly improved RAG and Company Research.
+- **Enhanced Company Dossiers**: Massively expanded the Premium Profile Intelligence UI. Now includes interview difficulty badges, a 5-star work culture grid with sub-dimensions, employee reviews with sentiment analysis, critics/complaints tracking, and core benefits pills.
 
-    ## [2.0.5] - 2026-03-15
+### Improvements
 
-    ### Improvements
+- **AI Language Strict Enforcement**: Rewrote the AI language enforcement pipeline. Native languages (Spanish, French, etc.) are now strongly prioritized over system prompt defaults using a triple-layer strict injection, guaranteeing the AI never incorrectly defaults back to English.
+- **Model Selection Accuracy**: Rewrote `LLMHelper` routing logic to guarantee your specifically selected cloud provider model (e.g., `gpt-4o`, `claude-3-5-sonnet`) is rigorously respected during vision fallbacks, multimodal processing, and streaming.
+- **Robust AI Fallbacks**: Added Gemini Flash and local Ollama models to the structured generation fallback chains, ensuring features like resume parsing work continuously even when primary models face rate limits or outages.
+- **Smoother Animations**: Mac window transitions now utilize zero-opacity pre-hiding to eliminate jarring animation flashes during rapid screenshot captures.
 
-    - **Stealth Mode UI**: The Process Disguise selector is now visually disabled and locked while Undetectable mode is active, preventing accidental state mismatches.
-    - **State Synchronization**: Greatly improved internal state synchronization across all application windows (Settings, Launcher, Overlay).
+### Fixes
 
-    ### Fixes
+- Fixed a bug where custom cURL endpoints and the "What to Say" auto-suggestion path would occasionally bypass the user's language preferences.
+- Fixed the OpenAI API validation ping by upgrading the deprecated connection test model to `gpt-4o-mini`.
+- Fixed UI sync issues where the AI response language dropdown could fall out of sync with the backend upon an IPC failure via a new optimistic playback system.
+- Removed unused dead user interface components and completely sanitized legacy template variables from core system prompts.
 
-    - **Infinite Feedback Loops**: Completely eliminated the bug where toggling Undetectable mode would sometimes cause the app to rapidly toggle itself on and off.
-    - **Delayed Dock Reappearance**: Fixed a regression where the macOS dock icon would mysteriously reappear several seconds after entering stealth mode if a disguise had recently been changed.
-    - **Initial State Loading**: Fixed an issue where the Settings UI would briefly show incorrect toggle states when first opened.
-    - **macOS OS-level Events**: Hardened the app against macOS `activate` events (like clicking the app in Finder) accidentally breaking stealth mode.
+## [2.0.5] - 2026-03-15
 
-    ### Technical
+### Improvements
 
-    - Refactored IPC (Inter-Process Communication) listeners for `SettingsPopup` and `SettingsOverlay` to use a strict one-way (receive-only) data binding pattern.
-    - Added strict management and cancellation of `forceUpdate` timeouts during stealth mode transitions.
-    - Added explicit type safety for the new getters in `electron.d.ts`.
+- **Stealth Mode UI**: The Process Disguise selector is now visually disabled and locked while Undetectable mode is active, preventing accidental state mismatches.
+- **State Synchronization**: Greatly improved internal state synchronization across all application windows (Settings, Launcher, Overlay).
 
-    ## [2.0.4] - 2026-03-14
+### Fixes
 
-    ### Summary
+- **Infinite Feedback Loops**: Completely eliminated the bug where toggling Undetectable mode would sometimes cause the app to rapidly toggle itself on and off.
+- **Delayed Dock Reappearance**: Fixed a regression where the macOS dock icon would mysteriously reappear several seconds after entering stealth mode if a disguise had recently been changed.
+- **Initial State Loading**: Fixed an issue where the Settings UI would briefly show incorrect toggle states when first opened.
+- **macOS OS-level Events**: Hardened the app against macOS `activate` events (like clicking the app in Finder) accidentally breaking stealth mode.
 
-    Version 2.0.4 introduces a massive architectural overhaul to the native audio pipeline, guaranteeing production-ready stability, true zero-allocation data transfer, and instantaneous STT responsiveness with WebRTC ML-based VAD.
+### Technical
 
-    ### What's New
+- Refactored IPC (Inter-Process Communication) listeners for `SettingsPopup` and `SettingsOverlay` to use a strict one-way (receive-only) data binding pattern.
+- Added strict management and cancellation of `forceUpdate` timeouts during stealth mode transitions.
+- Added explicit type safety for the new getters in `electron.d.ts`.
 
-    - **Two-Stage Silence Processing**: Replaced basic RMS noise gating with a two-stage pipeline combining an adaptive RMS threshold and WebRTC Machine Learning VAD. Rejects typing, fan noise, and non-speech sounds before they bill STT APIs.
-    - **Zero-Copy ABI Transfers**: Transitioned the `ThreadsafeFunction` bridging to direct `napi::Buffer` (Uint8Array) allocations, completely eliminating V8 garbage collection pressure during continuous capture.
-    - **Sliding-Window RAG**: Implemented a 50-token semantic overlap in `SemanticChunker.ts` to prevent conversational context loss across chunk boundaries.
+## [2.0.4] - 2026-03-14
 
-    ### Improvements
+### Summary
 
-    - **Latency & Responsiveness Tuning**: Stripped redundant TS debouncing, slashed `MIN_BUFFER_BYTES`, and reduced native hangover, achieving a ~300ms reduction in end-to-end transcription latency. short utterances ("Yes", "Stop") no longer sit trapped in the buffer.
-    - Removed floating-point division truncation for superior downsampling from 44.1kHz external microphones.
+Version 2.0.4 introduces a massive architectural overhaul to the native audio pipeline, guaranteeing production-ready stability, true zero-allocation data transfer, and instantaneous STT responsiveness with WebRTC ML-based VAD.
 
-    ### Fixes
+### What's New
 
-    - Fixed a critical bug where the native Rust monitor returned a hardcoded `16000Hz` while actually streaming 48kHz audio. Now syncs true hardware sample rates.
-    - Resolved the "Input missing" silent crash bug on microphone restarts by properly recreating the CPAL stream.
-    - Restored the 10s continuous speech backstop for REST APIs to prevent unbounded buffer growth.
-    - Added missing `notifySpeechEnded()` properties and cleaned up dangerous type casts.
+- **Two-Stage Silence Processing**: Replaced basic RMS noise gating with a two-stage pipeline combining an adaptive RMS threshold and WebRTC Machine Learning VAD. Rejects typing, fan noise, and non-speech sounds before they bill STT APIs.
+- **Zero-Copy ABI Transfers**: Transitioned the `ThreadsafeFunction` bridging to direct `napi::Buffer` (Uint8Array) allocations, completely eliminating V8 garbage collection pressure during continuous capture.
+- **Sliding-Window RAG**: Implemented a 50-token semantic overlap in `SemanticChunker.ts` to prevent conversational context loss across chunk boundaries.
 
-    ### Technical
+### Improvements
 
-    - Audio processing transitioned entirely to strict ABI memory bridging (`napi::Buffer`)
-    - Re-architected native silence_suppression state machine around WebRTC VAD inputs.
+- **Latency & Responsiveness Tuning**: Stripped redundant TS debouncing, slashed `MIN_BUFFER_BYTES`, and reduced native hangover, achieving a ~300ms reduction in end-to-end transcription latency. short utterances ("Yes", "Stop") no longer sit trapped in the buffer.
+- Removed floating-point division truncation for superior downsampling from 44.1kHz external microphones.
 
-    ## [2.0.3] - 2026-03-13
+### Fixes
 
-    ### What's New
+- Fixed a critical bug where the native Rust monitor returned a hardcoded `16000Hz` while actually streaming 48kHz audio. Now syncs true hardware sample rates.
+- Resolved the "Input missing" silent crash bug on microphone restarts by properly recreating the CPAL stream.
+- Restored the 10s continuous speech backstop for REST APIs to prevent unbounded buffer growth.
+- Added missing `notifySpeechEnded()` properties and cleaned up dangerous type casts.
 
-    - **Dynamic AI Model Selection:** Replaced static model lists with dynamic dropdowns. Your preferred models synced from providers (like OpenAI, Anthropic, Google) now automatically appear across the entire app.
-    - **Multimodal Resilience:** Added a "Smart Dynamic Fallback" using Groq Llama 4 Scout. If default vision models fail or get rate-limited during screen analysis, Natively instantly reroutes the image to ensure uninterrupted performance.
-    - **Multiple Screenshot Support:** The Natively Interface can now handle and process multiple attached screenshots simultaneously instead of just one.
-    - **Improved Settings UX:** API keys now auto-save after 5 seconds of inactivity, and selecting a preferred model immediately updates the rest of the application without requiring a page reload.
+### Technical
 
-    ### Architecture & Fixes
+- Audio processing transitioned entirely to strict ABI memory bridging (`napi::Buffer`)
+- Re-architected native silence_suppression state machine around WebRTC VAD inputs.
 
-    - **Better Embeddings:** Migrated from Gemini Embedding to a completely new and more robust embedding architecture.
-    - **Claude Fixes:** Resolved max_tokens and context limits issues specific to Anthropic Claude interactions.
-    - **DRY Refactoring:** Centralized model configuration strings across the codebase to ensure easier future updates.
+## [2.0.3] - 2026-03-13
 
-    ## [2.0.2] - 2026-03-10
+### What's New
 
-    ### Summary
+- **Dynamic AI Model Selection:** Replaced static model lists with dynamic dropdowns. Your preferred models synced from providers (like OpenAI, Anthropic, Google) now automatically appear across the entire app.
+- **Multimodal Resilience:** Added a "Smart Dynamic Fallback" using Groq Llama 4 Scout. If default vision models fail or get rate-limited during screen analysis, Natively instantly reroutes the image to ensure uninterrupted performance.
+- **Multiple Screenshot Support:** The Natively Interface can now handle and process multiple attached screenshots simultaneously instead of just one.
+- **Improved Settings UX:** API keys now auto-save after 5 seconds of inactivity, and selecting a preferred model immediately updates the rest of the application without requiring a page reload.
 
-    v2.0.2 focuses on fixing Windows system audio capture, improving RAG stability, and resolving critical Soniox STT configuration issues.
+### Architecture & Fixes
 
-    ### What's New
+- **Better Embeddings:** Migrated from Gemini Embedding to a completely new and more robust embedding architecture.
+- **Claude Fixes:** Resolved max_tokens and context limits issues specific to Anthropic Claude interactions.
+- **DRY Refactoring:** Centralized model configuration strings across the codebase to ensure easier future updates.
 
-    - Fully functional system audio capture for Windows
-    - Introduced system for manual transcript finalization and interim/final bridging during recordings
+## [2.0.2] - 2026-03-10
 
-    ### Improvements
+### Summary
 
-    - Migrated to `app.getAppPath()` for reliable cross-platform resource discovery
-    - Ensured `sqlite-vec` compatibility and fixed embedding queue management
-    - Upgraded `@google/genai` and optimized embedding dimensionality for lower latency
+v2.0.2 focuses on fixing Windows system audio capture, improving RAG stability, and resolving critical Soniox STT configuration issues.
 
-    ### Fixes
+### What's New
 
-    - Improved Soniox STT streaming reliability, manual flushing, and configuration persistence
-    - Resolved application entry point and module resolution issues in production builds
-    - Fixed transcript bridging for manual recording mode
-    - Corrected stealth activation and window focus inconsistencies
+- Fully functional system audio capture for Windows
+- Introduced system for manual transcript finalization and interim/final bridging during recordings
 
-    ### Technical
+### Improvements
 
-    - Dependency updates for `@google/genai`
-    - Cleaned up native compiler warnings for Windows
-    - Fixed module resolution for internal Electron paths
+- Migrated to `app.getAppPath()` for reliable cross-platform resource discovery
+- Ensured `sqlite-vec` compatibility and fixed embedding queue management
+- Upgraded `@google/genai` and optimized embedding dimensionality for lower latency
 
-    ## [2.0.1] - 2026-03-06
+### Fixes
 
-    ### New Features
+- Improved Soniox STT streaming reliability, manual flushing, and configuration persistence
+- Resolved application entry point and module resolution issues in production builds
+- Fixed transcript bridging for manual recording mode
+- Corrected stealth activation and window focus inconsistencies
 
-    - **Premium Profile Intelligence**: Job Description (JD) and Resume context awareness, company research, and negotiation assistance.
-    - **Live Meeting RAG**: Instant intelligent retrieval of context directly during a live meeting using local vectors.
-    - **Soniox Speech Provider**: Added support for ultra-fast and highly accurate streaming STT with Soniox.
-    - **Multilingual Support**: Choose from various response languages, set speech recognition matching specific accents and dialects.
+### Technical
 
-    ### Improvements & Fixes
+- Dependency updates for `@google/genai`
+- Cleaned up native compiler warnings for Windows
+- Fixed module resolution for internal Electron paths
 
-    - Fixed numerous issues and merged 3 community pull requests to improve overall stability.
+## [2.0.1] - 2026-03-06
 
-    ## [1.1.8] - 2026-02-23
+### New Features
 
-    ### Summary
+- **Premium Profile Intelligence**: Job Description (JD) and Resume context awareness, company research, and negotiation assistance.
+- **Live Meeting RAG**: Instant intelligent retrieval of context directly during a live meeting using local vectors.
+- **Soniox Speech Provider**: Added support for ultra-fast and highly accurate streaming STT with Soniox.
+- **Multilingual Support**: Choose from various response languages, set speech recognition matching specific accents and dialects.
 
-    Patch update addressing OpenAI GPT 5.x compatibility and increasing token output limits for all providers.
+### Improvements & Fixes
 
-    ### What's New
+- Fixed numerous issues and merged 3 community pull requests to improve overall stability.
 
-    - Replaced deprecated `max_tokens` parameter with `max_completion_tokens` required by GPT 5.x models.
-    - Increased max output tokens for OpenAI (GPT 5.2) and Claude (Sonnet 4.5) to 65,536.
-    - Increased max output tokens for Groq (Llama 3.3 70B) to 32,768.
+## [1.1.8] - 2026-02-23
 
-    ### Improvements
+### Summary
 
-    - Improved response length capabilities across all text-generation AI models.
-    - Updated connection test model to use `gpt-5.2-chat-latest` instead of the deprecated `gpt-3.5-turbo`.
+Patch update addressing OpenAI GPT 5.x compatibility and increasing token output limits for all providers.
 
-    ### Fixes
+### What's New
 
-    - Fixed 400 error when using OpenAI GPT 5.x models for text queries and toggle actions.
+- Replaced deprecated `max_tokens` parameter with `max_completion_tokens` required by GPT 5.x models.
+- Increased max output tokens for OpenAI (GPT 5.2) and Claude (Sonnet 4.5) to 65,536.
+- Increased max output tokens for Groq (Llama 3.3 70B) to 32,768.
 
-    ### Technical
+### Improvements
 
-    - Replaced `max_tokens` with `max_completion_tokens` in `LLMHelper.ts` and `ipcHandlers.ts`.
+- Improved response length capabilities across all text-generation AI models.
+- Updated connection test model to use `gpt-5.2-chat-latest` instead of the deprecated `gpt-3.5-turbo`.
 
-    ## [1.1.7] - 2026-02-20
+### Fixes
 
-    ### Summary
+- Fixed 400 error when using OpenAI GPT 5.x models for text queries and toggle actions.
 
-    Security hardening, memory optimization, and stability improvements for a more robust and reliable experience.
+### Technical
 
-    ### What's New
+- Replaced `max_tokens` with `max_completion_tokens` in `LLMHelper.ts` and `ipcHandlers.ts`.
 
-    - API rate limiting to prevent 429 errors on free-tier plans (Gemini, Groq, OpenAI, Claude)
-    - Cross-platform screenshot support (macOS, Linux, Windows)
-    - Official website link added to the About section
+## [1.1.7] - 2026-02-20
 
-    ### Improvements
+### Summary
 
-    - Smarter transcript memory management with epoch summarization instead of hard truncation — no more losing early meeting context
-    - API keys are now scrubbed from memory on app quit to minimize exposure window
-    - Credentials manager now overwrites key data before disposal for enhanced security
-    - Helper process renaming for improved stealth in Activity Monitor
+Security hardening, memory optimization, and stability improvements for a more robust and reliable experience.
 
-    ### Fixes
+### What's New
 
-    - Fixed V8/Electron entitlements crash on Intel Macs by including entitlements.mac.plist during ad-hoc signing
-    - Fixed process disguise not applying correctly when undetectable mode is toggled on
-    - Fixed usage array capping with dedicated helper method to prevent unbounded growth
+- API rate limiting to prevent 429 errors on free-tier plans (Gemini, Groq, OpenAI, Claude)
+- Cross-platform screenshot support (macOS, Linux, Windows)
+- Official website link added to the About section
 
-    ### Technical
+### Improvements
 
-    - Added `RateLimiter` service (token bucket algorithm with configurable burst and refill rates)
-    - Added `PRIVACY.md` and `SECURITY.md` policy documents
-    - Refactored ad-hoc signing script with helper renaming and proper entitlements flow
-    - Version bump to 1.1.7
+- Smarter transcript memory management with epoch summarization instead of hard truncation — no more losing early meeting context
+- API keys are now scrubbed from memory on app quit to minimize exposure window
+- Credentials manager now overwrites key data before disposal for enhanced security
+- Helper process renaming for improved stealth in Activity Monitor
 
-    ## [1.1.6] - 2026-02-15
+### Fixes
 
-    ### New Features
+- Fixed V8/Electron entitlements crash on Intel Macs by including entitlements.mac.plist during ad-hoc signing
+- Fixed process disguise not applying correctly when undetectable mode is toggled on
+- Fixed usage array capping with dedicated helper method to prevent unbounded growth
 
-    - **Speech Providers**: Added support for multiple speech providers including Google, Groq, OpenAI, Deepgram, ElevenLabs, Azure, and IBM Watson.
-    - **Fast Response Mode**: Introduced ultra-fast text responses using Groq Llama 3.
-    - **Local RAG & Memory**: Full offline vector retrieval for past meetings using SQLite.
-    - **Custom Key Bindings**: Added ability to customize global shortcuts for easier control.
-    - **Stealth Mode Improvements**: Enhanced disguise modes (Terminal, Settings, Activity Monitor) for better privacy.
-    - **Markdown Support**: Improved Markdown rendering in the Usage section for better readability of AI responses.
-    - **Image Processing**: Integrated `sharp` for optimized image handling and faster analysis.
+### Technical
 
-    ### Improvements & Fixes
+- Added `RateLimiter` service (token bucket algorithm with configurable burst and refill rates)
+- Added `PRIVACY.md` and `SECURITY.md` policy documents
+- Refactored ad-hoc signing script with helper renaming and proper entitlements flow
+- Version bump to 1.1.7
 
-    - Fixed various UI bugs and focus stealing issues.
-    - Improved application stability and performance.
+## [1.1.6] - 2026-02-15
 
-    ## [1.1.5] - 2026-02-13
+### New Features
 
-    ### Summary
+- **Speech Providers**: Added support for multiple speech providers including Google, Groq, OpenAI, Deepgram, ElevenLabs, Azure, and IBM Watson.
+- **Fast Response Mode**: Introduced ultra-fast text responses using Groq Llama 3.
+- **Local RAG & Memory**: Full offline vector retrieval for past meetings using SQLite.
+- **Custom Key Bindings**: Added ability to customize global shortcuts for easier control.
+- **Stealth Mode Improvements**: Enhanced disguise modes (Terminal, Settings, Activity Monitor) for better privacy.
+- **Markdown Support**: Improved Markdown rendering in the Usage section for better readability of AI responses.
+- **Image Processing**: Integrated `sharp` for optimized image handling and faster analysis.
 
-    The Stealth & Intelligence Update: Enhances stealth capabilities, expands AI provider support, and improves local AI integration.
+### Improvements & Fixes
 
-    ### What's New
+- Fixed various UI bugs and focus stealing issues.
+- Improved application stability and performance.
 
-    - **Native Speech Provider Support:** Added Deepgram, Groq, and OpenAI speech providers.
-    - **Custom LLM Providers:** Connect to any OpenAI-compatible API including OpenRouter and DeepSeek.
-    - **Smart Local AI:** Auto-detection of available Ollama models for local AI.
-    - **Global Spotlight Search:** Toggle chat overlay with Cmd+K (macOS) and Ctrl+K (Windows/Linux).
-    - **Masquerading Mode:** Appear as system processes like Terminal or Activity Monitor.
-    - **Improved Stealth Mode:** Enhanced activation and window focus transitions.
+## [1.1.5] - 2026-02-13
 
-    ### Improvements
+### Summary
 
-    - **Natural Responses:** Updated system prompts for more concise and natural responses.
-    - **Conversational Logic:** Reduced robotic preambles and unnecessary explanations.
-    - **Performance:** Improved UI scaling and reduced speech-to-text latency.
+The Stealth & Intelligence Update: Enhances stealth capabilities, expands AI provider support, and improves local AI integration.
 
-    ### Fixes
+### What's New
 
-    - No critical fixes reported in this release.
+- **Native Speech Provider Support:** Added Deepgram, Groq, and OpenAI speech providers.
+- **Custom LLM Providers:** Connect to any OpenAI-compatible API including OpenRouter and DeepSeek.
+- **Smart Local AI:** Auto-detection of available Ollama models for local AI.
+- **Global Spotlight Search:** Toggle chat overlay with Cmd+K (macOS) and Ctrl+K (Windows/Linux).
+- **Masquerading Mode:** Appear as system processes like Terminal or Activity Monitor.
+- **Improved Stealth Mode:** Enhanced activation and window focus transitions.
 
-    ### Technical
+### Improvements
 
-    - Internal logic refinements for improved conversational flow.
-    - Updater and background process stability improvements.
+- **Natural Responses:** Updated system prompts for more concise and natural responses.
+- **Conversational Logic:** Reduced robotic preambles and unnecessary explanations.
+- **Performance:** Improved UI scaling and reduced speech-to-text latency.
 
-    #### macOS Installation (Unsigned Build)
+### Fixes
 
-    If you see "App is damaged":
+- No critical fixes reported in this release.
 
-    1. Move the app to your Applications folder.
-    2. Open Terminal and run: `xattr -cr /Applications/Natively.app`
+### Technical
 
-    ## [1.1.4] - 2026-02-12
+- Internal logic refinements for improved conversational flow.
+- Updater and background process stability improvements.
 
-    ### What's New in v1.1.4
+#### macOS Installation (Unsigned Build)
 
-    - **Custom LLM Providers:** Connect to any OpenAI-compatible API (OpenRouter, DeepSeek, commercial endpoints) simply by pasting a cURL command.
-    - **Smart Local AI:** Enhanced Ollama integration that automatically detects and lists your available local models—no configuration required.
-    - **Refined Human Persona:** Major updates to system prompts (`prompts.ts`) to ensure responses are concise, conversational, and indistinguishable from a real candidate.
-    - **Anti-Chatbot Logic:** Specific negative constraints to prevent "AI-like" lectures, distinct "robot" preambles, and over-explanation.
-    - **Global Spotlight Search:** Access AI chat instantly with `Cmd+K` / `Ctrl+K`.
-    - **Masquerading (Undetectable Mode):** Stealth capability to disguise the app as common utility processes (Terminal, Activity Monitor) for discreet usage.
+If you see "App is damaged":
+
+1. Move the app to your Applications folder.
+2. Open Terminal and run: `xattr -cr /Applications/Natively.app`
+
+## [1.1.4] - 2026-02-12
+
+### What's New in v1.1.4
+
+- **Custom LLM Providers:** Connect to any OpenAI-compatible API (OpenRouter, DeepSeek, commercial endpoints) simply by pasting a cURL command.
+- **Smart Local AI:** Enhanced Ollama integration that automatically detects and lists your available local models—no configuration required.
+- **Refined Human Persona:** Major updates to system prompts (`prompts.ts`) to ensure responses are concise, conversational, and indistinguishable from a real candidate.
+- **Anti-Chatbot Logic:** Specific negative constraints to prevent "AI-like" lectures, distinct "robot" preambles, and over-explanation.
+- **Global Spotlight Search:** Access AI chat instantly with `Cmd+K` / `Ctrl+K`.
+- **Masquerading (Undetectable Mode):** Stealth capability to disguise the app as common utility processes (Terminal, Activity Monitor) for discreet usage.

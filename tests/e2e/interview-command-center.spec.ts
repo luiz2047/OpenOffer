@@ -596,7 +596,7 @@ test.describe('Interview Command Center', () => {
     await gotoApp(page);
 
     const commandCenter = page.getByTestId('interview-command-center');
-    await expect(page.getByText('Vacancy OS')).toBeVisible();
+    await expect(commandCenter.getByText('Vacancies', { exact: true })).toBeVisible();
     await expect(page.getByTestId('interview-pane-resize-handle')).toHaveCount(2);
     await expect(commandCenter.getByRole('button', { name: 'Connect' })).toHaveCount(0);
     await expect(commandCenter.getByRole('button', { name: 'Sync not configured' })).toBeVisible();

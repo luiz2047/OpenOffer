@@ -18,6 +18,7 @@ One short paragraph explaining who should upgrade and why.
 - Source checks:
 - macOS artifact verification:
 - Known gaps:
+- Checksums: attached as `SHA256SUMS.txt`
 
 ## Installation
 
@@ -42,4 +43,10 @@ Open the DMG, drag **OpenOffer** to **Applications**, and launch it.
 
 ## Checksums
 
-Add checksums for uploaded assets before publishing a release.
+The release workflow attaches `SHA256SUMS.txt` alongside the uploaded assets.
+Verify a downloaded file with:
+
+```bash
+FILE="OpenOffer-X.Y.Z-arm64.dmg" # or the asset you downloaded
+grep "  $FILE$" SHA256SUMS.txt | shasum -a 256 -c -
+```

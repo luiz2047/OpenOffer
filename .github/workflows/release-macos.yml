@@ -170,23 +170,56 @@ jobs:
             echo "::endgroup::"
           done
 
+      - name: Prepare release assets
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          rm -rf release-artifacts
+          mkdir -p release-artifacts
+
+          DMGS=(release/*.dmg)
+          ZIPS=(release/*.zip)
+          LATEST=(release/latest-mac.yml)
+          BLOCKMAPS=(release/*.blockmap)
+
+          if [ ${#DMGS[@]} -eq 0 ]; then echo "No DMG assets found in release/"; exit 1; fi
+          if [ ${#ZIPS[@]} -eq 0 ]; then echo "No ZIP assets found in release/"; exit 1; fi
+          if [ ${#LATEST[@]} -eq 0 ]; then echo "release/latest-mac.yml was not produced"; exit 1; fi
+
+          ASSETS=("${DMGS[@]}" "${ZIPS[@]}" "${LATEST[@]}" "${BLOCKMAPS[@]}")
+          : > release/SHA256SUMS.txt
+          for ASSET in "${ASSETS[@]}"; do
+            HASH=$(shasum -a 256 "$ASSET" | awk '{print $1}')
+            printf '%s  %s\n' "$HASH" "$(basename "$ASSET")" >> release/SHA256SUMS.txt
+            cp "$ASSET" release-artifacts/
+          done
+          cp release/SHA256SUMS.txt release-artifacts/
+
+          NOTE_PATH=".github/release-notes/${GITHUB_REF_NAME}.md"
+          if [ -f "$NOTE_PATH" ]; then
+            cp "$NOTE_PATH" release/RELEASE_BODY.md
+          else
+            {
+              echo "## OpenOffer ${GITHUB_REF_NAME#v}"
+              echo
+              echo "See CHANGELOG.md for the user-visible changes in this release."
+            } > release/RELEASE_BODY.md
+          fi
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: openoffer-macos-signed
           path: |
-            release/*.dmg
-            release/*.zip
-            release/latest-mac.yml
+            release-artifacts/*
           if-no-files-found: error
 
       - name: Publish GitHub Release assets
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          body_path: release/RELEASE_BODY.md
           fail_on_unmatched_files: true
+          overwrite_files: true
           files: |
-            release/*.dmg
-            release/*.zip
-            release/latest-mac.yml
+            release-artifacts/*

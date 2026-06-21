@@ -76,7 +76,9 @@ npm run dist:signed
 1. Confirm secrets are configured.
 2. Create and push `vX.Y.Z`.
 3. The `Release (macOS signed + notarized)` workflow builds both macOS arches.
-4. The workflow uploads Actions artifacts and, on tag builds, attaches `.dmg`, `.zip`, and `latest-mac.yml` to the GitHub Release.
+4. The workflow prepares a `release-artifacts/` bundle with required `.dmg`, `.zip`, `latest-mac.yml`, `SHA256SUMS.txt`, and optional `*.blockmap` files when Electron Builder produces them.
+5. On tag builds, the workflow publishes that bundle to the GitHub Release.
+6. If `.github/release-notes/vX.Y.Z.md` exists, the workflow uses it as the GitHub Release body. Otherwise it falls back to a short generated body and `CHANGELOG.md` remains the source of detailed notes.
 
 ## Verification
 
@@ -96,7 +98,10 @@ xcrun stapler validate "release/OpenOffer-X.Y.Z.dmg"
 Attach checksums to the release notes:
 
 ```bash
-shasum -a 256 release/*.dmg release/*.zip release/latest-mac.yml
+shopt -s nullglob
+for asset in release/*.dmg release/*.zip release/latest-mac.yml release/*.blockmap; do
+  shasum -a 256 "$asset" | awk -v name="$(basename "$asset")" '{print $1 "  " name}'
+done > release/SHA256SUMS.txt
 ```
 
 ## Release Notes Checklist
@@ -105,6 +110,7 @@ shasum -a 256 release/*.dmg release/*.zip release/latest-mac.yml
 - List the user-visible workflow changes.
 - Mention provider, privacy, and local-data changes.
 - Include verification commands or checksums for binaries.
+- Commit curated release notes under `.github/release-notes/vX.Y.Z.md` when the release is public-facing.
 - Link migration notes if settings, storage, providers, or permissions changed.
 - Link known issues when something remains incomplete.
 

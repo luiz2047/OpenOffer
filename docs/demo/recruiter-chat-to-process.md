@@ -44,6 +44,18 @@ OpenOffer should propose:
 5. Review the generated prep brief and question bank.
 6. After a test call or mock transcript, link the recording/transcript to the stage and write a retro.
 
+## Demo Media Capture
+
+Public demo media should be captured from this exact fictional scenario.
+
+Recommended outputs:
+
+- `assets/demo/recruiter-chat-to-process.mp4` for release notes and launch posts.
+- `assets/demo/recruiter-chat-to-process.gif` for README embedding if it remains small and legible.
+- `assets/demo/recruiter-chat-to-process.png` as a static fallback.
+
+Do not add a README image or video reference until the file exists in the repository.
+
 ## What Contributors Can Improve
 
 - Add more redacted examples for HH, Getmatch, Telegram, LinkedIn, email, and calendar invites.
