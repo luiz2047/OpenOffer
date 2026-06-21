@@ -48,16 +48,18 @@ Use this mode until Apple Developer ID signing and notarization are configured.
 The preview release path uses:
 
 - `.github/workflows/release-macos.yml`
-- the default Electron Builder config in `package.json`
+- `electron-builder.preview.cjs` for ZIP/app packaging
 - `scripts/ad-hoc-sign.js`
+- `scripts/build-preview-dmgs.cjs` for sequential DMG creation via `create-dmg`
 
-The artifacts are ad-hoc signed with `codesign --sign -`. The workflow verifies the app signatures and DMG integrity, but it does not run `spctl` or `stapler` because these artifacts are not notarized.
+The artifacts are ad-hoc signed with `codesign --sign -`. The workflow verifies the app signatures and DMG integrity, but it does not run `spctl` or `stapler` because these artifacts are not notarized. Preview DMGs are created after Electron Builder finishes ZIP/app packaging so CI does not race two `hdiutil create` jobs.
 
 ### Local Unsigned Build
 
 On macOS:
 
 ```bash
+brew install create-dmg
 npm run app:build:mac
 ```
 

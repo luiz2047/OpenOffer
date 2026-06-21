@@ -150,9 +150,16 @@ This runs the frontend build, Electron build, native audio build, Sharp checks, 
 Platform-specific packaging should run on the matching OS because OpenOffer ships native `.node` modules:
 
 ```bash
-npm run app:build:mac        # macOS runner, dmg + zip
+npm run app:build:mac        # macOS runner, requires create-dmg, dmg + zip
 npm run app:build:win        # Windows runner, x64 NSIS + portable
 npm run app:build:linux      # Ubuntu/Linux runner, AppImage + deb
+```
+
+For local macOS preview packaging, install `create-dmg` first:
+
+```bash
+brew install create-dmg
+npm run app:build:mac        # macOS runner, dmg + zip
 ```
 
 Signed macOS release builds still need Apple Developer ID credentials and GitHub release secrets. Until then, the release workflow publishes unsigned macOS preview artifacts as prereleases. See [OpenOffer release process](docs/RELEASE.md).

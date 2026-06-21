@@ -175,12 +175,14 @@ jobs:
         if: steps.release_mode.outputs.mode == 'unsigned-preview'
         run: |
           set -euo pipefail
+          which create-dmg >/dev/null 2>&1 || brew install create-dmg
           npm run build
           npm run typecheck:electron
           npm run build:electron
           NATIVELY_BUILD_ALL_MAC_ARCHES=1 npm run build:native
           node scripts/ensure-sharp-mac-deps.js
-          ./node_modules/.bin/electron-builder --mac --publish never
+          ./node_modules/.bin/electron-builder --mac --config electron-builder.preview.cjs --publish never
+          node scripts/build-preview-dmgs.cjs
 
       - name: Verify signature + notarization (both arches + DMGs)
         if: steps.release_mode.outputs.mode == 'signed'

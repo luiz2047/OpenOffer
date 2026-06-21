@@ -26,7 +26,7 @@
     "yandex:prompt-eval:live:smoke": "npm run build:electron && node scripts/yandex-prompt-eval.cjs --models yandexgpt-5-lite --packs yandex-ru-lite --max-calls 6",
     "yandex:prompt-eval:live:full": "npm run yandex:prompt-eval",
     "app:build": "npm run build && npm run typecheck:electron && npm run build:electron && cross-env NATIVELY_BUILD_ALL_MAC_ARCHES=1 npm run build:native && node scripts/ensure-sharp-mac-deps.js && electron-builder",
-    "app:build:mac": "npm run build && npm run typecheck:electron && npm run build:electron && cross-env NATIVELY_BUILD_ALL_MAC_ARCHES=1 npm run build:native && node scripts/ensure-sharp-mac-deps.js && electron-builder --mac --publish never",
+    "app:build:mac": "npm run build && npm run typecheck:electron && npm run build:electron && cross-env NATIVELY_BUILD_ALL_MAC_ARCHES=1 npm run build:native && node scripts/ensure-sharp-mac-deps.js && electron-builder --mac --config electron-builder.preview.cjs --publish never && node scripts/build-preview-dmgs.cjs",
     "app:build:win": "npm run build && npm run typecheck:electron && npm run build:electron && npm run build:native && electron-builder --win --x64 --publish never",
     "app:build:linux": "npm run build && npm run typecheck:electron && npm run build:electron && npm run build:native && electron-builder --linux --publish never",
     "app:build:signed": "npm run build && npm run typecheck:electron && npm run build:electron && cross-env NATIVELY_BUILD_ALL_MAC_ARCHES=1 npm run build:native && node scripts/ensure-sharp-mac-deps.js && electron-builder --config electron-builder.signed.cjs",
