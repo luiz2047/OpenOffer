@@ -1,8 +1,9 @@
 {
   "name": "openoffer",
   "version": "1.4.0",
+  "private": true,
   "main": "dist-electron/electron/main.js",
-  "description": "OpenOffer is a local-first, open-source career assistant for interviews, meetings, and work notes.",
+  "description": "Local-first open-source workspace for job-search processes, interviews, recruiter chats, and meeting notes.",
   "scripts": {
     "clean": "rimraf dist dist-electron",
     "dev": "vite",
@@ -69,6 +70,7 @@
     "test:intelligence:ui:report": "playwright show-report intelligence-eval-real-ui/results/playwright-report",
     "eval:intelligence:ui": "node --experimental-strip-types intelligence-eval-real-ui/run-real-ui-e2e.ts",
     "test:intelligence:ui:grader": "node --experimental-strip-types intelligence-eval-real-ui/grader-unit-checks.mjs",
+    "public-docs:check": "node scripts/check-public-docs.mjs",
     "benchmark:livememory": "cross-env NODE_NO_WARNINGS=1 NATIVELY_ENABLE_LIVE_SESSION_MEMORY=on node benchmarks/profile-intelligence/run_live_session_memory_eval.ts",
     "test:llm": "npm run build:electron && node --test \"electron/llm/__tests__/**/*.test.mjs\" \"electron/llm/codeVerification/__tests__/**/*.test.mjs\"",
     "test:answer-style-yandex": "npm run build:electron && node --test electron/llm/__tests__/answerStylePacks.test.mjs electron/llm/__tests__/yandexPromptPacks.test.mjs electron/services/__tests__/YandexProvider.test.mjs",
@@ -202,8 +204,29 @@
       }
     ]
   },
-  "keywords": [],
-  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/luiz2047/OpenOffer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/luiz2047/OpenOffer/issues"
+  },
+  "homepage": "https://github.com/luiz2047/OpenOffer#readme",
+  "keywords": [
+    "local-first",
+    "open-source",
+    "ai-assistant",
+    "job-search",
+    "interview-preparation",
+    "recruiter-chat",
+    "meeting-notes",
+    "electron",
+    "speech-to-text",
+    "ollama",
+    "byok",
+    "russian"
+  ],
+  "author": "OpenOffer contributors",
   "license": "AGPL-3.0",
   "devDependencies": {
     "@electron/notarize": "^3.1.1",

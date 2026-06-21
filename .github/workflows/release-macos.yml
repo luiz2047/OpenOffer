@@ -68,6 +68,31 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate release prerequisites
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_API_KEY_P8_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          set -euo pipefail
+          test -f electron-builder.signed.cjs || {
+            echo "electron-builder.signed.cjs is required for signed releases.";
+            exit 1;
+          }
+          missing=0
+          for name in MACOS_CERT_P12_BASE64 MACOS_CERT_PASSWORD KEYCHAIN_PASSWORD APPLE_API_KEY_P8_BASE64 APPLE_API_KEY_ID APPLE_API_ISSUER; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::$name is not configured for signed release builds."
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
       - name: Import Developer ID signing certificate
         env:
           MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
@@ -107,8 +132,6 @@ jobs:
           # App Store Connect API-key strategy (consumed by notarize.js + afterAllArtifactBuild.cjs):
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          # GH token for electron-builder publish (artifacts attach to the release on tag builds).
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         # Explicit stages (NOT `npm run dist:signed`): the dist:signed chain re-runs
         # `npm run build` (rimraf dist dist-electron) which can race electron-builder's
         # native rebuild and ENOENT on dist-electron at package time. Building the stages
@@ -156,3 +179,14 @@ jobs:
             release/*.zip
             release/latest-mac.yml
           if-no-files-found: error
+
+      - name: Publish GitHub Release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release/*.dmg
+            release/*.zip
+            release/latest-mac.yml

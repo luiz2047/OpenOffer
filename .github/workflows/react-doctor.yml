@@ -1,12 +1,10 @@
 name: React Doctor
 
 on:
-  pull_request:
-    branches: [main]
+  workflow_dispatch: {}
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   react-doctor:
@@ -15,5 +13,4 @@ jobs:
       - uses: actions/checkout@v4
       - uses: millionco/react-doctor@main
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           diff: main

@@ -1,50 +1,77 @@
-name: Bug Report
-description: Create a report to help us improve the project
+name: Bug report
+description: Report a reproducible OpenOffer problem
 title: "[Bug]: "
-labels: ["bug"]
-assignees:
-  - ''
+labels: ["bug", "needs reproduction"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this bug report!
+        Thanks for helping improve OpenOffer. Do not paste private resumes, full transcripts, API keys, meeting links, or unreduced recruiter chats. Redact sensitive text and keep only the smallest sample needed to reproduce the issue.
   - type: textarea
     id: what-happened
     attributes:
       label: What happened?
-      description: Also tell us, what did you expect to happen?
-      placeholder: Tell us what you see!
+      description: Include what you expected instead.
+      placeholder: "Example: pasted recruiter text was parsed as a new vacancy instead of a stage on an existing process."
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: Steps to Reproduce
+      label: Steps to reproduce
       description: How can we reproduce this bug?
       placeholder: |
-        1. Go to '...'
-        2. Click on '....'
-        3. Scroll down to '....'
-        4. See error
+        1. Start OpenOffer from source or a release build.
+        2. Open the Interview Command Center.
+        3. Paste this redacted recruiter/vacancy text: ...
+        4. Expected: ...
+        5. Actual: ...
     validations:
       required: true
+  - type: textarea
+    id: workflow-context
+    attributes:
+      label: Workflow context
+      description: Which OpenOffer workflow is affected?
+      placeholder: |
+        - Recruiter chat parsing
+        - Vacancy dossier
+        - Interview stage scheduling
+        - Recording/transcript linking
+        - Local STT
+        - LLM/provider routing
+        - Packaging/update/install
   - type: textarea
     id: environment
     attributes:
       label: Environment
-      description: Please provide relevant environment details (e.g., OS, app version, Node.js version, Electron version).
+      description: Please provide relevant environment details.
       placeholder: |
-        - OS: [e.g. Windows 11]
-        - App Version: [e.g. 1.0.0]
+        - OS:
+        - OpenOffer version or commit:
+        - Source build or release build:
+        - Node/npm version, if running from source:
+        - Install path:
+        - Locale/UI language:
+        - Transcription language:
+        - STT provider:
+        - LLM/provider:
+        - Microphone/screen/audio permissions:
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
-      label: Relevant Log Output
-      description: Please copy and paste any relevant console logs, error messages, or native module output here.
+      label: Relevant logs
+      description: Paste only redacted logs. Remove secrets, meeting URLs, transcript content, resumes, API keys, and provider tokens.
       render: shell
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed secrets, private transcripts, resumes, meeting links, and unreduced personal data from this issue.
+          required: true
   - type: checkboxes
     id: terms
     attributes:

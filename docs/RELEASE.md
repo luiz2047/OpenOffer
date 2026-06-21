@@ -1,115 +1,115 @@
-# Release Process & Update Channels
+# OpenOffer release process
 
-## Update Channels
+This guide describes how to publish an OpenOffer release from the public repository.
 
-Natively supports two update channels:
+OpenOffer is currently source-first. Signed macOS binary releases are supported by the workflow, but they require Apple Developer ID credentials and repository secrets before the workflow can produce official artifacts.
 
-| Channel | File | Description |
-|---------|------|-------------|
-| **stable** | `latest.yml` | Production releases for all users |
-| **beta** | `beta-latest.yml` | Pre-release testing for beta testers |
+## Version Source
 
-### How It Works
+The canonical version is `package.json`.
 
-The update channel is **auto-detected** based on the version suffix:
-
-```typescript
-// electron/main.ts - setupAutoUpdater()
-const currentVersion = app.getVersion()
-if (currentVersion.includes('beta')) {
-  autoUpdater.channel = 'beta'
-} else {
-  autoUpdater.channel = 'stable'
-}
-```
-
-| Version | Channel | Updates to |
-|---------|---------|------------|
-| `2.0.7` | stable | `2.0.8`, `2.1.0` |
-| `2.0.7-beta.1` | beta | `2.0.7-beta.2`, `2.0.8-beta.1` |
-| `2.0.8` | stable | `2.0.9`, `2.1.0` |
-
----
-
-## Release Workflow
-
-### 1. Beta Release (Testing)
+Before a release:
 
 ```bash
-# 1. Update version in package.json
-"version": "2.0.8-beta.1"
-
-# 2. Build
-npm run dist
-
-# 3. Upload to GitHub Release
-# - Tag: v2.0.8-beta.1
-# - Title: Natively v2.0.8-beta.1
-# - Mark as "Pre-release"
-# - Upload files from release/:
-#   - Natively Setup 2.0.8-beta.1.exe
-#   - Natively.2.0.8-beta.1.exe
-#   - beta-latest.yml  <-- important!
-#   - *.blockmap files
+node -p "require('./package.json').version"
+npm run public-docs:check
+npm run i18n:check
+npm run test:i18n
+npm run build
+npm run build:electron
 ```
 
-### 2. Stable Release (Production)
+For code releases, also run the focused test set from `.github/workflows/community-quality.yml`.
+
+## Source Release
+
+A source release is acceptable when signed artifacts are not ready yet.
+
+1. Make sure `README.md` and release notes clearly say source-first.
+2. Tag the exact commit:
+
+   ```bash
+   git tag vX.Y.Z
+   git push origin vX.Y.Z
+   ```
+
+3. Create a GitHub Release using `.github/RELEASE_TEMPLATE.md`.
+4. Do not imply signed binaries exist if no assets were uploaded.
+
+## Signed macOS Release
+
+The signed release path uses:
+
+- `.github/workflows/release-macos.yml`
+- `electron-builder.signed.cjs`
+- `scripts/notarize.js`
+- `scripts/afterAllArtifactBuild.cjs`
+- `build/entitlements.mac.plist`
+- `build/entitlements.mac.inherit.plist`
+
+Required GitHub secrets:
+
+- `MACOS_CERT_P12_BASE64`
+- `MACOS_CERT_PASSWORD`
+- `KEYCHAIN_PASSWORD`
+- `APPLE_API_KEY_P8_BASE64`
+- `APPLE_API_KEY_ID`
+- `APPLE_API_ISSUER`
+
+The workflow fails fast if these are absent. Do not publish a binary release by bypassing that check.
+
+### Local Signed Build
+
+Use this only on a machine with a valid Developer ID certificate and notarization credentials:
 
 ```bash
-# 1. Update version in package.json
-"version": "2.0.8"
-
-# 2. Build
-npm run dist
-
-# 3. Upload to GitHub Release
-# - Tag: v2.0.8
-# - Title: Natively v2.0.8
-# - Upload files from release/:
-#   - Natively Setup 2.0.8.exe
-#   - Natively.2.0.8.exe
-#   - latest.yml  <-- important!
-#   - *.blockmap files
+export CSC_LINK="/absolute/path/DeveloperIDApplication.p12"
+export CSC_KEY_PASSWORD="<p12 export password>"
+export APPLE_API_KEY="/absolute/path/AuthKey_XXXXXXXXXX.p8"
+export APPLE_API_KEY_ID="XXXXXXXXXX"
+export APPLE_API_ISSUER="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+npm run dist:signed
 ```
 
----
+### Workflow Release
 
-## Platform Behavior
+1. Confirm secrets are configured.
+2. Create and push `vX.Y.Z`.
+3. The `Release (macOS signed + notarized)` workflow builds both macOS arches.
+4. The workflow uploads Actions artifacts and, on tag builds, attaches `.dmg`, `.zip`, and `latest-mac.yml` to the GitHub Release.
 
-### Windows
-- ✅ Full auto-update (check → download → install)
-- Uses NSIS installer
+## Verification
 
-### macOS
-- ⚠️ Semi-automatic (check → download → manual install)
-- Opens download folder in Finder for unsigned apps
-- Requires Apple Developer ($99/year) for full auto-update
+Run these checks before calling the release official:
 
----
-
-## Version Numbering
-
-Follow [Semantic Versioning](https://semver.org/):
-
-```
-MAJOR.MINOR.PATCH[-PRERELEASE]
-
-Examples:
-2.0.7           - Stable release
-2.0.7-beta.1    - Beta pre-release
-2.0.7-beta.2    - Beta iteration
-2.1.0           - Minor feature release
-3.0.0           - Major breaking change
+```bash
+codesign --verify --deep --strict --verbose=4 "release/mac-arm64/OpenOffer.app"
+codesign --verify --deep --strict --verbose=4 "release/mac/OpenOffer.app"
+spctl -a -vvv -t execute "release/mac-arm64/OpenOffer.app"
+spctl -a -vvv -t execute "release/mac/OpenOffer.app"
+xcrun stapler validate "release/mac-arm64/OpenOffer.app"
+xcrun stapler validate "release/mac/OpenOffer.app"
+xcrun stapler validate "release/OpenOffer-X.Y.Z-arm64.dmg"
+xcrun stapler validate "release/OpenOffer-X.Y.Z.dmg"
 ```
 
----
+Attach checksums to the release notes:
 
-## Files Created by Build
+```bash
+shasum -a 256 release/*.dmg release/*.zip release/latest-mac.yml
+```
 
-| File | Purpose |
-|------|---------|
-| `latest.yml` | Stable channel manifest |
-| `beta-latest.yml` | Beta channel manifest |
-| `*.exe` | Windows installer |
-| `*.dmg` | macOS installer |
-| `*.blockmap` | Differential update support |
+## Release Notes Checklist
+
+- State whether the release is source-only or includes signed artifacts.
+- List the user-visible workflow changes.
+- Mention provider, privacy, and local-data changes.
+- Include verification commands or checksums for binaries.
+- Link migration notes if settings, storage, providers, or permissions changed.
+- Link known issues when something remains incomplete.
+
+## Known Constraints
+
+- Windows packaging exists in Electron Builder configuration, but the current official release workflow is macOS-only.
+- Linux packaging exists in configuration, but Linux is not the primary tested path.
+- `npm audit` is not currently a clean release gate; dependency/security hardening should be tracked separately instead of hidden.

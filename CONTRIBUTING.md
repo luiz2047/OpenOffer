@@ -1,120 +1,131 @@
 # Contributing to OpenOffer
 
-First off, thank you for considering contributing to OpenOffer. Contributions help keep the project local-first, free, and open source.
+OpenOffer is a local-first desktop assistant for job-search processes, interviews, recruiter chats, meetings, and notes. Contributions are most useful when they improve a concrete workflow without weakening the privacy boundary.
 
-Following these guidelines helps to communicate that you respect the time of the developers managing and developing this open source project. In return, they should reciprocate that respect in addressing your issue, assessing changes, and helping you finalize your pull requests.
+## Start in 30 Minutes
 
-## Table of Contents
+1. Fork the repo and create a branch from `main`.
+2. Install dependencies:
 
-- [Code of Conduct](#code-of-conduct)
-- [How Can I Contribute?](#how-can-i-contribute)
-  - [Reporting Bugs](#reporting-bugs)
-  - [Suggesting Enhancements](#suggesting-enhancements)
-  - [Pull Requests](#pull-requests)
-- [Development Workflow](#development-workflow)
-  - [Prerequisites](#prerequisites)
-  - [Local Development](#local-development)
-  - [Architecture Overview](#architecture-overview)
-- [Styleguides](#styleguides)
-  - [Git Commit Messages](#git-commit-messages)
+   ```bash
+   npm install
+   ```
+
+3. Run the app:
+
+   ```bash
+   npm run app:dev
+   ```
+
+4. Try the [Recruiter Chat to Process demo](docs/demo/recruiter-chat-to-process.md).
+5. Pick a small issue or open a focused report with redacted reproduction data.
+
+## Good First Lanes
+
+| Lane | Useful work |
+| :--- | :---------- |
+| Demo and docs | Better screenshots, redacted workflow examples, README clarity, release QA notes |
+| Russian job-search flows | HH/Getmatch/Telegram examples, Russian copy, local STT setup, prompt eval cases |
+| Interview workspace | Vacancy dossier, stage timeline, prep brief, question bank, retros, recording links |
+| Provider setup | Ollama, Local Whisper, GigaSTT, Yandex AI Studio, OpenAI-compatible endpoint diagnostics |
+| Privacy and security | Log redaction, provider boundary review, Electron IPC hardening, safe issue templates |
+| Reliability | Focused tests, Electron boot checks, native audio diagnostics, packaging smoke tests |
+| Localization | English/Russian i18n keys, custom pack validation, missing-copy tests |
+
+## Project Map
+
+| Path | Purpose |
+| :--- | :------ |
+| `src/` | React renderer UI and i18n resources |
+| `electron/` | Electron main process, services, audio, model routing, persistence |
+| `electron/services/` | Interview workspace, repositories, providers, storage, diagnostics |
+| `electron/llm/` | Prompt assembly, provider routing, answer policies, guardrails |
+| `native-module/` | Rust native audio support |
+| `tests/` | Playwright and fixture-based tests |
+| `docs/` | Current docs and historical engineering archive |
+| `openoffer-browser/` | Browser companion extension |
+| `.github/` | Issue templates, PR template, CI, release notes |
+
+When changing Electron behavior, be explicit about which side is affected: renderer, preload, main process, service layer, or native module.
+
+## Development Commands
+
+```bash
+npm run app:dev
+npm run build
+npm run build:electron
+npm run typecheck:electron
+npm run i18n:check
+npm run test:i18n
+npm run test
+npm run public-docs:check
+```
+
+Use the smallest check set that covers your change, then list the exact commands in the PR.
+
+## Interface Copy and Localization
+
+If you add or change user-facing copy:
+
+- Update English and Russian entries in `src/i18n/resources.ts`.
+- Run `npm run i18n:check`.
+- Run `npm run test:i18n` when changing interpolation, plural rules, or custom-pack behavior.
+- Keep transcription language, response language, and UI language separate in wording.
+
+See [Interface Translations](docs/translations.md).
+
+## Bug Reports
+
+Please include:
+
+- OpenOffer version or commit.
+- OS and install path.
+- Source build or release build.
+- Provider/STT/model configuration, without secrets.
+- Locale and transcription language.
+- Reproduction steps.
+- Redacted sample input if parsing is involved.
+- Redacted logs.
+
+Do not paste private transcripts, resumes, API keys, provider tokens, meeting links, or unreduced recruiter chats into public issues.
+
+## Feature Requests
+
+Lead with the workflow:
+
+- What are you trying to do?
+- What is the current workaround?
+- What data should stay local?
+- Which provider path is affected?
+- What would a minimal useful version look like?
+
+Implementation suggestions are welcome, but the workflow is the contract.
+
+## Pull Requests
+
+Before opening a PR:
+
+- Keep the diff focused.
+- Avoid unrelated refactors.
+- Add or update tests when behavior changes.
+- Update docs when user-facing behavior, setup, provider configuration, or release process changes.
+- Redact screenshots and logs.
+- Fill out the PR template with exact checks run.
+
+Maintainers may ask to split broad PRs into smaller slices if review risk is high.
+
+## Release and Packaging Work
+
+Packaging changes should say whether they affect:
+
+- Source development.
+- Unsigned local package builds.
+- Signed macOS release builds.
+- Auto-update metadata.
+- Windows/Linux packaging.
+
+Signed macOS releases depend on Apple Developer ID credentials and GitHub secrets. See [docs/RELEASE.md](docs/RELEASE.md).
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by the [OpenOffer Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to the maintainers listed in that document.
-
-## How Can I Contribute?
-
-### Reporting Bugs
-
-Before creating bug reports, please check the issue tracker as you might find out that you don't need to create one. When you are creating a bug report, please include as many details as possible:
-
-- Use a clear and descriptive title for the issue to identify the problem.
-- Describe the exact steps which reproduce the problem in as many details as possible.
-- Provide specific examples to demonstrate the steps.
-- Describe the behavior you observed after following the steps and point out what exactly is the problem with that behavior.
-- Explain which behavior you expected to see instead and why.
-- Include screenshots and animated GIFs which show you following the described steps and clearly demonstrate the problem.
-- Specify your OS version.
-- Specify your Node/Npm versions.
-
-### Suggesting Enhancements
-
-Enhancement suggestions are tracked as GitHub issues. When you are creating an enhancement suggestion, please include:
-
-- Use a clear and descriptive title for the issue to identify the suggestion.
-- Provide a step-by-step description of the suggested enhancement in as many details as possible.
-- Provide specific examples to demonstrate the steps.
-- Describe the current behavior and explain which behavior you expected to see instead and why.
-- Explain why this enhancement would be useful to most OpenOffer users.
-
-### Pull Requests
-
-- Fill in the required template
-- Do not include issue numbers in the PR title
-- Include screenshots and animated GIFs in your pull request whenever possible.
-- Follow the TypeScript and React styleguides.
-- Document new code based on the Documentation Styleguide.
-- End all files with a newline.
-
-## Development Workflow
-
-### Prerequisites
-
-- Node.js 22 LTS recommended. Node 20 may work, but Node 22 is the preferred baseline for current local development.
-- Git
-- Rust (required for native audio capture compilation)
-
-### Local Development
-
-1. Fork the repo and create your branch from `main`.
-2. Clone your fork locally: `git clone https://github.com/YOUR_USERNAME/openoffer.git`
-3. Install dependencies: `npm install`
-4. If you need provider credentials, copy `.env.example` to `.env` and fill in local values.
-5. Start the development server: `npm run app:dev`
-
-If you've added code that should be tested, add tests.
-If you've changed APIs, update the documentation.
-Ensure the test suite passes.
-
-If you add or change interface copy, update the English and Russian entries in
-`src/i18n/resources.ts` and run `npm run i18n:check`. User-owned languages can
-also be tested as data-only custom packs from the app-data translations folder.
-See `docs/translations.md` for key naming, interpolation, pack validation, and
-plural rules.
-
-### Architecture Overview
-
-OpenOffer uses a modern stack consisting of:
-
-- **Frontend**: React, Vite, TypeScript, TailwindCSS
-- **Backend/Desktop**: Electron
-- **Native Audio**: Rust (`napi-rs` for zero-copy ABI transfers)
-- **Database**: SQLite (local storage with `sqlite-vec` for RAG)
-
-When contributing, ensure you understand which context (Main Process, Renderer Process, or Native/Rust addon) your code will run in, and use the IPC correctly for communication.
-
-## Styleguides
-
-### Git Commit Messages
-
-- Use the present tense ("Add feature" not "Added feature")
-- Use the imperative mood ("Move cursor to..." not "Moves cursor to...")
-- Limit the first line to 72 characters or less
-- Reference issues and pull requests liberally after the first line
-- Consider starting the commit message with an applicable emoji:
-  - 🎨 `:art:` when improving the format/structure of the code
-  - 🐎 `:racehorse:` when improving performance
-  - 🚱 `:non-potable_water:` when plugging memory leaks
-  - 📝 `:memo:` when writing docs
-  - 🐧 `:penguin:` when fixing something on Linux
-  - 🍎 `:apple:` when fixing something on macOS
-  - 🏁 `:checkered_flag:` when fixing something on Windows
-  - 🐛 `:bug:` when fixing a bug
-  - 🔥 `:fire:` when removing code or files
-  - 💚 `:green_heart:` when fixing the CI build
-  - ✅ `:white_check_mark:` when adding tests
-  - 🔒 `:lock:` when dealing with security
-  - ⬆️ `:arrow_up:` when upgrading dependencies
-  - ⬇️ `:arrow_down:` when downgrading dependencies
-
-Thank you for contributing to OpenOffer!
+This project follows the [OpenOffer Code of Conduct](CODE_OF_CONDUCT.md). For security issues, use [SECURITY.md](SECURITY.md) instead of public issues.

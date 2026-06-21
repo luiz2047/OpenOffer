@@ -1,32 +1,61 @@
-name: Feature Request
-description: Suggest an idea for this project
-title: "[Feature Request]: "
-labels: ["enhancement"]
-assignees:
-  - ''
+name: Feature request
+description: Suggest an OpenOffer workflow improvement
+title: "[Feature]: "
+labels: ["enhancement", "needs triage"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for suggesting a new feature to improve the project!
+        OpenOffer prioritizes local-first job-search, interview, recruiter-chat, meeting, and provider-setup workflows. Please describe the real workflow before proposing UI or implementation details.
   - type: textarea
-    id: description
+    id: scenario
     attributes:
-      label: Description
-      description: A clear and concise description of what the feature is and what problem it solves.
-      placeholder: e.g. I'm always frustrated when [...] so I would like to have [...]
+      label: User scenario
+      description: What are you trying to do, and where does the current product break down?
+      placeholder: "Example: I have three recruiter chats for the same company and want OpenOffer to merge them into one vacancy with stage history."
     validations:
       required: true
   - type: textarea
-    id: alternative
+    id: current-workaround
     attributes:
-      label: Describe alternatives you've considered
-      description: A clear and concise description of any alternative solutions or features you've considered.
+      label: Current workaround
+      description: What do you do manually today?
+  - type: textarea
+    id: sample
+    attributes:
+      label: Redacted sample input
+      description: Optional. A short recruiter/vacancy/provider/setup sample helps, but remove personal data, secrets, and meeting links.
+      placeholder: |
+        Recruiter: ...
+        Vacancy: ...
+        Expected structured output: ...
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Recruiter chat to process
+        - Vacancy/interview workspace
+        - Local STT
+        - Provider setup
+        - Privacy/security
+        - Packaging/release
+        - Documentation/onboarding
+        - Localization
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy boundary
+      description: Should this stay fully local, work with BYOK cloud providers, or both?
+      placeholder: "Fully local preferred; cloud provider should be optional."
   - type: textarea
     id: additional-context
     attributes:
       label: Additional context
-      description: Add any other context or screenshots about the feature request here.
+      description: Add screenshots, sketches, or related issues if useful.
   - type: checkboxes
     id: terms
     attributes:
