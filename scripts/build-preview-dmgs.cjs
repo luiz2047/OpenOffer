@@ -11,11 +11,37 @@ const PRODUCT_NAME = pkg.build?.productName || pkg.productName || pkg.name || 'O
 const BACKGROUND = path.join(ROOT, 'assets', 'dmg-background.png');
 const VOLICON = path.join(ROOT, 'assets', 'openoffer.icns');
 
+function commandExists(command) {
+  try {
+    execFileSync('/usr/bin/which', [command], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function findApp(archDir) {
   const dir = path.join(OUT_DIR, archDir);
   if (!fs.existsSync(dir)) return null;
   const app = fs.readdirSync(dir).find((file) => file.endsWith('.app'));
   return app ? path.join(dir, app) : null;
+}
+
+function buildDmgWithHdiutil({ appPath, outDmg, stage }) {
+  const applicationsLink = path.join(stage, 'Applications');
+  if (!fs.existsSync(applicationsLink)) {
+    fs.symlinkSync('/Applications', applicationsLink);
+  }
+
+  console.warn('[preview-dmg] create-dmg not found; using hdiutil fallback without custom Finder layout.');
+  execFileSync('hdiutil', [
+    'create',
+    '-volname', PRODUCT_NAME,
+    '-srcfolder', stage,
+    '-ov',
+    '-format', 'UDZO',
+    outDmg,
+  ], { stdio: 'inherit' });
 }
 
 function buildDmg({ appPath, outDmg }) {
@@ -25,6 +51,11 @@ function buildDmg({ appPath, outDmg }) {
   try {
     execFileSync('ditto', [appPath, stagedApp], { stdio: 'inherit' });
     if (fs.existsSync(outDmg)) fs.unlinkSync(outDmg);
+
+    if (!commandExists('create-dmg')) {
+      buildDmgWithHdiutil({ appPath, outDmg, stage });
+      return;
+    }
 
     const args = [
       '--volname', PRODUCT_NAME,
