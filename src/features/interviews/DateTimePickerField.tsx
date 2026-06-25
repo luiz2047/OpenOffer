@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { CalendarDays, Clock3, X } from 'lucide-react';
 import { DayFlag, DayPicker, SelectionState, UI } from 'react-day-picker';
 import { enUS, ru } from 'react-day-picker/locale';
@@ -91,8 +92,9 @@ export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({
 
   const applyDraft = () => {
     if (!canApply) return;
-    onChange(epochFromLocalDateAndTime(draftDate, draftTime));
-    setOpen(false);
+    const nextValue = epochFromLocalDateAndTime(draftDate, draftTime);
+    flushSync(() => setOpen(false));
+    onChange(nextValue);
   };
 
   const clearDraft = () => {
@@ -121,6 +123,7 @@ export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({
         <div
           role="dialog"
           aria-labelledby={buttonId}
+          data-testid="date-time-picker-popover"
           className="absolute left-0 top-[calc(100%+8px)] z-[80] w-[296px] rounded-md border border-white/[0.08] bg-[#0b0d0f] p-3 shadow-2xl shadow-black/45"
         >
           <DayPicker
@@ -161,6 +164,7 @@ export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({
               type="button"
               onClick={applyDraft}
               disabled={!canApply}
+              data-testid="date-time-picker-apply"
               className="inline-flex min-h-10 items-center justify-center rounded-md bg-white px-3 text-[12px] font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {t('interviews.dateTime.apply')}

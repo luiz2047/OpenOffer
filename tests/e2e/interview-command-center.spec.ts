@@ -721,6 +721,10 @@ test.describe('Interview Command Center', () => {
     await techStage.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByText('Technical sync')).toBeVisible();
     const updatedTechStage = page.getByTestId('interview-stage-card').filter({ hasText: 'Technical sync' });
+    await updatedTechStage.locator('label', { hasText: 'Starts' }).getByRole('button').click();
+    await expect(page.getByTestId('date-time-picker-popover')).toBeVisible();
+    await page.getByTestId('date-time-picker-apply').click();
+    await expect(page.getByTestId('date-time-picker-popover')).toHaveCount(0);
     await updatedTechStage.getByRole('button', { name: 'Sync calendar' }).click();
     await expect(updatedTechStage.getByText('macos', { exact: true }).first()).toBeVisible();
     await updatedTechStage.getByLabel('Attach recording').selectOption({ label: 'Backend interview recording' });

@@ -309,6 +309,24 @@ test.describe('OpenOffer E2E smoke', () => {
     expect(box!.y + box!.height).toBeLessThanOrEqual(740);
   });
 
+  test('settings close button stays reachable in short viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 640, height: 420 });
+    await gotoApp(page);
+    await openSettings(page);
+
+    const closeBtn = page.getByRole('button', { name: 'Close' }).first();
+    await expect(closeBtn).toBeVisible();
+    const closeBox = await closeBtn.boundingBox();
+    expect(closeBox).not.toBeNull();
+    expect(closeBox!.x).toBeGreaterThanOrEqual(0);
+    expect(closeBox!.y).toBeGreaterThanOrEqual(0);
+    expect(closeBox!.x + closeBox!.width).toBeLessThanOrEqual(640);
+    expect(closeBox!.y + closeBox!.height).toBeLessThanOrEqual(420);
+
+    await closeBtn.click();
+    await expect(page.locator('#settings-panel')).toHaveCount(0);
+  });
+
   test('settings exposes local-first speech providers', async ({ page }) => {
     await gotoApp(page);
     await openSettings(page);

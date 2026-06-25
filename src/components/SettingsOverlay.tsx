@@ -1552,7 +1552,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.2 }}
                     id="settings-backdrop"
-                    className={`fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 lg:p-8 transition-colors duration-150 ${isPreviewingOpacity ? 'bg-transparent backdrop-blur-none' : 'bg-black/75 backdrop-blur-[2px]'}`}
+                    className={`fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 lg:p-8 transition-colors duration-150 ${isPreviewingOpacity ? 'bg-transparent backdrop-blur-none' : 'bg-black/75 backdrop-blur-[2px]'}`}
                 >
                     <motion.div
                         id="settings-panel-wrapper"
@@ -1565,15 +1565,24 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                             damping: 32,
                             mass: 1
                         }}
-                        className="bg-bg-elevated w-full max-w-5xl h-[80vh] min-h-[560px] rounded-2xl border border-border-subtle shadow-2xl overflow-hidden relative"
+                        className="bg-bg-elevated w-full max-w-5xl h-[calc(100dvh-16px)] max-h-[80vh] min-h-0 rounded-2xl border border-border-subtle shadow-2xl overflow-hidden relative sm:h-[80vh]"
                     >
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            aria-label={t('common.close')}
+                            title={t('common.close')}
+                            className="absolute right-2 top-2 z-[5] inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-bg-elevated/95 text-text-secondary shadow-lg shadow-black/20 transition hover:bg-bg-item-active hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60 sm:right-3 sm:top-3"
+                        >
+                            <X size={18} />
+                        </button>
                         <div
                             id="settings-panel"
                             className="flex w-full h-full min-w-0"
                             style={{ visibility: isPreviewingOpacity ? 'hidden' : 'visible' }}
                         >
                         {/* Sidebar */}
-                        <div className="w-56 shrink-0 bg-bg-sidebar flex flex-col border-r border-border-subtle xl:w-64">
+                        <div className="w-56 shrink-0 bg-bg-sidebar flex flex-col border-r border-border-subtle overflow-y-auto xl:w-64">
                             <div className="p-6">
                                 <h2 className="font-semibold text-gray-400 text-xs uppercase tracking-wider mb-2">{t('settings.sidebar.title')}</h2>
                                 <nav className="space-y-1">
