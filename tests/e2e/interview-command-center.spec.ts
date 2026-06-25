@@ -666,7 +666,6 @@ test.describe('Interview Command Center', () => {
 
     const applicationFields = page.getByTestId('application-fields-card');
     await applicationFields.getByRole('textbox', { name: 'Company', exact: true }).fill('Acme Edited');
-    await applicationFields.getByRole('textbox', { name: 'Next action', exact: true }).fill('Send follow-up');
     await applicationFields.getByRole('button', { name: 'Save' }).click();
     await expect.poll(async () => page.evaluate(() => (window as any).__openOfferTestState.applications[0].company)).toBe('Acme Edited');
 
@@ -680,6 +679,15 @@ test.describe('Interview Command Center', () => {
     await expect(page.getByText('1 active process')).toBeVisible();
     const firstAgentPayload = await page.evaluate(() => (window as any).__openOfferTestState.lastCreateFromIntakePayload);
     expect(firstAgentPayload.selectedApplicationId).toBe('app_1');
+
+    await page.getByRole('button', { name: 'Vacancy', exact: true }).click();
+    const nearestStage = page
+      .getByTestId('application-fields-card')
+      .locator('button')
+      .filter({ hasText: 'Nearest stage' });
+    await expect(nearestStage).toContainText('Tech screening');
+    await nearestStage.click();
+    await expect(page.getByTestId('interview-stage-card').filter({ hasText: 'Tech screening' })).toBeVisible();
 
     const techStage = page.getByTestId('interview-stage-card').filter({ hasText: 'Tech screening' });
     await expect(techStage).toBeVisible();

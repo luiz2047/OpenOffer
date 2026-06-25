@@ -33,6 +33,13 @@ import { KeyRecorder } from './ui/KeyRecorder';
 import icon from './icon.png';
 import { sanitizeSttProvider } from '../lib/legacyStateMigration';
 import type { InterfaceLanguagePreference, InterfaceLocaleOption, InterfaceTranslationsSnapshot } from '../i18n';
+import type { CalendarEventSummary, CalendarStatusResult } from '../types/interviews';
+
+const EMPTY_CALENDAR_STATUS: CalendarStatusResult = {
+    providers: [],
+    preferredProvider: null,
+    connected: false,
+};
 
 // ---------------------------------------------------------------------------
 // StarRating — renders filled/empty stars for culture ratings
@@ -1301,9 +1308,9 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     };
 
 
-    const [calendarStatus, setCalendarStatus] = useState<{ connected: boolean; email?: string }>({ connected: false });
+    const [calendarStatus, setCalendarStatus] = useState<CalendarStatusResult>(EMPTY_CALENDAR_STATUS);
     const [isCalendarsLoading, setIsCalendarsLoading] = useState(false);
-    const [calendarEvents, setCalendarEvents] = useState<Array<{ id: string; title: string; startTime: string; endTime: string; link?: string }>>([]);
+    const [calendarEvents, setCalendarEvents] = useState<CalendarEventSummary[]>([]);
     const [isCalendarRefreshing, setIsCalendarRefreshing] = useState(false);
 
 

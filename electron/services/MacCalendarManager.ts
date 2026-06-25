@@ -5,6 +5,10 @@ import type { CalendarCreateEventInput, CalendarEvent } from './CalendarManager'
 const execFileAsync = promisify(execFile);
 const DEFAULT_TIMEOUT_MS = 4_000;
 
+export interface MacCalendarReadOptions {
+  throwOnError?: boolean;
+}
+
 const MAC_CALENDAR_JXA = `
 ObjC.import('stdlib');
 
@@ -54,11 +58,16 @@ Calendar.includeStandardAdditions = true;
 Calendar.calendars().forEach(function(calendar) {
   var calendarName = stringValue(calendar.name(), 'Calendar');
   try {
-    calendar.events().forEach(function(event) {
+    var events = calendar.events.whose({
+      startDate: {
+        _greaterThan: start,
+        _lessThan: end
+      }
+    })();
+    events.forEach(function(event) {
       var startDate = asDate(event.startDate());
       var endDate = asDate(event.endDate());
       if (!startDate || !endDate) return;
-      if (startDate < start || startDate > end) return;
       if ((endDate.getTime() - startDate.getTime()) < 5 * 60 * 1000) return;
       var title = stringValue(event.summary(), '(No Title)');
       var notes = '';
@@ -154,8 +163,11 @@ export class MacCalendarManager {
     return process.platform === 'darwin';
   }
 
-  public async getUpcomingEvents(): Promise<CalendarEvent[]> {
-    if (!this.isAvailable()) return [];
+  public async getUpcomingEvents(options: MacCalendarReadOptions = {}): Promise<CalendarEvent[]> {
+    if (!this.isAvailable()) {
+      if (options.throwOnError) throw new Error('macOS Calendar is only available on Darwin.');
+      return [];
+    }
 
     const now = new Date();
     const horizon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -183,6 +195,7 @@ export class MacCalendarManager {
         .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
     } catch (error: any) {
       console.warn('[MacCalendarManager] macOS Calendar read failed:', error?.message || error);
+      if (options.throwOnError) throw error;
       return [];
     }
   }

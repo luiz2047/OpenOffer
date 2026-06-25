@@ -49,8 +49,81 @@ export type CalendarSyncStatus =
   | 'calendar_disabled'
   | 'refresh_error';
 
+export type CalendarProviderId = 'google' | 'macos';
+
+export type CalendarProviderState =
+  | 'connected'
+  | 'available'
+  | 'permission_unknown'
+  | 'needs_setup'
+  | 'permission_denied'
+  | 'unavailable'
+  | 'syncing'
+  | 'error';
+
+export type CalendarCapability = 'yes' | 'no' | 'unknown';
+
+export interface CalendarAttendeeSummary {
+  email: string;
+  name?: string;
+  photoUrl?: string;
+  response?: 'accepted' | 'declined' | 'tentative' | 'needsAction' | string;
+}
+
+export interface CalendarEventSummary {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  link?: string;
+  source: CalendarProviderId;
+  attendees?: CalendarAttendeeSummary[];
+}
+
+export interface CalendarProviderStatus {
+  provider: CalendarProviderId;
+  state: CalendarProviderState;
+  labelKey: string;
+  detailKey?: string;
+  accountLabel?: string;
+  lastSyncAt?: number | null;
+  lastErrorCode?: string | null;
+  readCapability: CalendarCapability;
+  writeCapability: CalendarCapability;
+  canConnect: boolean;
+}
+
+export interface CalendarStatusResult {
+  providers: CalendarProviderStatus[];
+  preferredProvider: CalendarProviderId | null;
+  connected: boolean;
+  email?: string;
+}
+
+export interface CalendarRefreshProviderResult {
+  provider: CalendarProviderId;
+  ok: boolean;
+  eventCount?: number;
+  errorCode?: string;
+}
+
+export interface CalendarRefreshResult {
+  refreshedAt: number;
+  providers: CalendarRefreshProviderResult[];
+  status: CalendarStatusResult;
+}
+
+export interface ClearArchivedApplicationsResult {
+  applicationsDeleted: number;
+  stagesDeleted: number;
+  legacyEventsDeleted: number;
+  meetingsDetached: number;
+}
+
 export type InterviewErrorCode =
+  | 'bridge_unavailable'
   | 'invalid_payload'
+  | 'invalid_stage_time_range'
   | 'ambiguous_stage'
   | 'ambiguous_application_match'
   | 'local_database_unavailable'

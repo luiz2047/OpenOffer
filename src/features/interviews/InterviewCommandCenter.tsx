@@ -25,10 +25,13 @@ import type {
   ApplicationIntakeResult,
   ApplicationStatus,
   ApplicationUpdatePatch,
+  CalendarEventSummary,
   CalendarProvider,
   CalendarSnapshot,
+  CalendarStatusResult,
   InterviewCreatePayload,
   InterviewDetail,
+  InterviewErrorCode,
   InterviewListItem,
   InterviewPriority,
   InterviewQuestionPayload,
@@ -47,7 +50,18 @@ import type {
   VacancyDossierPayload,
 } from '../../types/interviews';
 import { applicationApi, interviewApi, stageApi } from './api';
+import { CalendarDatePickerButton } from './CalendarDatePickerButton';
+import { DateTimePickerField } from './DateTimePickerField';
+import { createInterviewUiError, normalizeInterviewError, type InterviewUiError } from './interviewErrors';
+import {
+  formatCalendarDayLabel,
+  isStageDateRangeInvalid,
+  normalizeEpoch,
+  normalizeStageDateRange,
+  type StageDateRangeField,
+} from './dateTime';
 import type { TopSearchResultRow, VacancyTopSearchContext } from './topSearchHelpers';
+import { getNearestStage } from './vacancySelectors';
 
 interface MeetingSummary {
   id: string;
@@ -55,16 +69,6 @@ interface MeetingSummary {
   date: string;
   duration: string;
   summary: string;
-}
-
-interface CalendarEventSummary {
-  id: string;
-  title: string;
-  startTime: string;
-  endTime: string;
-  link?: string;
-  source: 'google' | 'macos' | string;
-  attendees?: Array<{ email: string; name?: string; photoUrl?: string; response?: string }>;
 }
 
 export interface InterviewMeetingStartMetadata {
@@ -254,19 +258,6 @@ function startOfWeek(value: Date): Date {
 
 function isSameLocalDay(left: Date, right: Date): boolean {
   return startOfDay(left).getTime() === startOfDay(right).getTime();
-}
-
-function toLocalInputValue(ms?: number | null): string {
-  if (!ms) return '';
-  const date = new Date(ms);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}
-
-function fromLocalInputValue(value: string): number | null {
-  if (!value) return null;
-  const ms = new Date(value).getTime();
-  return Number.isFinite(ms) ? ms : null;
 }
 
 function emptyToNull(value: string): string | null {
@@ -512,7 +503,7 @@ function applicationDraftFromDetail(application: ApplicationDetail | null) {
     compensationText: application?.compensationText ?? '',
     locationFormat: application?.locationFormat ?? '',
     nextAction: application?.nextAction ?? '',
-    nextActionDueAt: toLocalInputValue(application?.nextActionDueAt),
+    nextActionDueAt: normalizeEpoch(application?.nextActionDueAt),
     rawSourceText: application?.rawSourceText ?? '',
   };
 }
@@ -522,8 +513,8 @@ function stageDraftFromStage(stage: InterviewStage) {
     title: stage.title,
     stageType: stage.stageType,
     status: stage.status,
-    startsAt: toLocalInputValue(stage.startsAt),
-    endsAt: toLocalInputValue(stage.endsAt),
+    startsAt: normalizeEpoch(stage.startsAt),
+    endsAt: normalizeEpoch(stage.endsAt),
     timezone: stage.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
     format: stage.format ?? 'unknown' as InterviewStageFormat,
     meetingUrl: stage.meetingUrl ?? '',
@@ -594,7 +585,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   onCalendarConnected,
   onSearchContextChange,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [interviews, setInterviews] = useState<InterviewListItem[]>([]);
   const [applications, setApplications] = useState<ApplicationDetail[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -603,7 +594,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const [retroPrompt, setRetroPrompt] = useState<RetroPromptDecision | null>(null);
   const [retroEvaluation, setRetroEvaluation] = useState<InterviewRetroEvaluation | null>(null);
   const [retroEvaluating, setRetroEvaluating] = useState(false);
-  const [calendarStatus, setCalendarStatus] = useState<{ connected: boolean; email?: string } | null>(null);
+  const [calendarStatus, setCalendarStatus] = useState<CalendarStatusResult | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [rawSourceExpanded, setRawSourceExpanded] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>('Vacancy');
@@ -639,7 +630,11 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const [questionCategory, setQuestionCategory] = useState('');
   const [attachMeetingIds, setAttachMeetingIds] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<InterviewUiError | null>(null);
+
+  const showError = useCallback((err: unknown, fallbackCode: InterviewErrorCode = 'unexpected_error') => {
+    setError(normalizeInterviewError(err, fallbackCode));
+  }, []);
 
   const loadInterviews = useCallback(async () => {
     try {
@@ -660,9 +655,9 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         return applicationLegacyId ?? rows[0]?.id ?? null;
       });
     } catch (err: any) {
-      setError(err?.message || 'Could not load interviews.');
+      showError(err);
     }
-  }, []);
+  }, [showError]);
 
   const loadCalendarStatus = useCallback(async () => {
     try {
@@ -672,7 +667,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         onCalendarConnected(Boolean(status.connected));
       }
     } catch {
-      setCalendarStatus({ connected: false });
+      setCalendarStatus(null);
       onCalendarConnected(false);
     }
   }, [onCalendarConnected]);
@@ -722,13 +717,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         });
         setQuestionDrafts(nextDetail.questions ?? []);
       } catch (err: any) {
-        if (!cancelled) setError(err?.message || 'Could not open interview.');
+        if (!cancelled) showError(err, 'not_found');
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [selectedId]);
+  }, [selectedId, showError]);
 
   useEffect(() => {
     if (!applicationDetail?.id) return;
@@ -769,6 +764,10 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const filteredVacancies = useMemo(() => {
     return statusFilteredVacancies;
   }, [statusFilteredVacancies]);
+  const archivedVacancyCount = useMemo(
+    () => vacancyItems.filter(item => item.status === 'archived').length,
+    [vacancyItems],
+  );
 
   const topSearchRows = useMemo<TopSearchResultRow[]>(() => {
     const rows: TopSearchResultRow[] = [];
@@ -866,7 +865,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   }, [interviews, selectedDate]);
 
   const selectedDayCount = selectedDayEvents.length + selectedDayInterviews.length;
+  const selectedDayLabel = useMemo(() => formatCalendarDayLabel(
+    selectedDate,
+    { today: t('interviews.today'), tomorrow: t('interviews.tomorrow') },
+    i18n.language,
+  ), [i18n.language, selectedDate, t]);
   const stages = applicationDetail?.stages ?? [];
+  const nearestStage = useMemo(() => getNearestStage(stages), [stages]);
   const activeStages = stages.filter(stage => stage.status !== 'archived' && !stage.archivedAt);
   const archivedStages = stages.filter(stage => stage.status === 'archived' || stage.archivedAt);
   const formatSchedule = useCallback((ms?: number | null) => (ms ? formatDateTime(ms) : t('interviews.unscheduled')), [t]);
@@ -881,7 +886,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     try {
       await action();
     } catch (err: any) {
-      setError(err?.message || 'Action failed.');
+      showError(err);
     } finally {
       setBusy(false);
     }
@@ -903,12 +908,12 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       setSelectedId(result.legacyInterview?.id ?? result.application.legacyInterviewEventId ?? null);
       return result;
     } catch (err: any) {
-      setError(err?.message || 'Action failed.');
+      showError(err);
       throw err;
     } finally {
       setBusy(false);
     }
-  }, [loadInterviews]);
+  }, [loadInterviews, showError]);
 
   const topSearchContext = useMemo<VacancyTopSearchContext>(() => ({
     isActive: true,
@@ -962,21 +967,40 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     await Promise.all([Promise.resolve(onRefresh()), loadInterviews(), loadCalendarStatus()]);
   };
 
+  const clearArchivedApplications = async () => {
+    if (archivedVacancyCount < 1) return;
+    if (!window.confirm(t('interviews.clearArchiveConfirm', { count: archivedVacancyCount }))) return;
+    await run(async () => {
+      await applicationApi.clearArchived();
+      setSelectedId(null);
+      setDetail(null);
+      setApplicationDetail(null);
+      setStatusFilter('active');
+      await loadInterviews();
+    });
+  };
+
   const applyIntakePreviewToForm = (preview: ApplicationIntakeResult) => {
-    setCreateForm(prev => ({
-      ...prev,
-      title: prev.title.trim() || preview.application.title || prev.title,
-      company: prev.company?.trim() ? prev.company : preview.application.company ?? prev.company,
-      roleTitle: prev.roleTitle?.trim() ? prev.roleTitle : preview.application.roleTitle ?? prev.roleTitle,
-      stage: prev.stage?.trim() && prev.stage !== 'Recruiter screen' ? prev.stage : preview.stage?.title ?? prev.stage,
-      source: preview.application.source ?? prev.source,
-      vacancyUrl: prev.vacancyUrl?.trim() ? prev.vacancyUrl : preview.application.vacancyUrl ?? prev.vacancyUrl,
-      meetingUrl: prev.meetingUrl?.trim() ? prev.meetingUrl : preview.stage?.meetingUrl ?? prev.meetingUrl,
-      startsAt: prev.startsAt ?? preview.stage?.startsAt ?? null,
-      endsAt: prev.endsAt ?? preview.stage?.endsAt ?? null,
-      timezone: preview.stage?.timezone ?? prev.timezone,
-      rawSourceText: preview.application.rawSourceText ?? prev.rawSourceText,
-    }));
+    setCreateForm(prev => {
+      const range = normalizeStageDateRange({
+        startsAt: prev.startsAt ?? preview.stage?.startsAt ?? null,
+        endsAt: prev.endsAt ?? preview.stage?.endsAt ?? null,
+      }, 'startsAt');
+      return {
+        ...prev,
+        title: prev.title.trim() || preview.application.title || prev.title,
+        company: prev.company?.trim() ? prev.company : preview.application.company ?? prev.company,
+        roleTitle: prev.roleTitle?.trim() ? prev.roleTitle : preview.application.roleTitle ?? prev.roleTitle,
+        stage: prev.stage?.trim() && prev.stage !== 'Recruiter screen' ? prev.stage : preview.stage?.title ?? prev.stage,
+        source: preview.application.source ?? prev.source,
+        vacancyUrl: prev.vacancyUrl?.trim() ? prev.vacancyUrl : preview.application.vacancyUrl ?? prev.vacancyUrl,
+        meetingUrl: prev.meetingUrl?.trim() ? prev.meetingUrl : preview.stage?.meetingUrl ?? prev.meetingUrl,
+        startsAt: range.startsAt,
+        endsAt: range.endsAt,
+        timezone: preview.stage?.timezone ?? prev.timezone,
+        rawSourceText: preview.application.rawSourceText ?? prev.rawSourceText,
+      };
+    });
   };
 
   const parseSourceText = async (useAi = false) => {
@@ -990,6 +1014,10 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   };
 
   const createInterview = async () => {
+    if (isStageDateRangeInvalid({ startsAt: createForm.startsAt ?? null, endsAt: createForm.endsAt ?? null })) {
+      setError(createInterviewUiError('invalid_stage_time_range'));
+      return;
+    }
     await run(async () => {
       const preview = intakePreview ?? await applicationApi.parseIntake({ text: createForm.rawSourceText ?? createForm.title, useAi: false });
       const result = await applicationApi.createFromIntake({
@@ -1017,7 +1045,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         try {
           await interviewApi.createCalendarEvent(legacyId, createCalendarProvider);
         } catch (err: any) {
-          setError(`Created locally. Calendar sync failed: ${err?.message || 'unknown error'}`);
+          showError(err, 'calendar_refresh_failed');
         }
       }
       setShowCreate(false);
@@ -1083,7 +1111,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       compensationText: emptyToNull(applicationDraft.compensationText),
       locationFormat: emptyToNull(applicationDraft.locationFormat),
       nextAction: emptyToNull(applicationDraft.nextAction),
-      nextActionDueAt: fromLocalInputValue(applicationDraft.nextActionDueAt),
+      nextActionDueAt: applicationDraft.nextActionDueAt,
       rawSourceText: emptyToNull(applicationDraft.rawSourceText),
     };
     await run(async () => {
@@ -1109,14 +1137,45 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     setStageSaveStatus(prev => ({ ...prev, [stageId]: 'dirty' }));
   };
 
+  const updateCreateFormDate = (key: StageDateRangeField, value: number | null) => {
+    setCreateForm(prev => ({
+      ...prev,
+      ...normalizeStageDateRange({
+        startsAt: key === 'startsAt' ? value : prev.startsAt ?? null,
+        endsAt: key === 'endsAt' ? value : prev.endsAt ?? null,
+      }, key),
+    }));
+  };
+
+  const updateStageDraftDate = (stage: InterviewStage, key: StageDateRangeField, value: number | null) => {
+    setStageDrafts(prev => {
+      const current = prev[stage.id] ?? stageDraftFromStage(stage);
+      return {
+        ...prev,
+        [stage.id]: {
+          ...current,
+          ...normalizeStageDateRange({
+            startsAt: key === 'startsAt' ? value : current.startsAt,
+            endsAt: key === 'endsAt' ? value : current.endsAt,
+          }, key),
+        },
+      };
+    });
+    setStageSaveStatus(prev => ({ ...prev, [stage.id]: 'dirty' }));
+  };
+
   const saveStage = async (stage: InterviewStage) => {
     const draft = stageDrafts[stage.id] ?? stageDraftFromStage(stage);
+    if (isStageDateRangeInvalid({ startsAt: draft.startsAt, endsAt: draft.endsAt })) {
+      setError(createInterviewUiError('invalid_stage_time_range'));
+      return;
+    }
     const patch: InterviewStageUpdatePatch = {
       title: draft.title,
       stageType: draft.stageType,
       status: draft.status,
-      startsAt: fromLocalInputValue(draft.startsAt),
-      endsAt: fromLocalInputValue(draft.endsAt),
+      startsAt: draft.startsAt,
+      endsAt: draft.endsAt,
       timezone: emptyToNull(draft.timezone),
       format: draft.format,
       meetingUrl: emptyToNull(draft.meetingUrl),
@@ -1261,7 +1320,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       const evaluation = await interviewApi.generateRetroEvaluation(detail.id);
       setRetroEvaluation(evaluation);
     } catch (err: any) {
-      setError(err?.message || 'Could not generate retro evaluation.');
+      showError(err);
     } finally {
       setRetroEvaluating(false);
     }
@@ -1460,12 +1519,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
             >
               <ChevronLeft size={16} />
             </button>
-            <button type="button"
-              className="min-h-11 flex-1 rounded-md border border-white/[0.08] px-3 text-[12px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white"
-              onClick={() => setSelectedDate(startOfDay(new Date()))}
-            >
-              {selectedDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
-            </button>
+            <CalendarDatePickerButton
+              value={selectedDate}
+              label={selectedDayLabel}
+              ariaLabel={t('interviews.chooseDate')}
+              onChange={date => setSelectedDate(startOfDay(date))}
+              className="min-w-0 flex-1"
+            />
             <button type="button"
               className={iconButtonClass}
               onClick={() => setSelectedDate(prev => addDays(prev, 7))}
@@ -1498,7 +1558,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
           <div className="mb-2 flex items-center justify-between">
-            <span className={labelClass}>{t('interviews.selectedDay')}</span>
+            <span className={labelClass}>{selectedDayLabel}</span>
             <span className="text-[11px] text-text-tertiary">{selectedDayCount}</span>
           </div>
           <div className="space-y-2">
@@ -1592,6 +1652,22 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               </button>
             ))}
           </div>
+          {statusFilter === 'archived' && (
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-md bg-white/[0.025] px-2 py-2">
+              <span className="text-[11px] text-text-tertiary">
+                {t('interviews.archivedVacancyCount', { count: archivedVacancyCount })}
+              </span>
+              <button
+                type="button"
+                onClick={clearArchivedApplications}
+                disabled={busy || archivedVacancyCount < 1}
+                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-white/[0.08] px-2.5 text-[11px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Trash2 size={13} />
+                {t('interviews.clearArchive')}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
@@ -1703,13 +1779,6 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
           )}
         </div>
 
-        {error && (
-          <div className="mx-5 mt-4 flex items-center gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-[12px] text-red-200">
-            <AlertCircle size={14} />
-            {error}
-          </div>
-        )}
-
         {detail ? (
           <div className="min-h-0 flex-1">
             <div className="h-full min-h-0 overflow-y-auto p-5 pb-24 custom-scrollbar">
@@ -1741,11 +1810,29 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                                 : t('interviews.detail.synced')}
                         </div>
                       </div>
-                      <button type="button" onClick={saveApplication} disabled={busy || !applicationDetail || !applicationDraft.title.trim()} className={primaryButtonClass}>
-                        {t('common.save')}
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+	                      <button type="button" onClick={saveApplication} disabled={busy || !applicationDetail || !applicationDraft.title.trim()} className={primaryButtonClass}>
+	                        {t('common.save')}
+	                      </button>
+	                    </div>
+	                    {nearestStage && (
+	                      <button
+	                        type="button"
+	                        onClick={() => setDetailTab('Stages')}
+	                        className="mb-4 flex w-full items-start justify-between gap-3 rounded-md border border-cyan-300/15 bg-cyan-300/[0.06] p-3 text-left transition hover:border-cyan-300/30 hover:bg-cyan-300/[0.09] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60"
+	                      >
+	                        <div className="min-w-0">
+	                          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-cyan-200/80">{t('interviews.detail.nearestStage')}</div>
+	                          <div className="mt-1 truncate text-[14px] font-semibold text-text-primary">{nearestStage.title}</div>
+	                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-text-secondary">
+	                            <span>{formatSchedule(nearestStage.startsAt)}</span>
+	                            <span className="text-white/[0.16]">/</span>
+	                            <span>{t(`interviews.stageStatus.${nearestStage.status}`)}</span>
+	                          </div>
+	                        </div>
+	                        <ChevronRight size={16} className="mt-1 flex-none text-cyan-100/70" />
+	                      </button>
+	                    )}
+	                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                       <Field label={t('interviews.detail.title')}>
                         <input className={inputClass} value={applicationDraft.title} onChange={event => updateApplicationDraft('title', event.target.value)} />
                       </Field>
@@ -1790,13 +1877,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       <Field label={t('interviews.detail.locationFormat')}>
                         <input className={inputClass} value={applicationDraft.locationFormat} onChange={event => updateApplicationDraft('locationFormat', event.target.value)} />
                       </Field>
-                      <Field label={t('interviews.detail.nextAction')}>
-                        <input className={inputClass} value={applicationDraft.nextAction} onChange={event => updateApplicationDraft('nextAction', event.target.value)} />
-                      </Field>
-                      <Field label={t('interviews.detail.nextActionDueAt')}>
-                        <input className={inputClass} type="datetime-local" value={applicationDraft.nextActionDueAt} onChange={event => updateApplicationDraft('nextActionDueAt', event.target.value)} />
-                      </Field>
-                      <div className="md:col-span-2">
+	                      <div className="md:col-span-2">
                         <Field label={t('interviews.detail.sourceText')}>
                           <textarea className={`${inputClass} min-h-[120px] resize-y`} value={applicationDraft.rawSourceText} onChange={event => updateApplicationDraft('rawSourceText', event.target.value)} />
                         </Field>
@@ -1953,10 +2034,20 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                                 </select>
                               </Field>
                               <Field label={t('interviews.detail.starts')}>
-                                <input className={inputClass} type="datetime-local" value={stageDraft.startsAt} onChange={event => updateStageDraft(stage.id, 'startsAt', event.target.value)} />
+                                <DateTimePickerField
+                                  value={stageDraft.startsAt}
+                                  placeholder={t('interviews.unscheduled')}
+                                  invalid={isStageDateRangeInvalid({ startsAt: stageDraft.startsAt, endsAt: stageDraft.endsAt })}
+                                  onChange={value => updateStageDraftDate(stage, 'startsAt', value)}
+                                />
                               </Field>
                               <Field label={t('interviews.detail.ends')}>
-                                <input className={inputClass} type="datetime-local" value={stageDraft.endsAt} onChange={event => updateStageDraft(stage.id, 'endsAt', event.target.value)} />
+                                <DateTimePickerField
+                                  value={stageDraft.endsAt}
+                                  placeholder={t('interviews.unscheduled')}
+                                  invalid={isStageDateRangeInvalid({ startsAt: stageDraft.startsAt, endsAt: stageDraft.endsAt })}
+                                  onChange={value => updateStageDraftDate(stage, 'endsAt', value)}
+                                />
                               </Field>
                               <Field label={t('interviews.detail.timezone')}>
                                 <input className={inputClass} value={stageDraft.timezone} onChange={event => updateStageDraft(stage.id, 'timezone', event.target.value)} />
@@ -2262,8 +2353,22 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                   {PRIORITY_OPTIONS.map(priority => <option key={priority} value={priority}>{priority}</option>)}
                 </select>
               </Field>
-              <Field label={t('interviews.detail.starts')}><input className={inputClass} type="datetime-local" value={toLocalInputValue(createForm.startsAt)} onChange={event => setCreateForm(prev => ({ ...prev, startsAt: fromLocalInputValue(event.target.value) }))} /></Field>
-              <Field label={t('interviews.detail.ends')}><input className={inputClass} type="datetime-local" value={toLocalInputValue(createForm.endsAt)} onChange={event => setCreateForm(prev => ({ ...prev, endsAt: fromLocalInputValue(event.target.value) }))} /></Field>
+              <Field label={t('interviews.detail.starts')}>
+                <DateTimePickerField
+                  value={createForm.startsAt}
+                  placeholder={t('interviews.unscheduled')}
+                  invalid={isStageDateRangeInvalid({ startsAt: createForm.startsAt ?? null, endsAt: createForm.endsAt ?? null })}
+                  onChange={value => updateCreateFormDate('startsAt', value)}
+                />
+              </Field>
+              <Field label={t('interviews.detail.ends')}>
+                <DateTimePickerField
+                  value={createForm.endsAt}
+                  placeholder={t('interviews.unscheduled')}
+                  invalid={isStageDateRangeInvalid({ startsAt: createForm.startsAt ?? null, endsAt: createForm.endsAt ?? null })}
+                  onChange={value => updateCreateFormDate('endsAt', value)}
+                />
+              </Field>
               <Field label={t('interviews.detail.vacancyUrl')}><input className={inputClass} value={createForm.vacancyUrl ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, vacancyUrl: event.target.value }))} /></Field>
               <Field label={t('interviews.detail.meetingUrl')}><input className={inputClass} value={createForm.meetingUrl ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, meetingUrl: event.target.value }))} /></Field>
               <Field label={t('interviews.detail.calendarSync')}>
@@ -2286,6 +2391,29 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {error && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="fixed bottom-5 right-5 z-[140] flex w-[min(420px,calc(100vw-32px))] items-start gap-3 rounded-md border border-rose-400/25 bg-[#180d10] p-4 text-left shadow-2xl shadow-black/45"
+        >
+          <AlertCircle size={18} className="mt-0.5 flex-none text-rose-300" />
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-semibold text-rose-100">{t(error.i18nKey)}</div>
+            <div className="mt-1 font-mono text-[11px] text-rose-200/70">code: {error.code}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-md text-rose-200/70 transition hover:bg-white/[0.06] hover:text-white"
+            title={t('common.dismiss')}
+            aria-label={t('common.dismiss')}
+          >
+            <X size={15} />
+          </button>
         </div>
       )}
     </div>

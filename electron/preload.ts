@@ -3,10 +3,14 @@ import type {
   ApplicationCreateFromIntakePayload,
   ApplicationCreateFromIntakeResult,
   ApplicationDetail,
+  ClearArchivedApplicationsResult,
   ApplicationListInput,
   ApplicationUpdatePatch,
   ApplicationIntakeInput,
   ApplicationIntakeResult,
+  CalendarEventSummary,
+  CalendarRefreshResult,
+  CalendarStatusResult,
   InterviewCreatePayload,
   InterviewDetail,
   InterviewIpcResult,
@@ -589,18 +593,9 @@ interface ElectronAPI {
   // Calendar
   calendarConnect: () => Promise<{ success: boolean; error?: string }>;
   calendarDisconnect: () => Promise<{ success: boolean; error?: string }>;
-  getCalendarStatus: () => Promise<{ connected: boolean; email?: string }>;
-  getUpcomingEvents: () => Promise<
-    Array<{
-      id: string;
-      title: string;
-      startTime: string;
-      endTime: string;
-      link?: string;
-      source: 'google' | 'macos';
-    }>
-  >;
-  calendarRefresh: () => Promise<{ success: boolean; error?: string }>;
+  getCalendarStatus: () => Promise<CalendarStatusResult>;
+  getUpcomingEvents: () => Promise<CalendarEventSummary[]>;
+  calendarRefresh: () => Promise<CalendarRefreshResult>;
 
   // Auto-Update
   onUpdateAvailable: (callback: (info: any) => void) => () => void;
@@ -892,6 +887,7 @@ interface ElectronAPI {
   applicationsList: (input?: ApplicationListInput) => Promise<InterviewIpcResult<ApplicationDetail[]>>;
   applicationsGet: (id: string) => Promise<InterviewIpcResult<ApplicationDetail>>;
   applicationsUpdate: (id: string, patch: ApplicationUpdatePatch) => Promise<InterviewIpcResult<ApplicationDetail>>;
+  applicationsClearArchived: () => Promise<InterviewIpcResult<ClearArchivedApplicationsResult>>;
   applicationsCreateFromIntake: (operationId: string, payload: ApplicationCreateFromIntakePayload) => Promise<InterviewIpcResult<ApplicationCreateFromIntakeResult>>;
   interviewStagesCreate: (payload: InterviewStageCreatePayload) => Promise<InterviewIpcResult<ApplicationDetail>>;
   interviewStagesUpdate: (id: string, patch: InterviewStageUpdatePatch) => Promise<InterviewIpcResult<ApplicationDetail>>;
@@ -2268,6 +2264,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   applicationsGet: (id: string) => ipcRenderer.invoke('applications:get', id),
   applicationsUpdate: (id: string, patch: ApplicationUpdatePatch) =>
     ipcRenderer.invoke('applications:update', id, patch),
+  applicationsClearArchived: () => ipcRenderer.invoke('applications:clear-archived'),
   applicationsCreateFromIntake: (operationId: string, payload: ApplicationCreateFromIntakePayload) =>
     ipcRenderer.invoke('applications:create-from-intake', operationId, payload),
   interviewStagesCreate: (payload: InterviewStageCreatePayload) =>

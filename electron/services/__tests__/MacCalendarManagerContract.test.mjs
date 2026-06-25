@@ -14,6 +14,8 @@ test('MacCalendarManager reads local Calendar.app through a bounded osascript br
 
   assert.match(source, /execFileAsync\('\/usr\/bin\/osascript', \['-l', 'JavaScript'/);
   assert.match(source, /timeout:\s*DEFAULT_TIMEOUT_MS/);
+  assert.match(source, /events\.whose\(\{/);
+  assert.doesNotMatch(source, /calendar\.events\(\)\.forEach/, 'macOS reads must not scan every historical event');
   assert.match(source, /process\.platform === 'darwin'/);
   assert.match(source, /source:\s*'macos' as const/);
   assert.doesNotMatch(source, /npm|icalBuddy|sqlite/i, 'local calendar support must not add an external runtime dependency');
@@ -21,15 +23,18 @@ test('MacCalendarManager reads local Calendar.app through a bounded osascript br
 
 test('get-upcoming-events merges Google and macOS calendar sources', () => {
   const ipc = read('electron/ipcHandlers.ts');
+  const coordinator = read('electron/services/CalendarProviderCoordinator.ts');
   const block = sliceSafeHandleBlock(ipc, 'get-upcoming-events');
 
   assert.ok(findSafeHandle(ipc, 'get-upcoming-events') >= 0);
-  assert.match(block, /CalendarManager\.getInstance\(\)\.getUpcomingEvents\(\)/);
-  assert.match(block, /MacCalendarManager\.getInstance\(\)\.getUpcomingEvents\(\)/);
-  assert.match(block, /\.sort\(\(a: any, b: any\)/);
+  assert.match(block, /CalendarProviderCoordinator\.getInstance\(\)\.getUpcomingEvents\(\)/);
+  assert.match(coordinator, /safeReadGoogle\(\)/);
+  assert.match(coordinator, /safeReadMacos\(\)/);
+  assert.match(coordinator, /\.sort\(\(a, b\) =>/);
 });
 
 test('renderer calendar event type accepts both Google and macOS source labels', () => {
-  assert.match(read('electron/preload.ts'), /source:\s*'google' \| 'macos'/);
-  assert.match(read('src/types/electron.d.ts'), /source:\s*'google' \| 'macos'/);
+  assert.match(read('electron/preload.ts'), /CalendarEventSummary/);
+  assert.match(read('src/types/electron.d.ts'), /CalendarEventSummary/);
+  assert.match(read('src/types/interviews.ts'), /export type CalendarProviderId = ['"]google['"] \| ['"]macos['"]/);
 });

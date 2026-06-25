@@ -22,25 +22,25 @@
   - Priority: P2
   - Depends on / blocked by: P1 schema/content model shipped.
 
-- [ ] Calendar ADR and Google Calendar write-back after P1.
-  - What: write a Calendar ADR, then implement Google Calendar event creation/update for interview events.
-  - Why: users want interviews added from OpenOffer to their calendars, but external calendar mutation is a trust boundary.
-  - Pros: closes the create/schedule loop and unlocks stronger calendar-native workflows.
-  - Cons: OAuth scope expansion, conflict resolution, delete/update semantics, external mutation bugs, and permission copy.
-  - Context: P1 is read-only calendar integration using `CalendarManager.getUpcomingEvents()` and local snapshots. ADR should define scopes, source of truth, retries, delete policy, and rollback.
+- [ ] Production Google OAuth/proxy and calendar update/delete ADR after Release 1.
+  - What: write a Calendar ADR for the production Google Calendar setup, then implement production OAuth/proxy hardening plus event update/delete semantics after the Release 1 create/sync path stabilizes.
+  - Why: Release 1 should make basic provider status, sync, and event creation trustworthy; broader external calendar mutation remains a trust boundary that needs explicit policy before shipping as a durable platform behavior.
+  - Pros: keeps Release 1 focused while preserving the path to reliable Google Calendar update/delete workflows.
+  - Cons: OAuth scope expansion, hosted proxy ownership, conflict resolution, delete/update semantics, external mutation bugs, and permission copy.
+  - Context: Release 1 owns the local provider matrix, explicit create action, bounded refresh, and local dedup/snapshot rules. This follow-up should define production OAuth, proxy deployment, source of truth, retries, update/delete policy, and rollback.
   - Effort: L
   - Priority: P2
-  - Depends on / blocked by: P1 dogfood and validation gate.
+  - Depends on / blocked by: Release 1 calendar trust dogfood and validation gate.
 
-- [ ] Mac Calendar / EventKit spike.
-  - What: spike native macOS Calendar/EventKit read/write integration for interview events.
-  - Why: many macOS users rely on native Calendar, and local-first calendar integration fits OpenOffer better than Google-only support.
-  - Pros: stronger macOS-native UX, less Google dependency, and better local-first story.
-  - Cons: native permission prompts, signing/package implications, recurrence/conflict behavior, and platform-specific code.
-  - Context: P1 does not include EventKit. This spike should produce an ADR covering capabilities, permission UX, failure modes, test plan, and packaging notes.
+- [ ] Native EventKit replacement spike after Release 1 calendar dogfood.
+  - What: evaluate whether the Release 1 JXA/Calendar.app bridge should be replaced with a native EventKit layer for macOS calendar read/write behavior.
+  - Why: Release 1 should first prove the provider matrix, explicit sync, and event creation UX; native EventKit may still be needed for stronger permission handling, recurrence behavior, and long-term packaging reliability.
+  - Pros: keeps the Mac calendar path local-first while giving a clear upgrade route if JXA proves brittle.
+  - Cons: native permission prompts, signing/package implications, recurrence/conflict behavior, platform-specific code, and extra test matrix.
+  - Context: Release 1 owns Mac Calendar through the existing `MacCalendarManager` plus `CalendarProviderCoordinator`. This follow-up should compare JXA vs EventKit and produce an ADR covering capabilities, permission UX, failure modes, tests, and packaging notes.
   - Effort: M-L
   - Priority: P3
-  - Depends on / blocked by: P1 interview loop; ideally after Calendar ADR.
+  - Depends on / blocked by: Release 1 calendar trust dogfood.
 
 - [ ] Internal namespace cleanup after OpenOffer v0.1 hard-delete lands.
   - What: rename remaining internal Natively-era filenames, comments, localStorage keys, logs, DB names, and non-user-visible symbols to OpenOffer equivalents where it is safe.

@@ -114,6 +114,9 @@ export interface AppSettings {
     // Interface language controls app chrome only. STT recognition and AI response
     // language remain separate settings.
     interfaceLanguage?: InterfaceLanguagePreference;
+    // Calendar provider selected for explicit write actions. The provider matrix
+    // still decides availability; this only stores the user's preference.
+    calendarPreferredProvider?: 'google' | 'macos' | null;
 }
 
 export const VALID_SCREEN_UNDERSTANDING_MODES = ['vision_first', 'vision_only', 'private_vision'] as const;

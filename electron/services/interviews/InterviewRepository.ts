@@ -25,6 +25,7 @@ import type {
   RetroPromptAction,
   RetroPromptState,
   InterviewUpdatePatch,
+  ClearArchivedApplicationsResult,
   PrepBrief,
   PrepBriefPayload,
   VacancyDossier,
@@ -72,6 +73,14 @@ function nowMs(): number {
 
 function newId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID()}`;
+}
+
+function placeholders(values: readonly unknown[]): string {
+  return values.map(() => '?').join(', ');
+}
+
+function uniqueStrings(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values.filter((value): value is string => typeof value === 'string' && value.length > 0)));
 }
 
 function toJson(value: JsonValue): string {
@@ -1153,6 +1162,130 @@ export class InterviewRepository {
       }
     }
     return result.changes > 0;
+  }
+
+  clearArchivedApplications(): ClearArchivedApplicationsResult {
+    return this.db.transaction(() => {
+      const archivedApplications = this.db.prepare(`
+        SELECT id, legacy_interview_event_id
+        FROM applications
+        WHERE archived_at IS NOT NULL OR status = 'archived'
+      `).all<{ id: string; legacy_interview_event_id?: string | null }>();
+      const applicationIds = uniqueStrings(archivedApplications.map(row => row.id));
+      const applicationLegacyIds = uniqueStrings(archivedApplications.map(row => row.legacy_interview_event_id));
+      const applicationPlaceholders = applicationIds.length > 0 ? placeholders(applicationIds) : '';
+
+      const stageIds = applicationIds.length > 0
+        ? this.db.prepare(`
+          SELECT id
+          FROM interview_stages
+          WHERE application_id IN (${applicationPlaceholders})
+        `).all<{ id: string }>(...applicationIds).map(row => row.id)
+        : [];
+      const mappedLegacyIds = applicationIds.length > 0
+        ? this.db.prepare(`
+          SELECT legacy_interview_event_id
+          FROM legacy_interview_event_map
+          WHERE application_id IN (${applicationPlaceholders})
+        `).all<{ legacy_interview_event_id?: string | null }>(...applicationIds).map(row => row.legacy_interview_event_id)
+        : [];
+      const orphanArchivedLegacyIds = this.db.prepare(`
+        SELECT e.id
+        FROM interview_events e
+        LEFT JOIN legacy_interview_event_map map ON map.legacy_interview_event_id = e.id
+        WHERE (e.archived_at IS NOT NULL OR e.status = 'archived')
+          AND map.application_id IS NULL
+      `).all<{ id: string }>().map(row => row.id);
+      const legacyEventIds = uniqueStrings([
+        ...applicationLegacyIds,
+        ...mappedLegacyIds,
+        ...orphanArchivedLegacyIds,
+      ]);
+
+      const detachLinkedRows = (table: string): number => {
+        const setParts: string[] = [];
+        const setParams: unknown[] = [];
+        const whereParts: string[] = [];
+        const whereParams: unknown[] = [];
+
+        if (legacyEventIds.length > 0) {
+          const sql = placeholders(legacyEventIds);
+          setParts.push(`interview_event_id = CASE WHEN interview_event_id IN (${sql}) THEN NULL ELSE interview_event_id END`);
+          setParams.push(...legacyEventIds);
+          whereParts.push(`interview_event_id IN (${sql})`);
+          whereParams.push(...legacyEventIds);
+        }
+        if (stageIds.length > 0) {
+          const sql = placeholders(stageIds);
+          setParts.push(`interview_stage_id = CASE WHEN interview_stage_id IN (${sql}) THEN NULL ELSE interview_stage_id END`);
+          setParams.push(...stageIds);
+          whereParts.push(`interview_stage_id IN (${sql})`);
+          whereParams.push(...stageIds);
+        }
+        if (applicationIds.length > 0) {
+          const sql = placeholders(applicationIds);
+          setParts.push(`application_id = CASE WHEN application_id IN (${sql}) THEN NULL ELSE application_id END`);
+          setParams.push(...applicationIds);
+          whereParts.push(`application_id IN (${sql})`);
+          whereParams.push(...applicationIds);
+        }
+        if (setParts.length === 0 || whereParts.length === 0) return 0;
+        return this.db.prepare(`
+          UPDATE ${table}
+          SET ${setParts.join(', ')}
+          WHERE ${whereParts.join(' OR ')}
+        `).run(...setParams, ...whereParams).changes;
+      };
+
+      const meetingsDetached = detachLinkedRows('meetings');
+      detachLinkedRows('interview_retro_evaluations');
+
+      if (legacyEventIds.length > 0) {
+        const eventSql = placeholders(legacyEventIds);
+        for (const table of [
+          'interview_contacts',
+          'retro_prompt_state',
+          'interview_questions',
+          'interview_retros',
+          'prep_briefs',
+          'vacancy_dossiers',
+        ]) {
+          this.db.prepare(`DELETE FROM ${table} WHERE interview_event_id IN (${eventSql})`).run(...legacyEventIds);
+        }
+        this.db.prepare(`DELETE FROM legacy_interview_event_map WHERE legacy_interview_event_id IN (${eventSql})`).run(...legacyEventIds);
+      }
+
+      let stagesDeleted = 0;
+      let applicationsDeleted = 0;
+      if (applicationIds.length > 0) {
+        stagesDeleted = this.db.prepare(`
+          DELETE FROM interview_stages
+          WHERE application_id IN (${applicationPlaceholders})
+        `).run(...applicationIds).changes;
+        this.db.prepare(`
+          DELETE FROM legacy_interview_event_map
+          WHERE application_id IN (${applicationPlaceholders})
+        `).run(...applicationIds);
+        applicationsDeleted = this.db.prepare(`
+          DELETE FROM applications
+          WHERE id IN (${applicationPlaceholders})
+        `).run(...applicationIds).changes;
+      }
+
+      const legacyEventsDeleted = legacyEventIds.length > 0
+        ? this.db.prepare(`
+          DELETE FROM interview_events
+          WHERE id IN (${placeholders(legacyEventIds)})
+        `).run(...legacyEventIds).changes
+        : 0;
+
+      return {
+        applicationsDeleted,
+        stagesDeleted,
+        legacyEventsDeleted,
+        meetingsDetached,
+      };
+    });
   }
 
   hardDelete(id: string, includeLinkedMeetings = false): boolean {
