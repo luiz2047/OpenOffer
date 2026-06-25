@@ -125,6 +125,7 @@ const STRONG_LOCAL_MATCH_SCORE = 30;
 const STRONG_AI_MATCH_CONFIDENCE = 0.85;
 const INTENT_UNKNOWN_THRESHOLD = 25;
 const URI_REGEX = /\bhttps?:\/\/[^\s/$.?#].[^\s]*/i;
+const MEETING_URI_REGEX = /\bhttps?:\/\/[^\s]*(?:meet|zoom|teams|webex)[^\s]*/i;
 
 const VACANCY_SIGNALS = [
   { pattern: /vacancy|ваканси/i, weight: 18 },
@@ -135,10 +136,10 @@ const VACANCY_SIGNALS = [
 ];
 
 const STAGE_SIGNALS = [
-  { pattern: /\binterview|\bstage|собесед|стад/i, weight: 18 },
-  { pattern: /\brecruiter|хирур|технич|техническ|hr/i, weight: 12 },
-  { pattern: /\bmeeting|звонок|созвон|ссылка|calendar|календар/i, weight: 12 },
-  { pattern: /\bschedule|time|дат|when|когда|дата/i, weight: 10 },
+  { pattern: /\binterview|\bstage|собесед|интервью|этап|стад/i, weight: 18 },
+  { pattern: /\brecruiter|рекрутер|хирур|технич|техническ|hr/i, weight: 12 },
+  { pattern: /\bmeeting|звонок|созвон|ссылка|calendar|календар|meet\.|zoom|teams/i, weight: 12 },
+  { pattern: /\bschedule|time|дат|when|когда|дата|завтра|сегодня|приглаша/i, weight: 10 },
 ];
 
 function normalize(value?: string | null): string {
@@ -178,9 +179,17 @@ export function detectTopSearchPasteIntent(rawText: string): TopSearchPasteInten
     };
   }
 
-  if (URI_REGEX.test(needle)) {
+  if (MEETING_URI_REGEX.test(needle)) {
+    stageScore += 28;
+    matchedSignals.push('meeting_url');
+  } else if (URI_REGEX.test(needle)) {
     vacancyScore += 35;
     matchedSignals.push('vacancy_url');
+  }
+
+  if (/(?:next|следующ)\s+(?:stage|этап)|stage\s+update|техническ(?:ое|ий)?\s+интервью|technical\s+interview|приглаша(?:ем|ют)?/i.test(needle)) {
+    stageScore += 24;
+    matchedSignals.push('next_stage');
   }
 
   for (const signal of VACANCY_SIGNALS) {

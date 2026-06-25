@@ -1,10 +1,18 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useStreamBuffer } from '../hooks/useStreamBuffer';
 import { X, Copy, Check, Globe, ArrowUp } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { genMessageId } from '../utils/messageId';
 import openOfferIcon from './icon.png';
 import { useTranslation } from 'react-i18next';
+import type { ApplicationIntakeResult } from '../types/interviews';
+import {
+    detectTopSearchPasteIntent,
+    resolveTopSearchProposalTarget,
+    type TopSearchActionKind,
+    type TopSearchProposalTargetReason,
+    type VacancyTopSearchContext,
+} from '../features/interviews/topSearchHelpers';
 
 // ============================================
 // Types
@@ -21,6 +29,8 @@ interface GlobalChatOverlayProps {
     isOpen: boolean;
     onClose: () => void;
     initialQuery?: string;
+    forceProposal?: boolean;
+    vacancyContext?: VacancyTopSearchContext | null;
 }
 
 // ============================================
@@ -113,21 +123,76 @@ const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean }> = (
 // ============================================
 
 type ChatState = 'idle' | 'waiting_for_llm' | 'streaming_response' | 'error';
+const CHAT_PROPOSAL_INPUT_CLASS = 'min-h-9 w-full rounded-md border border-white/[0.08] bg-black/20 px-2 text-[12px] outline-none focus:border-cyan-300/45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60';
+
+function shouldCreateChatProposal(question: string, vacancyContext?: VacancyTopSearchContext | null, forceProposal = false): boolean {
+    if (!vacancyContext?.isActive) return false;
+    if (forceProposal) return true;
+    const trimmed = question.trim();
+    if (!trimmed) return false;
+    const intent = detectTopSearchPasteIntent(trimmed);
+    return intent.intent !== 'unknown' || trimmed.length > 180 || trimmed.split(/\n/).length > 2;
+}
+
+function proposalActionFromQuestion(question: string): TopSearchActionKind {
+    const intent = detectTopSearchPasteIntent(question);
+    return intent.intent === 'stage' || (intent.stageScore > 0 && intent.stageScore >= intent.vacancyScore)
+        ? 'add_stage_from_text'
+        : 'parse_vacancy_source';
+}
+
+function buildVacancyChatContext(vacancyContext?: VacancyTopSearchContext | null): string | undefined {
+    if (!vacancyContext?.isActive) return undefined;
+    const selected = vacancyContext.rows.find(row => row.kind === 'vacancy' && row.id === vacancyContext.selectedApplicationId);
+    const stages = vacancyContext.rows
+        .filter(row => row.kind === 'stage' && (!vacancyContext.selectedApplicationId || row.applicationId === vacancyContext.selectedApplicationId))
+        .slice(0, 8);
+    const candidates = vacancyContext.candidateApplications.slice(0, 8);
+    const lines = [
+        'OPENOFFER LOCAL VACANCY CONTEXT:',
+        selected
+            ? `Current vacancy: ${[selected.title, selected.company, selected.roleTitle].filter(Boolean).join(' · ')}`
+            : 'Current vacancy: none selected',
+    ];
+    if (stages.length) {
+        lines.push('Known stages:');
+        for (const stage of stages) {
+            lines.push(`- ${[stage.title, stage.company, stage.roleTitle].filter(Boolean).join(' · ')} | status=${stage.status} | startsAt=${stage.startsAt ?? 'none'}`);
+        }
+    }
+    if (candidates.length) {
+        lines.push('Candidate vacancies:');
+        for (const candidate of candidates) {
+            lines.push(`- ${candidate.id}: ${[candidate.title, candidate.company, candidate.roleTitle].filter(Boolean).join(' · ')}`);
+        }
+    }
+    lines.push('Use this as local app context. Do not write application or stage data unless the user approves an explicit proposal.');
+    return lines.join('\n');
+}
 
 const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
     isOpen,
     onClose,
-    initialQuery = ''
+    initialQuery = '',
+    forceProposal = false,
+    vacancyContext = null,
 }) => {
     const { t } = useTranslation();
     const [messages, setMessages] = useState<Message[]>([]);
     const [chatState, setChatState] = useState<ChatState>('idle');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [query, setQuery] = useState('');
+    const [proposalState, setProposalState] = useState<'idle' | 'parsing' | 'proposal' | 'applying' | 'success' | 'error'>('idle');
+    const [proposalAction, setProposalAction] = useState<TopSearchActionKind>('parse_vacancy_source');
+    const [proposal, setProposal] = useState<ApplicationIntakeResult | null>(null);
+    const [targetApplicationId, setTargetApplicationId] = useState('');
+    const [proposalTargetReason, setProposalTargetReason] = useState<TopSearchProposalTargetReason>('none');
+    const [proposalError, setProposalError] = useState<string | null>(null);
     const streamBuffer = useStreamBuffer();
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatWindowRef = useRef<HTMLDivElement>(null);
+    const vacancyChatContext = useMemo(() => buildVacancyChatContext(vacancyContext), [vacancyContext]);
 
     // Submit initial query when overlay opens
     useEffect(() => {
@@ -172,6 +237,76 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
         }
     };
 
+    const resetProposal = useCallback(() => {
+        setProposalState('idle');
+        setProposalAction('parse_vacancy_source');
+        setProposal(null);
+        setTargetApplicationId('');
+        setProposalTargetReason('none');
+        setProposalError(null);
+    }, []);
+
+    const startProposalFlow = useCallback(async (question: string): Promise<boolean> => {
+        if (!shouldCreateChatProposal(question, vacancyContext, forceProposal)) return false;
+        const action = proposalActionFromQuestion(question);
+        setProposalAction(action);
+        setProposalState('parsing');
+        setProposal(null);
+        setTargetApplicationId('');
+        setProposalTargetReason('none');
+        setProposalError(null);
+        setChatState('idle');
+
+        try {
+            const preview = await vacancyContext!.onPreviewIntake({
+                text: question,
+                useAi: true,
+                task: 'agent_actions',
+                candidateApplicationIds: vacancyContext!.candidateApplications.map(candidate => candidate.id),
+            });
+            const targetResolution = resolveTopSearchProposalTarget(preview, vacancyContext!.rows);
+            setProposal(preview);
+            setTargetApplicationId(preview.stage && targetResolution.selectedApplicationId ? targetResolution.selectedApplicationId : '');
+            setProposalTargetReason(preview.stage ? targetResolution.reason : 'none');
+            setProposalState('proposal');
+        } catch (error: any) {
+            setProposalError(error?.message || t('topSearch.errors.parseFailed'));
+            setProposalState('error');
+        }
+        return true;
+    }, [forceProposal, t, vacancyContext]);
+
+    const updateApplicationField = useCallback((field: keyof ApplicationIntakeResult['application'], value: string) => {
+        setProposal(prev => prev ? { ...prev, application: { ...prev.application, [field]: value } } : prev);
+    }, []);
+
+    const updateStageField = useCallback((field: keyof NonNullable<ApplicationIntakeResult['stage']>, value: string) => {
+        setProposal(prev => prev?.stage ? { ...prev, stage: { ...prev.stage, [field]: value } } : prev);
+    }, []);
+
+    const applyProposal = useCallback(async () => {
+        if (!proposal || !vacancyContext?.isActive) return;
+        const requiresTarget = proposalAction === 'add_stage_from_text' && !!proposal.stage;
+        if (requiresTarget && !targetApplicationId) return;
+        setProposalState('applying');
+        setProposalError(null);
+        try {
+            await vacancyContext.onApplyIntake(proposal, {
+                selectedApplicationId: proposal.stage && targetApplicationId ? targetApplicationId : null,
+            });
+            setProposalState('success');
+            setMessages(prev => [...prev, {
+                id: genMessageId(),
+                role: 'assistant',
+                content: t('topSearch.proposal.applied'),
+            }]);
+            window.setTimeout(onClose, 500);
+        } catch (error: any) {
+            setProposalError(error?.message || t('topSearch.errors.applyFailed'));
+            setProposalState('error');
+        }
+    }, [onClose, proposal, proposalAction, targetApplicationId, t, vacancyContext]);
+
     // Submit question using global RAG
     const submitQuestion = useCallback(async (question: string) => {
         if (!question.trim() || chatState === 'waiting_for_llm' || chatState === 'streaming_response') return;
@@ -184,6 +319,7 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
         setMessages(prev => [...prev, userMessage]);
         setChatState('waiting_for_llm');
         setErrorMessage(null);
+        resetProposal();
 
         // Scroll to bottom when user sends message
         setTimeout(() => {
@@ -193,6 +329,9 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
         const assistantMessageId = genMessageId();
 
         try {
+            const handledByProposal = await startProposalFlow(question);
+            if (handledByProposal) return;
+
             // Add typing indicator delay (200ms) - makes the AI feel "thoughtful"
             await new Promise(resolve => setTimeout(resolve, 200));
 
@@ -291,7 +430,7 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                 });
 
                 // Call standard chat
-                await window.electronAPI?.streamGeminiChat(question, undefined, undefined, { skipSystemPrompt: false });
+                await window.electronAPI?.streamGeminiChat(question, undefined, vacancyChatContext, { skipSystemPrompt: false });
             }
 
         } catch (error) {
@@ -300,7 +439,13 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
             setErrorMessage(t('overlay.responseSomethingWrong'));
             setChatState('error');
         }
-    }, [chatState, t]);
+    }, [chatState, resetProposal, startProposalFlow, streamBuffer, t, vacancyChatContext]);
+
+    const requiresTarget = proposalAction === 'add_stage_from_text' && !!proposal?.stage;
+    const applyDisabled = proposalState === 'applying' || !proposal || (requiresTarget && !targetApplicationId);
+    const targetSelectionMessage = requiresTarget && !targetApplicationId
+        ? t(`topSearch.proposal.targetReasons.${proposalTargetReason === 'none' ? 'no_match' : proposalTargetReason}`)
+        : null;
 
     return (
         <AnimatePresence
@@ -308,6 +453,7 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                 setChatState('idle');
                 setMessages([]);
                 setErrorMessage(null);
+                resetProposal();
             }}
         >
             {isOpen && (
@@ -371,6 +517,98 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                                     className="text-[#FF6B6B] text-[13px] py-2"
                                 >
                                     {errorMessage}
+                                </motion.div>
+                            )}
+
+                            {(proposalState === 'parsing' || proposalState === 'proposal' || proposalState === 'applying' || proposalState === 'success' || proposalState === 'error') && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="mb-6 max-w-[92%] rounded-xl border border-cyan-300/20 bg-cyan-300/[0.055] p-4"
+                                    data-testid="top-search-proposal"
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <div className="text-[13px] font-semibold text-cyan-100">
+                                                {proposalState === 'success'
+                                                    ? t('topSearch.proposal.applied')
+                                                    : proposalState === 'parsing'
+                                                        ? t('topSearch.proposal.parsing')
+                                                        : t('topSearch.proposal.ready')}
+                                            </div>
+                                            <div className="mt-1 text-[11px] text-text-tertiary">
+                                                {proposal
+                                                    ? t('topSearch.proposal.confidence', { value: Math.round(proposal.confidence * 100) })
+                                                    : t('topSearch.proposal.noWriteUntilApply')}
+                                            </div>
+                                        </div>
+                                        <button type="button" className="text-[11px] font-semibold text-text-secondary hover:text-white" onClick={resetProposal}>
+                                            {t('topSearch.proposal.clear')}
+                                        </button>
+                                    </div>
+
+                                    {proposalError && <div className="mt-2 text-[12px] text-red-300">{proposalError}</div>}
+
+                                    {proposal && (
+                                        <div className="mt-3 space-y-2 text-[12px]">
+                                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                                <label className="block">
+                                                    <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-tertiary">{t('topSearch.proposal.fields.title')}</span>
+                                                    <input className={CHAT_PROPOSAL_INPUT_CLASS} value={proposal.application.title ?? ''} onChange={event => updateApplicationField('title', event.target.value)} />
+                                                </label>
+                                                <label className="block">
+                                                    <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-tertiary">{t('topSearch.proposal.fields.company')}</span>
+                                                    <input className={CHAT_PROPOSAL_INPUT_CLASS} value={proposal.application.company ?? ''} onChange={event => updateApplicationField('company', event.target.value)} />
+                                                </label>
+                                                <label className="block">
+                                                    <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-tertiary">{t('topSearch.proposal.fields.role')}</span>
+                                                    <input className={CHAT_PROPOSAL_INPUT_CLASS} value={proposal.application.roleTitle ?? ''} onChange={event => updateApplicationField('roleTitle', event.target.value)} />
+                                                </label>
+                                                {proposal.stage && (
+                                                    <label className="block">
+                                                        <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-tertiary">{t('topSearch.proposal.fields.stage')}</span>
+                                                        <input className={CHAT_PROPOSAL_INPUT_CLASS} value={proposal.stage.title ?? ''} onChange={event => updateStageField('title', event.target.value)} />
+                                                    </label>
+                                                )}
+                                            </div>
+                                            {proposal.stage && vacancyContext?.candidateApplications.length ? (
+                                                <label className="block">
+                                                    <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-tertiary">{t('topSearch.proposal.fields.attachToVacancy')}</span>
+                                                    <select className={CHAT_PROPOSAL_INPUT_CLASS} value={targetApplicationId} onChange={event => setTargetApplicationId(event.target.value)}>
+                                                        <option value="">{proposalAction === 'add_stage_from_text' ? t('topSearch.proposal.placeholders.enableApply') : t('topSearch.proposal.placeholders.createNewVacancy')}</option>
+                                                        {vacancyContext.candidateApplications.map(candidate => (
+                                                            <option key={candidate.id} value={candidate.id}>
+                                                                {[candidate.title, candidate.company, candidate.roleTitle].filter(Boolean).join(' · ')}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </label>
+                                            ) : null}
+                                            {targetSelectionMessage && (
+                                                <div className="text-[11px] text-amber-200">{targetSelectionMessage}</div>
+                                            )}
+                                            {proposal.warnings.length > 0 && (
+                                                <div className="text-[11px] text-amber-200">{proposal.warnings.join(', ')}</div>
+                                            )}
+                                            <div className="flex justify-end">
+                                                <button
+                                                    type="button"
+                                                    data-testid="top-search-apply-proposal"
+                                                    onClick={applyProposal}
+                                                    disabled={applyDisabled}
+                                                    className="min-h-10 rounded-md bg-white px-3 text-[12px] font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
+                                                >
+                                                    {proposalState === 'applying'
+                                                        ? t('topSearch.proposal.actions.applying')
+                                                        : proposalAction === 'add_stage_from_text'
+                                                            ? t('topSearch.proposal.actions.addStage')
+                                                            : proposal.stage
+                                                                ? t('topSearch.proposal.actions.createVacancyStage')
+                                                                : t('topSearch.proposal.actions.createVacancy')}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </motion.div>
                             )}
 

@@ -34,7 +34,7 @@ interface MeetingResult {
 interface TopSearchPillProps {
     meetings: Meeting[];
     vacancyContext?: VacancyTopSearchContext | null;
-    onAIQuery: (query: string) => void;
+    onAIQuery: (query: string, options?: { forceProposal?: boolean; vacancyContext?: VacancyTopSearchContext | null }) => void;
     onLiteralSearch: (query: string) => void;
     onOpenMeeting: (meetingId: string) => void;
     onExpansionChange?: (isExpanded: boolean) => void;
@@ -168,16 +168,6 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                 subtitle: makeSafeExcerpt(trimmed, '', { maxLength: 96 }),
                 action: 'ask_ai',
             },
-            {
-                id: 'action:literal_meeting_search',
-                kind: 'action',
-                group: 'actions',
-                title: t('topSearch.actions.literalMeetingSearch'),
-                subtitle: t('topSearch.actionSubtitles.literalMeetingSearch', {
-                    query: makeSafeExcerpt(trimmed, '', { maxLength: 72 }),
-                }),
-                action: 'literal_meeting_search',
-            },
         ];
 
         if (vacancyContext?.isActive) {
@@ -297,7 +287,8 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                 onLiteralSearch(query);
                 close();
             } else {
-                void openProposal(entry.action);
+                onAIQuery(query, { forceProposal: true, vacancyContext });
+                close();
             }
             return;
         }

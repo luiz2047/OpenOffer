@@ -388,8 +388,9 @@ test.describe('Interview Command Center', () => {
               missingFields: [],
             });
           }
-          if (/Synthetic (second )?stage update/i.test(text) && candidateId) {
+          if (/(Synthetic (second )?stage update|следующий этап|русский этап)/i.test(text) && candidateId) {
             const second = /second/i.test(text);
+            const russian = /следующий этап|русский этап/i.test(text);
             return result({
               classification: 'stage_update_for_existing_vacancy',
               confidence: 0.93,
@@ -405,12 +406,12 @@ test.describe('Interview Command Center', () => {
                 questionsToAsk: [],
               },
               stage: {
-                title: second ? 'Final interview' : 'Tech screening',
+                title: second ? 'Final interview' : russian ? 'Техническое интервью' : 'Tech screening',
                 stageType: second ? 'final' : 'technical_screen',
-                startsAt: second ? 1_803_456_000_000 : 1_802_588_400_000,
-                endsAt: second ? 1_803_459_600_000 : 1_802_590_200_000,
+                startsAt: second ? 1_803_456_000_000 : russian ? 1_804_000_000_000 : 1_802_588_400_000,
+                endsAt: second ? 1_803_459_600_000 : russian ? 1_804_003_600_000 : 1_802_590_200_000,
                 timezone: 'Europe/Moscow',
-                meetingUrl: second ? 'https://meet.example/final' : 'https://meet.example/tech',
+                meetingUrl: second ? 'https://meet.example/final' : russian ? 'https://meet.example/ru-tech' : 'https://meet.example/tech',
                 status: 'scheduled',
               },
               existingApplicationMatch: {
@@ -668,7 +669,7 @@ test.describe('Interview Command Center', () => {
     await page.keyboard.press('Enter');
     const accidentalPayload = await page.evaluate(() => (window as any).__openOfferTestState.lastCreateFromIntakePayload);
     expect(accidentalPayload).toBeFalsy();
-    await page.keyboard.press('Control+K');
+    await page.keyboard.press('Escape');
     await expect(page.getByTestId('top-search-proposal')).toHaveCount(0);
 
     await page.getByRole('button', { name: /^New Vacancy$/ }).click();
@@ -699,6 +700,7 @@ test.describe('Interview Command Center', () => {
     await page.getByTestId('top-search-row-action').filter({ hasText: 'Add stage from text' }).click();
     await expect(page.getByTestId('top-search-proposal')).toContainText('Proposal ready');
     await page.getByTestId('top-search-apply-proposal').click();
+    await expect(page.getByTestId('top-search-proposal')).toHaveCount(0);
     await page.getByRole('button', { name: 'Stages', exact: true }).click();
     await expect(page.getByText('Tech screening')).toBeVisible();
     await expect(page.getByText('1 active process')).toBeVisible();
@@ -741,17 +743,30 @@ test.describe('Interview Command Center', () => {
     await page.getByTestId('top-search-row-action').filter({ hasText: 'Add stage from text' }).click();
     await expect(page.getByTestId('top-search-proposal')).toContainText('Proposal ready');
     await page.getByTestId('top-search-apply-proposal').click();
+    await expect(page.getByTestId('top-search-proposal')).toHaveCount(0);
     await expect(page.getByText('2 stages', { exact: true }).first()).toBeVisible();
     const secondAgentPayload = await page.evaluate(() => (window as any).__openOfferTestState.lastCreateFromIntakePayload);
     expect(secondAgentPayload.selectedApplicationId).toBe('app_1');
 
+    await page.keyboard.press('Control+K');
+    await page.getByTestId('top-search-input').fill('Приглашаем на следующий этап по вакансии Acme Backend Developer. Техническое интервью завтра, ссылка https://meet.example/ru-tech');
+    await page.getByTestId('top-search-row-action').filter({ hasText: 'Add stage from text' }).click();
+    await expect(page.getByTestId('top-search-proposal')).toContainText('Proposal ready');
+    await page.getByTestId('top-search-apply-proposal').click();
+    await expect(page.getByTestId('top-search-proposal')).toHaveCount(0);
+    await expect(page.getByText('3 stages', { exact: true }).first()).toBeVisible();
+    const russianAgentPayload = await page.evaluate(() => (window as any).__openOfferTestState.lastCreateFromIntakePayload);
+    expect(russianAgentPayload.selectedApplicationId).toBe('app_1');
+
     await page.getByRole('button', { name: 'Stages', exact: true }).click();
     const stageCards = page.getByTestId('interview-stage-card');
-    await expect(stageCards).toHaveCount(2);
+    await expect(stageCards).toHaveCount(3);
     const technicalStage = stageCards.nth(0);
     const finalStage = stageCards.nth(1);
+    const russianStage = stageCards.nth(2);
     await expect(technicalStage).toContainText('Technical sync');
     await expect(finalStage).toContainText('Final interview');
+    await expect(russianStage).toContainText('Техническое интервью');
     await expect(technicalStage.getByTestId('stage-recording-count')).toHaveText('2');
     await expect(finalStage.getByTestId('stage-recording-count')).toHaveText('0');
     await finalStage.getByLabel('Attach recording').selectOption({ label: 'Final stage recording' });
@@ -759,7 +774,7 @@ test.describe('Interview Command Center', () => {
     await expect(finalStage.getByTestId('stage-recording-count')).toHaveText('1');
 
     await page.getByRole('button', { name: 'Add stage' }).first().click();
-    await expect(page.getByTestId('interview-stage-card')).toHaveCount(3);
+    await expect(page.getByTestId('interview-stage-card')).toHaveCount(4);
     await expect(page.getByTestId('interview-stage-card').filter({ hasText: 'Interview stage' })).toBeVisible();
 
     await finalStage.getByTitle('Archive stage').click();

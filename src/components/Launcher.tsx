@@ -66,6 +66,8 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
     // Global search state (for AI chat overlay)
     const [isGlobalChatOpen, setIsGlobalChatOpen] = useState(false);
     const [submittedGlobalQuery, setSubmittedGlobalQuery] = useState('');
+    const [globalChatForceProposal, setGlobalChatForceProposal] = useState(false);
+    const [globalChatVacancyContext, setGlobalChatVacancyContext] = useState<VacancyTopSearchContext | null>(null);
 
     const [showModesOnboarding, setShowModesOnboarding] = useState(false);
     const [showProfileOnboarding, setShowProfileOnboarding] = useState(false);
@@ -306,9 +308,11 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                 <TopSearchPill
                     meetings={meetings}
                     vacancyContext={selectedMeeting ? null : vacancySearchContext}
-                    onAIQuery={(query) => {
+                    onAIQuery={(query, options) => {
                         analytics.trackCommandExecuted('ai_query_search');
                         setSubmittedGlobalQuery(query);
+                        setGlobalChatForceProposal(Boolean(options?.forceProposal));
+                        setGlobalChatVacancyContext(options?.vacancyContext ?? vacancySearchContext);
                         setIsGlobalChatOpen(true);
                     }}
                     onLiteralSearch={(query) => {
@@ -650,8 +654,12 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                 onClose={() => {
                     setIsGlobalChatOpen(false);
                     setSubmittedGlobalQuery('');
+                    setGlobalChatForceProposal(false);
+                    setGlobalChatVacancyContext(null);
                 }}
                 initialQuery={submittedGlobalQuery}
+                forceProposal={globalChatForceProposal}
+                vacancyContext={globalChatVacancyContext ?? vacancySearchContext}
             />
         </div >
     );
