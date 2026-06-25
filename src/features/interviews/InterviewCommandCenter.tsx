@@ -1642,29 +1642,32 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         </div>
 
         <div className="border-b border-white/[0.07] p-3">
-          <div className="grid grid-cols-3 gap-1.5">
-            {([
-              ['active', t('interviews.filters.active')],
-              ['all', t('interviews.filters.all')],
-              ['lead_found', t(applicationStatusLabelKey('lead_found'))],
-              ['applied', t(applicationStatusLabelKey('applied'))],
-              ['screening', t(applicationStatusLabelKey('screening'))],
-              ['interviewing', t(applicationStatusLabelKey('interviewing'))],
-              ['offer', t(applicationStatusLabelKey('offer'))],
-              ['rejected', t(applicationStatusLabelKey('rejected'))],
-              ['withdrawn', t(applicationStatusLabelKey('withdrawn'))],
-              ['archived', t(applicationStatusLabelKey('archived'))],
-            ] as Array<[VacancyStatusFilter, string]>).map(([value, label]) => (
-              <button
-                type="button"
-                key={value}
-                onClick={() => setStatusFilter(value)}
-                className={`min-h-9 rounded-md px-2 text-[11px] font-semibold transition ${statusFilter === value ? 'bg-cyan-300/12 text-cyan-100 ring-1 ring-cyan-300/25' : 'bg-white/[0.025] text-text-secondary hover:bg-white/[0.06] hover:text-white'}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <label className="flex min-h-11 items-center justify-between gap-3 rounded-md border border-white/[0.08] bg-white/[0.025] px-3">
+            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-tertiary">
+              {t('interviews.filters.status')}
+            </span>
+            <select
+              value={statusFilter}
+              onChange={event => setStatusFilter(event.target.value as VacancyStatusFilter)}
+              className="min-h-9 min-w-0 flex-1 bg-transparent text-right text-[12px] font-semibold text-text-primary outline-none"
+              aria-label={t('interviews.filters.status')}
+            >
+              {([
+                ['active', t('interviews.filters.active')],
+                ['all', t('interviews.filters.all')],
+                ['lead_found', t(applicationStatusLabelKey('lead_found'))],
+                ['applied', t(applicationStatusLabelKey('applied'))],
+                ['screening', t(applicationStatusLabelKey('screening'))],
+                ['interviewing', t(applicationStatusLabelKey('interviewing'))],
+                ['offer', t(applicationStatusLabelKey('offer'))],
+                ['rejected', t(applicationStatusLabelKey('rejected'))],
+                ['withdrawn', t(applicationStatusLabelKey('withdrawn'))],
+                ['archived', t(applicationStatusLabelKey('archived'))],
+              ] as Array<[VacancyStatusFilter, string]>).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
           {statusFilter === 'archived' && (
             <div className="mt-2 flex items-center justify-between gap-2 rounded-md bg-white/[0.025] px-2 py-2">
               <span className="text-[11px] text-text-tertiary">

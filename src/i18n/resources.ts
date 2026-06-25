@@ -514,6 +514,7 @@ export const resources = {
           archived: 'Archived',
         },
         filters: {
+          status: 'Status filter',
           active: 'Active',
           all: 'All',
         },
@@ -1601,6 +1602,7 @@ export const resources = {
           archived: 'Архив',
         },
         filters: {
+          status: 'Фильтр статуса',
           active: 'Активные',
           all: 'Все',
         },
