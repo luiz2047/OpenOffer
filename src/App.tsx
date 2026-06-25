@@ -23,7 +23,6 @@ import {
 } from './premium'
 import { analytics } from "./lib/analytics/analytics.service"
 import { ErrorBoundary } from "./components/ErrorBoundary"
-import ModesSettings from "./components/settings/ModesSettings"
 import { ProfileIntelligenceSettings } from "./components/ProfileIntelligenceSettings"
 
 interface StartMeetingMetadata {
@@ -92,23 +91,15 @@ const App: React.FC = () => {
   const [showStartup, setShowStartup] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string>('general');
-  const [isModesOpen, setIsModesOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const openSettingsExclusive = useCallback((tab: string = 'general') => {
-    setIsModesOpen(false);
     setIsProfileOpen(false);
     setSettingsInitialTab(tab);
     setIsSettingsOpen(true);
   }, []);
   const openProfileExclusive = useCallback(() => {
-    setIsModesOpen(false);
     setIsSettingsOpen(false);
     setIsProfileOpen(true);
-  }, []);
-  const openModesExclusive = useCallback(() => {
-    setIsProfileOpen(false);
-    setIsSettingsOpen(false);
-    setIsModesOpen(true);
   }, []);
   // Overlay opacity — only meaningful when isOverlayWindow, but stored centrally
   // so it can be initialized once from localStorage and updated via IPC.
@@ -262,7 +253,7 @@ const App: React.FC = () => {
       }
     }
 
-    // Listen for open-settings-tab events from other windows (e.g. overlay Modes button)
+    // Listen for open-settings-tab events from other windows.
     const removeOpenSettingsTab = window.electronAPI?.onOpenSettingsTab?.((tab: string) => {
       openSettingsExclusive(tab);
     });
@@ -570,7 +561,6 @@ const App: React.FC = () => {
                     onStartMeeting={handleStartMeeting}
                     onOpenSettings={(tab = 'general') => openSettingsExclusive(tab)}
                     onOpenProfile={() => openProfileExclusive()}
-                    onOpenModes={() => openModesExclusive()}
                     onPageChange={setIsLauncherMainView}
                     ollamaPullStatus={ollamaPullStatus}
                     ollamaPullPercent={ollamaPullPercent}
@@ -584,39 +574,6 @@ const App: React.FC = () => {
                   }}
                   initialTab={settingsInitialTab}
                 />
-                <AnimatePresence>
-                  {isModesOpen && (
-                    <motion.div
-                      key="modes-panel"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.15 }}
-                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-[2px]"
-                      onClick={(e) => { if (e.target === e.currentTarget) setIsModesOpen(false); }}
-                    >
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.92, y: 18, filter: 'blur(12px)' }}
-                        animate={{ opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' }}
-                        exit={{ opacity: 0, scale: 0.96, y: 8, filter: 'blur(8px)' }}
-                        transition={{
-                          opacity: { duration: 0.32, ease: [0.23, 1, 0.32, 1] },
-                          filter: { duration: 0.34, ease: [0.23, 1, 0.32, 1] },
-                          scale: { type: 'spring', stiffness: 320, damping: 34, mass: 0.9 },
-                          y: { type: 'spring', stiffness: 320, damping: 34, mass: 0.9 },
-                        }}
-                        style={{
-                          willChange: 'transform, opacity, filter',
-                          transformOrigin: 'center',
-                          boxShadow: '0 30px 80px -20px rgba(0,0,0,0.65), 0 16px 40px -12px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.06)',
-                        }}
-                        className="h-[calc(100vh_-_48px)] max-h-[820px] w-[calc(100vw_-_48px)] max-w-[1100px] rounded-xl overflow-hidden border border-white/10 bg-[#141414]"
-                      >
-                        <ModesSettings onClose={() => setIsModesOpen(false)} isPremium={false} isLoaded={true} isTrialActive={false} />
-                      </motion.div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
                 <AnimatePresence>
                   {isProfileOpen && (
                     <motion.div

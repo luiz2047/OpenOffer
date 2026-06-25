@@ -15,7 +15,6 @@ import { HelpSettings } from './settings/HelpSettings';
 import { AIProvidersSettings } from './settings/AIProvidersSettings';
 import { PhoneMirrorSettings } from './settings/PhoneMirrorSettings';
 import { IntelligenceSettings } from './settings/IntelligenceSettings';
-import { SkillsSettings } from './settings/SkillsSettings';
 import { LocalWhisperModelPanel } from './LocalWhisperModelPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useShortcuts } from '../hooks/useShortcuts';
@@ -40,6 +39,8 @@ const EMPTY_CALENDAR_STATUS: CalendarStatusResult = {
     preferredProvider: null,
     connected: false,
 };
+
+const normalizeSettingsTab = (tab?: string) => tab === 'skills' ? 'general' : (tab || 'general');
 
 // ---------------------------------------------------------------------------
 // StarRating — renders filled/empty stars for culture ratings
@@ -409,12 +410,12 @@ type SttRuntimeStatus = {
 const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, initialTab = 'general' }) => {
     const { t } = useTranslation();
     const isLight = useResolvedTheme() === 'light';
-    const [activeTab, setActiveTab] = useState(initialTab);
+    const [activeTab, setActiveTab] = useState(normalizeSettingsTab(initialTab));
 
     // Sync active tab when modal opens
     useEffect(() => {
         if (isOpen && initialTab) {
-            setActiveTab(initialTab);
+            setActiveTab(normalizeSettingsTab(initialTab));
 
 
         }
@@ -1601,12 +1602,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                         <FlaskConical size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.aiProviders')}</span>
                                     </button>
                                     <button type="button"
-                                        onClick={() => setActiveTab('skills')}
-                                        className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'skills' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
-                                    >
-                                        <Sparkles size={16} className={`shrink-0 ${activeTab === 'skills' ? 'text-accent-primary' : 'text-text-secondary'}`} /> <span className="min-w-0 truncate">{t('settings.sidebar.skills')}</span>
-                                    </button>
-                                    <button type="button"
                                         onClick={() => setActiveTab('intelligence')}
                                         className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'intelligence' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
@@ -2426,9 +2421,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
                             {activeTab === 'ai-providers' && (
                                 <AIProvidersSettings />
-                            )}
-                            {activeTab === 'skills' && (
-                                <SkillsSettings />
                             )}
                             {activeTab === 'keybinds' && (
                                 <div className="space-y-5 animated fadeIn select-text pb-4">

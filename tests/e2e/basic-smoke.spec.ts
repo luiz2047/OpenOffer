@@ -274,13 +274,15 @@ test.describe('OpenOffer E2E smoke', () => {
     expect(hasBridge).toBe(true);
   });
 
-  test('modes panel renders with mode list', async ({ page }) => {
+  test('experimental skills and modes entrypoints stay hidden', async ({ page }) => {
     await gotoApp(page);
 
-    await page.locator('button[title="Modes"]').click();
-    await expect(page.getByText('Modes Manager', { exact: true })).toBeVisible();
-    await expect(page.getByText('General', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Technical Interview', { exact: true }).first()).toBeVisible();
+    await expect(page.locator('button[title="Modes"]')).toHaveCount(0);
+
+    await openSettings(page);
+    const settingsPanel = page.locator('#settings-panel');
+    await expect(settingsPanel.getByRole('button', { name: /^Skills$/ })).toHaveCount(0);
+    await expect(settingsPanel.getByText('Modes and notes', { exact: true })).toHaveCount(0);
   });
 
   test('settings panel opens and closes', async ({ page }) => {
