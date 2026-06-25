@@ -27,6 +27,7 @@ import type {
   ApplicationUpdatePatch,
   CalendarEventSummary,
   CalendarProvider,
+  CalendarProviderId,
   CalendarSnapshot,
   CalendarStatusResult,
   InterviewCreatePayload,
@@ -572,6 +573,7 @@ const iconButtonClass = 'inline-flex h-11 w-11 items-center justify-center round
 const paneHeaderClass = 'flex min-h-16 items-center justify-between border-b border-white/[0.07] px-4';
 const primaryButtonClass = 'inline-flex min-h-11 min-w-[44px] items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-[13px] font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40';
 const secondaryButtonClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-white/[0.08] px-3 py-2 text-[13px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
+const compactSecondaryButtonClass = 'inline-flex min-h-9 min-w-[44px] items-center justify-center gap-1.5 rounded-md border border-white/[0.08] px-2.5 py-1.5 text-[11px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
 
 const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   meetings,
@@ -631,6 +633,17 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const [attachMeetingIds, setAttachMeetingIds] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<InterviewUiError | null>(null);
+
+  const preferredWritableCalendarProvider = useMemo<CalendarProviderId | null>(() => {
+    const providers = calendarStatus?.providers ?? [];
+    const isWritable = (provider: typeof providers[number]) => (
+      provider.writeCapability !== 'no'
+      && !['needs_setup', 'permission_denied', 'unavailable', 'error'].includes(provider.state)
+    );
+    const preferred = providers.find(provider => provider.provider === calendarStatus?.preferredProvider);
+    if (preferred && isWritable(preferred)) return preferred.provider;
+    return providers.find(isWritable)?.provider ?? null;
+  }, [calendarStatus]);
 
   const showError = useCallback((err: unknown, fallbackCode: InterviewErrorCode = 'unexpected_error') => {
     setError(normalizeInterviewError(err, fallbackCode));
@@ -1230,7 +1243,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     });
   };
 
-  const createStageCalendarEvent = async (stage: InterviewStage, provider: 'google' | 'macos') => {
+  const createStageCalendarEvent = async (stage: InterviewStage, provider: CalendarProviderId) => {
     await run(async () => {
       const updated = await stageApi.createCalendarEvent(stage.id, provider);
       setApplicationDetail(updated);
@@ -1997,11 +2010,17 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                                     {isMeetingActive ? t('common.openLive') : t('interviews.detail.startRecording')}
                                   </button>
                                 )}
-                                <button type="button" onClick={() => createStageCalendarEvent(stage, 'google')} disabled={busy || isArchived || !stage.startsAt || !stage.endsAt} className={secondaryButtonClass}>
-                                  {t('interviews.detail.createInGoogleCalendar')}
-                                </button>
-                                <button type="button" onClick={() => createStageCalendarEvent(stage, 'macos')} disabled={busy || isArchived || !stage.startsAt || !stage.endsAt} className={secondaryButtonClass}>
-                                  {t('interviews.detail.createInMacCalendar')}
+                                <button
+                                  type="button"
+                                  onClick={() => preferredWritableCalendarProvider && createStageCalendarEvent(stage, preferredWritableCalendarProvider)}
+                                  disabled={busy || isArchived || !stage.startsAt || !stage.endsAt || !preferredWritableCalendarProvider}
+                                  className={compactSecondaryButtonClass}
+                                  title={preferredWritableCalendarProvider
+                                    ? t('interviews.detail.syncCalendarWithProvider', { provider: preferredWritableCalendarProvider === 'macos' ? t('interviews.mac') : t('interviews.google') })
+                                    : t('interviews.detail.calendarProviderUnavailable')}
+                                >
+                                  <CalendarDays size={13} />
+                                  {t('interviews.detail.syncCalendar')}
                                 </button>
                                 {!isArchived ? (
                                   <button type="button" onClick={() => archiveStage(stage)} disabled={busy} className={iconButtonClass} title={t('interviews.detail.archiveStage')}>

@@ -225,7 +225,32 @@ test.describe('Interview Command Center', () => {
         getInputDevices: async () => [],
         getOutputDevices: async () => [],
         getSttRuntimeStatus: async () => ({ provider: 'none', ready: false, message: 'No speech provider selected.' }),
-        getCalendarStatus: async () => ({ connected: false, disabled: true }),
+        getCalendarStatus: async () => ({
+          connected: false,
+          providers: [
+            {
+              provider: 'google',
+              state: 'needs_setup',
+              labelKey: 'settings.calendar.google',
+              readCapability: 'no',
+              writeCapability: 'no',
+              canConnect: true,
+              lastSyncAt: null,
+              lastErrorCode: null,
+            },
+            {
+              provider: 'macos',
+              state: 'available',
+              labelKey: 'settings.calendar.macos',
+              readCapability: 'yes',
+              writeCapability: 'yes',
+              canConnect: false,
+              lastSyncAt: null,
+              lastErrorCode: null,
+            },
+          ],
+          preferredProvider: 'macos',
+        }),
         getCanAutoUpdate: async () => ({ canAutoUpdate: false }),
         calendarConnect: async () => ({ success: true }),
         onboardingGetFlags: async () => ({ seenStartup: true, seenProfileOnboarding: true, seenModesOnboarding: true, permsShown: true }),
@@ -696,8 +721,8 @@ test.describe('Interview Command Center', () => {
     await techStage.getByRole('button', { name: 'Save' }).click();
     await expect(page.getByText('Technical sync')).toBeVisible();
     const updatedTechStage = page.getByTestId('interview-stage-card').filter({ hasText: 'Technical sync' });
-    await updatedTechStage.getByRole('button', { name: 'Create in Google Calendar' }).click();
-    await expect(updatedTechStage.getByText('google', { exact: true }).first()).toBeVisible();
+    await updatedTechStage.getByRole('button', { name: 'Sync calendar' }).click();
+    await expect(updatedTechStage.getByText('macos', { exact: true }).first()).toBeVisible();
     await updatedTechStage.getByLabel('Attach recording').selectOption({ label: 'Backend interview recording' });
     await updatedTechStage.getByRole('button', { name: 'Link' }).click();
     await expect(page.getByText('Backend interview recording').last()).toBeVisible();
