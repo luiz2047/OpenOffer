@@ -422,14 +422,14 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                             initial={false}
                             animate={{ width: isExpanded ? 560 : 340 }}
                             transition={{ type: 'spring', stiffness: 150, damping: 25 }}
-                            className="relative transform-gpu"
+                            className="relative max-w-[calc(100vw-96px)] transform-gpu sm:max-w-none"
                         >
                             <div className="relative">
                                 <div className={`relative overflow-hidden rounded-2xl shadow-sm backdrop-blur-xl backdrop-saturate-150 ${isLight ? 'bg-[#F2F2F7]/90' : 'bg-[#161618]/90'}`}>
                                         <div className="relative flex items-center" onClick={() => state === 'idle' && open()}>
                                             <div className="pointer-events-none absolute left-3 flex items-center gap-1">
                                                 <Sparkles size={14} className="text-cyan-300" />
-                                                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-tertiary">
+                                                <span className="hidden text-[10px] font-semibold uppercase tracking-[0.12em] text-text-tertiary min-[421px]:inline">
                                                     {t('topSearch.assistantName')}
                                                 </span>
                                             </div>
@@ -442,7 +442,7 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                                             title={t('topSearch.assistantName')}
                                             aria-label={t('topSearch.inputAriaLabel')}
                                             data-testid="top-search-input"
-                                            className={`w-full bg-transparent py-1 pl-36 pr-4 text-[13px] text-text-primary placeholder-text-tertiary focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60 ${state === 'idle' ? 'cursor-default' : 'cursor-text'}`}
+                                            className={`w-full bg-transparent py-1 pl-9 pr-3 text-[13px] text-text-primary placeholder-text-tertiary focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60 min-[421px]:pl-36 min-[421px]:pr-4 ${state === 'idle' ? 'cursor-default' : 'cursor-text'}`}
                                             placeholder={t('topSearch.placeholder')}
                                         />
                                     </div>
@@ -456,7 +456,7 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                                                 transition={{ type: 'spring', stiffness: 150, damping: 25, opacity: { duration: 0.3 } }}
                                                 className="overflow-hidden"
                                             >
-                                                <div className="w-[560px] border-t border-border-muted py-2">
+                                                <div className="border-t border-border-muted py-2" style={{ width: 'min(560px, calc(100vw - 32px))' }}>
                                                     {groupedEntries.map(group => (
                                                         <div key={group.title} className="px-3 py-1">
                                                             <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-text-tertiary">

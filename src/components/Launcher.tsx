@@ -267,7 +267,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
     return (
         <div className="h-full w-full flex flex-col bg-bg-primary text-text-primary font-sans overflow-hidden selection:bg-accent-secondary/30">
             {/* 1. Header (Static) */}
-            <header className={`relative w-full h-[40px] shrink-0 flex items-center justify-between pl-0 drag-region select-none ${isLight ? 'bg-bg-primary' : 'bg-bg-secondary'} border-b border-border-subtle z-[200]`}>
+            <header className={`relative flex h-[40px] w-full min-w-0 shrink-0 items-center justify-between pl-0 drag-region select-none ${isLight ? 'bg-bg-primary' : 'bg-bg-secondary'} border-b border-border-subtle z-[200]`}>
                 {/* Left: Spacing for Traffic Lights + Navigation Arrows */}
                 <div className="flex items-center gap-1 no-drag">
                     {isMac && <div className="w-[70px]" />} {/* Traffic Light Spacer (macOS only) */}
@@ -350,8 +350,8 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                 />
 
                 {/* Right: Actions */}
-                <div className={`flex items-center gap-1 no-drag shrink-0 ${isMac ? 'mr-1' : ''}`}>
-                    <div className="relative group/profile-btn select-none">
+                <div className={`flex shrink-0 items-center gap-1 no-drag ${isMac ? 'mr-1' : ''}`}>
+                    <div className="relative hidden select-none group/profile-btn sm:block">
                         <button type="button"
                             data-testid="open-profile-intelligence"
                             onClick={() => {
@@ -361,7 +361,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                                 onOpenProfile?.();
                             }}
                             title={t('launcher.profileIntelligence')}
-                            className={`p-2 text-text-secondary hover:text-text-primary transition-all duration-300 ${isLight ? 'hover:drop-shadow-[0_0_6px_rgba(0,0,0,0.25)]' : 'hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]'}`}
+                            className={`flex h-11 w-11 items-center justify-center text-text-secondary transition-all duration-300 hover:text-text-primary ${isLight ? 'hover:drop-shadow-[0_0_6px_rgba(0,0,0,0.25)]' : 'hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]'}`}
                         >
                             <UserSearch size={18} />
                         </button>
@@ -449,7 +449,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                             )}
                         </AnimatePresence>
                     </div>
-                    <div className="relative group/modes-btn select-none">
+                    <div className="relative hidden select-none group/modes-btn sm:block">
                         <button type="button"
                             onClick={() => {
                                 setShowModesOnboarding(false);
@@ -458,7 +458,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                                 onOpenModes?.();
                             }}
                             title={t('launcher.modes')}
-                            className={`p-2 text-text-secondary hover:text-text-primary transition-all duration-300 ${isLight ? 'hover:drop-shadow-[0_0_6px_rgba(0,0,0,0.25)]' : 'hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]'}`}
+                            className={`flex h-11 w-11 items-center justify-center text-text-secondary transition-all duration-300 hover:text-text-primary ${isLight ? 'hover:drop-shadow-[0_0_6px_rgba(0,0,0,0.25)]' : 'hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]'}`}
                         >
                             <svg width={18} height={18} viewBox="0 0 14 14" fill="none">
                                 <rect x="1" y="1" width="5.5" height="5.5" rx="1.5" fill="currentColor" opacity="0.9"/>
@@ -561,7 +561,7 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
                             onOpenSettings();
                         }}
                         title={t('common.settings')}
-                        className={`p-2 text-text-secondary hover:text-text-primary transition-all duration-300 ${isLight ? 'hover:drop-shadow-[0_0_6px_rgba(0,0,0,0.25)]' : 'hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]'}`}
+                        className={`flex h-11 w-11 items-center justify-center text-text-secondary transition-all duration-300 hover:text-text-primary ${isLight ? 'hover:drop-shadow-[0_0_6px_rgba(0,0,0,0.25)]' : 'hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]'}`}
                     >
                         <Settings size={18} />
                     </button>
