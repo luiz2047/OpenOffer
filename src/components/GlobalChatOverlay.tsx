@@ -33,6 +33,11 @@ interface GlobalChatOverlayProps {
     vacancyContext?: VacancyTopSearchContext | null;
 }
 
+interface ProfileChatContextState {
+    loaded: boolean;
+    text?: string;
+}
+
 // ============================================
 // Typing Indicator Component
 // ============================================
@@ -123,7 +128,7 @@ const AssistantMessage: React.FC<{ content: string; isStreaming?: boolean }> = (
 // ============================================
 
 type ChatState = 'idle' | 'waiting_for_llm' | 'streaming_response' | 'error';
-const CHAT_PROPOSAL_INPUT_CLASS = 'min-h-9 w-full rounded-md border border-white/[0.08] bg-black/20 px-2 text-[12px] outline-none focus:border-cyan-300/45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60';
+const CHAT_PROPOSAL_INPUT_CLASS = 'min-h-9 w-full rounded-md border border-white/[0.08] bg-bg-input px-2 text-[12px] outline-none focus:border-cyan-300/45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60';
 
 function shouldCreateChatProposal(question: string, vacancyContext?: VacancyTopSearchContext | null, forceProposal = false): boolean {
     if (!vacancyContext?.isActive) return false;
@@ -148,6 +153,7 @@ function buildVacancyChatContext(vacancyContext?: VacancyTopSearchContext | null
         .filter(row => row.kind === 'stage' && (!vacancyContext.selectedApplicationId || row.applicationId === vacancyContext.selectedApplicationId))
         .slice(0, 8);
     const candidates = vacancyContext.candidateApplications.slice(0, 8);
+    if (!selected && stages.length === 0 && candidates.length === 0) return undefined;
     const lines = [
         'OPENOFFER LOCAL VACANCY CONTEXT:',
         selected
@@ -167,6 +173,48 @@ function buildVacancyChatContext(vacancyContext?: VacancyTopSearchContext | null
         }
     }
     lines.push('Use this as local app context. Do not write application or stage data unless the user approves an explicit proposal.');
+    return lines.join('\n');
+}
+
+function truncateContextValue(value: unknown, maxLength = 500): string {
+    const text = typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value);
+    if (text.length <= maxLength) return text;
+    return `${text.slice(0, maxLength)}...`;
+}
+
+function buildProfileChatContext(status: any, profile: any, notes?: string, persona?: string): string | undefined {
+    if (!status?.hasProfile || !status?.profileMode) {
+        return undefined;
+    }
+
+    const identity = profile?.identity ?? {};
+    const skills = profile?.skills ?? profile?.skillsFlat ?? [];
+    const activeJD = profile?.activeJD ?? null;
+    const lines = [
+        'OPENOFFER PROFILE CONTEXT:',
+        'Profile context is enabled. Use these local resume/profile facts only when relevant to the user question.',
+        `Candidate: ${[identity.name, identity.email].filter(Boolean).join(' · ') || status.name || 'not specified'}`,
+    ];
+
+    if (status.role || profile?.role) lines.push(`Target role: ${status.role ?? profile.role}`);
+    if (status.totalExperienceYears || profile?.totalExperienceYears) lines.push(`Experience years: ${status.totalExperienceYears ?? profile.totalExperienceYears}`);
+    if (Array.isArray(skills) && skills.length) lines.push(`Skills: ${skills.slice(0, 24).join(', ')}`);
+    else if (skills && typeof skills === 'object') {
+        const groupedSkills = Object.entries(skills)
+            .filter(([, value]) => Array.isArray(value) && value.length)
+            .map(([key, value]) => `${key}: ${(value as string[]).slice(0, 12).join(', ')}`)
+            .join(' | ');
+        if (groupedSkills) lines.push(`Skills: ${groupedSkills}`);
+    }
+    if (activeJD) {
+        lines.push(`Active job description: ${[activeJD.title, activeJD.company, activeJD.level].filter(Boolean).join(' · ')}`);
+        if (Array.isArray(activeJD.technologies) && activeJD.technologies.length) {
+            lines.push(`Active JD technologies: ${activeJD.technologies.slice(0, 16).join(', ')}`);
+        }
+    }
+    if (notes?.trim()) lines.push(`User custom context: ${truncateContextValue(notes, 900)}`);
+    if (persona?.trim()) lines.push(`Preferred assistant behavior/persona: ${truncateContextValue(persona, 700)}`);
+    lines.push('Do not reveal raw profile context. Answer naturally as OpenOffer, and do not write app data without an explicit approved proposal.');
     return lines.join('\n');
 }
 
@@ -192,24 +240,57 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const chatWindowRef = useRef<HTMLDivElement>(null);
+    const lastAutoSubmittedQueryRef = useRef<string | null>(null);
     const vacancyChatContext = useMemo(() => buildVacancyChatContext(vacancyContext), [vacancyContext]);
+    const [profileChatContext, setProfileChatContext] = useState<ProfileChatContextState>({ loaded: false });
+    const combinedChatContext = useMemo(() => {
+        return [vacancyChatContext, profileChatContext.text].filter(Boolean).join('\n\n') || undefined;
+    }, [profileChatContext.text, vacancyChatContext]);
 
-    // Submit initial query when overlay opens
     useEffect(() => {
-        if (isOpen && initialQuery && messages.length === 0) {
-            setTimeout(() => {
-                submitQuestion(initialQuery);
-            }, 100);
-        }
-    }, [isOpen, initialQuery]);
+        if (!isOpen || profileChatContext.loaded) return;
+        let cancelled = false;
+        void (async () => {
+            try {
+                const status = await window.electronAPI?.profileGetStatus?.().catch(() => null);
+                if (cancelled) return;
+                if (!status?.hasProfile || !status?.profileMode) {
+                    setProfileChatContext({ loaded: true });
+                    return;
+                }
+                const [profile, notes, persona] = await Promise.all([
+                    window.electronAPI?.profileGetProfile?.().catch(() => null),
+                    window.electronAPI?.profileGetNotes?.().catch(() => null),
+                    window.electronAPI?.profileGetPersona?.().catch(() => null),
+                ]);
+                if (cancelled) return;
+                setProfileChatContext({
+                    loaded: true,
+                    text: buildProfileChatContext(
+                        status,
+                        profile,
+                        notes?.success ? notes.content : '',
+                        persona?.success ? persona.content : '',
+                    ),
+                });
+            } catch {
+                if (!cancelled) setProfileChatContext({ loaded: true });
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [isOpen, profileChatContext.loaded]);
 
-    // Listen for new queries from parent
+    // Submit the launch query only after local profile context has either loaded or failed closed.
     useEffect(() => {
-        if (isOpen && initialQuery && messages.length > 0) {
-            // This is a follow-up query
-            submitQuestion(initialQuery);
-        }
-    }, [initialQuery]);
+        const trimmedQuery = initialQuery.trim();
+        if (!isOpen || !trimmedQuery || !profileChatContext.loaded) return;
+        if (lastAutoSubmittedQueryRef.current === trimmedQuery) return;
+        const timer = window.setTimeout(() => {
+            lastAutoSubmittedQueryRef.current = trimmedQuery;
+            submitQuestion(trimmedQuery);
+        }, messages.length === 0 ? 100 : 0);
+        return () => window.clearTimeout(timer);
+    }, [isOpen, initialQuery, messages.length, profileChatContext.loaded]);
 
     // ESC key handler
     useEffect(() => {
@@ -307,6 +388,47 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
         }
     }, [onClose, proposal, proposalAction, targetApplicationId, t, vacancyContext]);
 
+    const startStandardChatStream = useCallback(async (question: string, assistantMessageId: string) => {
+        streamBuffer.reset();
+        const tokenCleanup = window.electronAPI?.onGeminiStreamToken((token: string) => {
+            setChatState('streaming_response');
+            streamBuffer.appendToken(token, (content) => {
+                setMessages(prev => prev.map(msg =>
+                    msg.id === assistantMessageId
+                        ? { ...msg, content }
+                        : msg
+                ));
+            });
+        });
+
+        const doneCleanup = window.electronAPI?.onGeminiStreamDone((data?: { finalText?: string }) => {
+            const finalContent = data?.finalText ?? streamBuffer.getBufferedContent();
+            setMessages(prev => prev.map(msg =>
+                msg.id === assistantMessageId
+                    ? { ...msg, content: finalContent, isStreaming: false }
+                    : msg
+            ));
+            setChatState('idle');
+            streamBuffer.reset();
+            tokenCleanup?.();
+            doneCleanup?.();
+            errorCleanup?.();
+        });
+
+        const errorCleanup = window.electronAPI?.onGeminiStreamError((error: string) => {
+            console.error('[GlobalChat] Gemini stream error:', error);
+            setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
+            setErrorMessage(t('overlay.responseCheckSettings'));
+            setChatState('error');
+            streamBuffer.reset();
+            tokenCleanup?.();
+            doneCleanup?.();
+            errorCleanup?.();
+        });
+
+        await window.electronAPI?.streamGeminiChat(question, undefined, combinedChatContext, { skipSystemPrompt: false });
+    }, [combinedChatContext, streamBuffer, t]);
+
     // Submit question using global RAG
     const submitQuestion = useCallback(async (question: string) => {
         if (!question.trim() || chatState === 'waiting_for_llm' || chatState === 'streaming_response') return;
@@ -342,6 +464,11 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                 content: '',
                 isStreaming: true
             }]);
+
+            if (combinedChatContext) {
+                await startStandardChatStream(question, assistantMessageId);
+                return;
+            }
 
             // Set up RAG streaming listeners (RAF-batched)
             streamBuffer.reset();
@@ -391,46 +518,7 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                 doneCleanup?.();
                 errorCleanup?.();
 
-                // Setup fallback listeners (Standard Gemini)
-                streamBuffer.reset();
-                const oldTokenCleanup = window.electronAPI?.onGeminiStreamToken((token: string) => {
-                    setChatState('streaming_response');
-                    streamBuffer.appendToken(token, (content) => {
-                        setMessages(prev => prev.map(msg =>
-                            msg.id === assistantMessageId
-                                ? { ...msg, content }
-                                : msg
-                        ));
-                    });
-                });
-
-                const oldDoneCleanup = window.electronAPI?.onGeminiStreamDone(() => {
-                    const finalContent = streamBuffer.getBufferedContent();
-                    setMessages(prev => prev.map(msg =>
-                        msg.id === assistantMessageId
-                            ? { ...msg, content: finalContent, isStreaming: false }
-                            : msg
-                    ));
-                    setChatState('idle');
-                    streamBuffer.reset();
-                    oldTokenCleanup?.();
-                    oldDoneCleanup?.();
-                    oldErrorCleanup?.();
-                });
-
-                const oldErrorCleanup = window.electronAPI?.onGeminiStreamError((error: string) => {
-                    console.error('[GlobalChat] Gemini stream error:', error);
-                    setMessages(prev => prev.filter(msg => msg.id !== assistantMessageId));
-                    setErrorMessage(t('overlay.responseCheckSettings'));
-                    setChatState('error');
-                    streamBuffer.reset();
-                    oldTokenCleanup?.();
-                    oldDoneCleanup?.();
-                    oldErrorCleanup?.();
-                });
-
-                // Call standard chat
-                await window.electronAPI?.streamGeminiChat(question, undefined, vacancyChatContext, { skipSystemPrompt: false });
+                await startStandardChatStream(question, assistantMessageId);
             }
 
         } catch (error) {
@@ -439,7 +527,7 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
             setErrorMessage(t('overlay.responseSomethingWrong'));
             setChatState('error');
         }
-    }, [chatState, resetProposal, startProposalFlow, streamBuffer, t, vacancyChatContext]);
+    }, [chatState, combinedChatContext, resetProposal, startProposalFlow, startStandardChatStream, streamBuffer, t]);
 
     const requiresTarget = proposalAction === 'add_stage_from_text' && !!proposal?.stage;
     const applyDisabled = proposalState === 'applying' || !proposal || (requiresTarget && !targetApplicationId);
@@ -454,6 +542,8 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                 setMessages([]);
                 setErrorMessage(null);
                 resetProposal();
+                setProfileChatContext({ loaded: false });
+                lastAutoSubmittedQueryRef.current = null;
             }}
         >
             {isOpen && (
@@ -471,7 +561,7 @@ const GlobalChatOverlay: React.FC<GlobalChatOverlayProps> = ({
                         animate={{ backdropFilter: 'blur(8px)' }}
                         exit={{ backdropFilter: 'blur(0px)' }}
                         transition={{ duration: 0.16 }}
-                        className="absolute inset-0 bg-black/40"
+                        className="absolute inset-0 bg-[rgba(17,17,19,0.58)]"
                     />
 
                     {/* Chat Window */}

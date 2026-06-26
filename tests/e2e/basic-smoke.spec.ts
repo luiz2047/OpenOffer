@@ -179,7 +179,34 @@ test.describe('OpenOffer E2E smoke', () => {
         getInputDevices: async () => [],
         getOutputDevices: async () => [],
         getSttRuntimeStatus: async () => ({ provider: 'none', ready: false, message: 'No speech provider selected.' }),
-        getCalendarStatus: async () => ({ connected: false, disabled: true }),
+        getCalendarStatus: async () => ({
+          connected: true,
+          providers: [
+            {
+              provider: 'google',
+              state: 'needs_setup',
+              labelKey: 'settings.calendar.providers.google',
+              detailKey: 'settings.calendar.providerDetails.googleNeedsSetup',
+              readCapability: 'no',
+              writeCapability: 'no',
+              canConnect: true,
+              lastSyncAt: null,
+              lastErrorCode: null,
+            },
+            {
+              provider: 'macos',
+              state: 'available',
+              labelKey: 'settings.calendar.providers.macos',
+              detailKey: 'settings.calendar.providerDetails.macosAvailable',
+              readCapability: 'yes',
+              writeCapability: 'yes',
+              canConnect: false,
+              lastSyncAt: null,
+              lastErrorCode: null,
+            },
+          ],
+          preferredProvider: 'macos',
+        }),
         getCanAutoUpdate: async () => ({ canAutoUpdate: false }),
         checkPermissions: async () => ({ platform: 'darwin', microphone: 'granted', screen: 'granted' }),
         onboardingGetFlags: async () => ({
@@ -192,6 +219,25 @@ test.describe('OpenOffer E2E smoke', () => {
         localWhisperGetModels: async () => [],
         localWhisperGetChannelConfig: async () => ({ micModelId: null, systemModelId: null }),
         localWhisperGetHardware: async () => ({ hasGpu: false, platform: 'darwin' }),
+        profileGetStatus: async () => ({
+          hasProfile: true,
+          profileMode: true,
+          name: 'Aleksey',
+          role: 'ML Engineer',
+          totalExperienceYears: 7,
+          profileFactsReady: true,
+          resume_profile_facts_ready: true,
+          extractionMode: 'llm',
+        }),
+        profileSetMode: async () => ({ success: true }),
+        profileGetProfile: async () => ({
+          identity: { name: 'Aleksey', email: 'aleksey@example.com' },
+          role: 'ML Engineer',
+          totalExperienceYears: 7,
+          skills: { languages: ['Python'], ml: ['Computer Vision'] },
+        }),
+        profileGetNotes: async () => ({ success: true, content: 'Prefers concise direct answers.' }),
+        profileGetPersona: async () => ({ success: true, content: 'Answer as a practical interview copilot.' }),
         modesGetAll: async () => modes,
         modesGetActive: async () => modes[0],
         modesCreate: async ({ name, templateType }: { name: string; templateType: string }) => ({
@@ -297,6 +343,47 @@ test.describe('OpenOffer E2E smoke', () => {
     }
   });
 
+  test('calendar settings show macOS sync without pretending Google is connected', async ({ page }) => {
+    await gotoApp(page);
+    await openSettings(page);
+
+    await page.getByRole('button', { name: /^Calendar$/ }).click();
+    const settingsPanel = page.locator('#settings-panel');
+
+    await expect(settingsPanel.getByTestId('calendar-provider-google')).toBeVisible();
+    await expect(settingsPanel.getByTestId('calendar-provider-macos')).toBeVisible();
+    await expect(settingsPanel.getByText('Google Calendar').first()).toBeVisible();
+    await expect(settingsPanel.getByText('macOS Calendar').first()).toBeVisible();
+    await expect(settingsPanel.getByText('Calendar.app is available. Sync will use the local Mac calendar when selected.')).toBeVisible();
+    await expect(settingsPanel.getByText('Sync target')).toBeVisible();
+    await expect(settingsPanel.getByText('Connected as User')).toHaveCount(0);
+    await expect(settingsPanel.getByRole('button', { name: /^Disconnect$/ })).toHaveCount(0);
+    await expect(settingsPanel.getByRole('button', { name: 'Refresh upcoming events' })).toBeVisible();
+  });
+
+  test('settings search jumps to matching sections', async ({ page }) => {
+    await gotoApp(page);
+    await openSettings(page);
+
+    const settingsPanel = page.locator('#settings-panel');
+    await settingsPanel.getByTestId('settings-search-input').fill('macos');
+    const calendarResult = settingsPanel
+      .getByTestId('settings-search-results')
+      .getByRole('button', { name: /Calendar/i });
+    await expect(calendarResult).toBeVisible();
+    await calendarResult.click();
+
+    await expect(settingsPanel.getByTestId('settings-search-results')).toHaveCount(0);
+    await expect(settingsPanel.getByTestId('calendar-provider-macos')).toBeVisible();
+
+    await settingsPanel.getByTestId('settings-search-input').fill('profile');
+    await page.keyboard.press('Enter');
+    await expect(settingsPanel.getByTestId('settings-search-results')).toHaveCount(0);
+    await expect(settingsPanel.getByTestId('profile-context-settings-card')).toBeVisible();
+    await expect(settingsPanel.getByText('Profile context for AI')).toBeVisible();
+    await expect(settingsPanel.getByText('Active', { exact: true })).toBeVisible();
+  });
+
   test('settings panel stays within compact viewport bounds', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 740 });
     await gotoApp(page);
@@ -334,11 +421,11 @@ test.describe('OpenOffer E2E smoke', () => {
     await openSettings(page);
 
     await page.getByRole('button', { name: /audio/i }).click();
-    await expect(page.getByText(/Speech Provider|Провайдер распознавания речи/).first()).toBeVisible();
+    await expect(page.getByText(/Speech provider|Провайдер распознавания речи/i).first()).toBeVisible();
 
-    await page.locator('button:has-text("Select Provider"), button:has-text("Выберите провайдера"), button:has-text("GigaSTT"), button:has-text("Local Whisper")').first().click();
+    await page.locator('button:has-text("Speech provider"), button:has-text("Провайдер распознавания речи"), button:has-text("Select Provider"), button:has-text("Выберите провайдера"), button:has-text("GigaSTT"), button:has-text("Local Whisper")').first().click();
     await expect(page.getByText('GigaSTT').first()).toBeVisible();
     await expect(page.getByText('Local Whisper').first()).toBeVisible();
-    await expect(page.getByText(/Local Russian-first STT server|Локальный STT-сервер/i).first()).toBeVisible();
+    await expect(page.getByText(/Local STT server tuned for Russian speech|Локальный STT-сервер/i).first()).toBeVisible();
   });
 });

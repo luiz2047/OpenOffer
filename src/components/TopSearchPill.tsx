@@ -4,13 +4,10 @@ import { Sparkles, FileText, BriefcaseBusiness, CircleDot } from 'lucide-react';
 import { AnimatePresence, LazyMotion, domAnimation, m } from 'framer-motion';
 import { useResolvedTheme } from '../hooks/useResolvedTheme';
 import { useTranslation } from 'react-i18next';
-import type { ApplicationIntakeResult } from '../types/interviews';
 import {
     detectTopSearchPasteIntent,
     makeSafeExcerpt,
-    resolveTopSearchProposalTarget,
     type TopSearchActionKind,
-    type TopSearchProposalTargetReason,
     type TopSearchResultRow,
     type VacancyTopSearchContext,
 } from '../features/interviews/topSearchHelpers';
@@ -48,7 +45,6 @@ type SearchEntry =
     | { id: string; kind: 'vacancy' | 'stage'; group: SearchGroup; title: string; subtitle?: string; row: TopSearchResultRow };
 
 const AGENT_INPUT_MAX_CHARS = 50000;
-const PROPOSAL_INPUT_CLASS = 'min-h-9 w-full rounded-md border border-white/[0.08] bg-black/20 px-2 text-[12px] outline-none focus:border-cyan-300/45 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60';
 
 type TopSearchTranslationFunction = (key: string, options?: Record<string, any>) => string;
 
@@ -114,10 +110,6 @@ function proposalTitle(t: TopSearchTranslationFunction, action: TopSearchActionK
     return t('topSearch.actions.literalMeetingSearch');
 }
 
-function isProposalAction(action: TopSearchActionKind): boolean {
-    return action === 'parse_vacancy_source' || action === 'add_stage_from_text';
-}
-
 const TopSearchPill: React.FC<TopSearchPillProps> = ({
     meetings,
     vacancyContext,
@@ -131,16 +123,9 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
     const [state, setState] = useState<PillState>('idle');
     const [query, setQuery] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
-    const [proposalState, setProposalState] = useState<'idle' | 'parsing' | 'proposal' | 'applying' | 'success' | 'error'>('idle');
-    const [proposalAction, setProposalAction] = useState<TopSearchActionKind>('parse_vacancy_source');
-    const [proposal, setProposal] = useState<ApplicationIntakeResult | null>(null);
-    const [targetApplicationId, setTargetApplicationId] = useState<string>('');
-    const [proposalTargetReason, setProposalTargetReason] = useState<TopSearchProposalTargetReason>('none');
-    const [proposalError, setProposalError] = useState<string | null>(null);
 
     const inputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const applyInFlightRef = useRef(false);
 
     useEffect(() => {
         onExpansionChange?.(state !== 'idle');
@@ -220,15 +205,6 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
         setSelectedIndex(prev => Math.min(Math.max(prev, 0), entries.length - 1));
     }, [entries.length]);
 
-    const resetProposal = useCallback(() => {
-        setProposalState('idle');
-        setProposal(null);
-        setTargetApplicationId('');
-        setProposalTargetReason('none');
-        setProposalError(null);
-        applyInFlightRef.current = false;
-    }, []);
-
     const open = useCallback(() => {
         setState('focused');
         setTimeout(() => inputRef.current?.focus(), 50);
@@ -240,41 +216,15 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
         window.setTimeout(() => {
             setQuery('');
             setSelectedIndex(0);
-            resetProposal();
         }, 150);
-    }, [resetProposal]);
+    }, []);
 
     const handleInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
         const value = event.target.value.slice(0, AGENT_INPUT_MAX_CHARS);
         setQuery(value);
         setSelectedIndex(0);
-        resetProposal();
         setState(value.trim() ? 'results' : 'focused');
-    }, [resetProposal]);
-
-    const openProposal = useCallback(async (action: TopSearchActionKind) => {
-        if (!vacancyContext?.isActive || !isProposalAction(action) || !query.trim()) return;
-        setProposalAction(action);
-        setProposalState('parsing');
-        setProposal(null);
-        setProposalError(null);
-        try {
-            const preview = await vacancyContext.onPreviewIntake({
-                text: query,
-                useAi: true,
-                task: 'agent_actions',
-                candidateApplicationIds: vacancyContext.candidateApplications.map(candidate => candidate.id),
-            });
-            const targetResolution = resolveTopSearchProposalTarget(preview, vacancyContext.rows);
-            setProposal(preview);
-            setTargetApplicationId(preview.stage && targetResolution.selectedApplicationId ? targetResolution.selectedApplicationId : '');
-            setProposalTargetReason(preview.stage ? targetResolution.reason : 'none');
-            setProposalState('proposal');
-        } catch (error: any) {
-            setProposalError(error?.message || t('topSearch.errors.parseFailed'));
-            setProposalState('error');
-        }
-    }, [query, t, vacancyContext]);
+    }, []);
 
     const handleSelect = useCallback((index: number) => {
         const entry = entries[index];
@@ -299,7 +249,7 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
         }
         vacancyContext?.onOpenRow(entry.row);
         close();
-    }, [close, entries, onAIQuery, onLiteralSearch, onOpenMeeting, openProposal, query, vacancyContext]);
+    }, [close, entries, onAIQuery, onLiteralSearch, onOpenMeeting, query, vacancyContext]);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -322,14 +272,14 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
             } else if (event.key === 'ArrowUp') {
                 event.preventDefault();
                 setSelectedIndex(prev => Math.max(prev - 1, 0));
-            } else if (event.key === 'Enter' && proposalState !== 'proposal' && proposalState !== 'applying') {
+            } else if (event.key === 'Enter') {
                 event.preventDefault();
                 handleSelect(selectedIndex);
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [close, entries.length, handleSelect, open, proposalState, selectedIndex, state]);
+    }, [close, entries.length, handleSelect, open, selectedIndex, state]);
 
     useEffect(() => {
         if (state === 'idle') return;
@@ -343,34 +293,6 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
         };
     }, [state, close]);
 
-    const updateApplicationField = useCallback((field: keyof ApplicationIntakeResult['application'], value: string) => {
-        setProposal(prev => prev ? { ...prev, application: { ...prev.application, [field]: value } } : prev);
-    }, []);
-
-    const updateStageField = useCallback((field: keyof NonNullable<ApplicationIntakeResult['stage']>, value: string) => {
-        setProposal(prev => prev?.stage ? { ...prev, stage: { ...prev.stage, [field]: value } } : prev);
-    }, []);
-
-    const applyProposal = useCallback(async () => {
-        if (!proposal || !vacancyContext?.isActive || applyInFlightRef.current) return;
-        const requiresTarget = proposalAction === 'add_stage_from_text' && !!proposal.stage;
-        if (requiresTarget && !targetApplicationId) return;
-        applyInFlightRef.current = true;
-        setProposalState('applying');
-        setProposalError(null);
-        try {
-            await vacancyContext.onApplyIntake(proposal, {
-                selectedApplicationId: proposal.stage && targetApplicationId ? targetApplicationId : null,
-            });
-            setProposalState('success');
-            window.setTimeout(close, 500);
-        } catch (error: any) {
-            setProposalError(error?.message || t('topSearch.errors.applyFailed'));
-            setProposalState('error');
-            applyInFlightRef.current = false;
-        }
-    }, [close, proposal, proposalAction, targetApplicationId, t, vacancyContext]);
-
     const isExpanded = state !== 'idle';
     const showResults = state === 'results' && query.trim();
     const groupedEntries = useMemo(() => {
@@ -382,11 +304,6 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
         }
         return groups;
     }, [entries]);
-    const requiresTarget = proposalAction === 'add_stage_from_text' && !!proposal?.stage;
-    const applyDisabled = proposalState === 'applying' || !proposal || (requiresTarget && !targetApplicationId);
-    const targetSelectionMessage = requiresTarget && !targetApplicationId
-        ? t(`topSearch.proposal.targetReasons.${proposalTargetReason === 'none' ? 'no_match' : proposalTargetReason}`)
-        : null;
 
     return (
         <LazyMotion features={domAnimation}>
@@ -399,7 +316,7 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.15 }}
-                                className="fixed inset-0 z-[90] bg-black/30 backdrop-blur-[8px]"
+                                className="fixed inset-0 z-[90] bg-[rgba(17,17,19,0.54)] backdrop-blur-[8px]"
                                 onClick={close}
                             />
                         )}
@@ -416,11 +333,11 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                             className="relative max-w-[calc(100vw-96px)] transform-gpu sm:max-w-none"
                         >
                             <div className="relative">
-                                <div className={`relative overflow-hidden rounded-2xl shadow-sm backdrop-blur-xl backdrop-saturate-150 ${isLight ? 'bg-[#F2F2F7]/90' : 'bg-[#161618]/90'}`}>
-                                        <div className="relative flex items-center" onClick={() => state === 'idle' && open()}>
-                                            <div className="pointer-events-none absolute left-3 flex items-center gap-1">
-                                                <Sparkles size={14} className="text-cyan-300" />
-                                                <span className="hidden text-[10px] font-semibold uppercase tracking-[0.12em] text-text-tertiary min-[421px]:inline">
+                                <div className={`relative overflow-hidden rounded-2xl border backdrop-blur-xl backdrop-saturate-150 ${isLight ? 'border-black/[0.08] bg-[#F2F2F7]/95 shadow-[0_10px_24px_rgba(0,0,0,0.08)]' : 'border-white/[0.10] bg-bg-card shadow-[0_14px_34px_rgba(0,0,0,0.26)] ring-1 ring-white/[0.035]'}`}>
+                                        <div className="relative flex min-h-10 items-center" onClick={() => state === 'idle' && open()}>
+                                            <div className="pointer-events-none absolute left-3 flex items-center gap-1.5">
+                                                <Sparkles size={15} className="text-cyan-300" />
+                                                <span className="hidden text-[10px] font-semibold uppercase text-text-secondary min-[421px]:inline">
                                                     {t('topSearch.assistantName')}
                                                 </span>
                                             </div>
@@ -433,7 +350,7 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                                             title={t('topSearch.assistantName')}
                                             aria-label={t('topSearch.inputAriaLabel')}
                                             data-testid="top-search-input"
-                                            className={`w-full bg-transparent py-1 pl-9 pr-3 text-[13px] text-text-primary placeholder-text-tertiary focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60 min-[421px]:pl-36 min-[421px]:pr-4 ${state === 'idle' ? 'cursor-default' : 'cursor-text'}`}
+                                            className={`w-full bg-transparent py-2 pl-10 pr-3 text-[13px] font-medium text-text-primary placeholder-text-tertiary focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60 min-[421px]:pl-36 min-[421px]:pr-4 ${state === 'idle' ? 'cursor-default' : 'cursor-text'}`}
                                             placeholder={t('topSearch.placeholder')}
                                         />
                                     </div>
@@ -468,7 +385,7 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                                                                         type="button"
                                                                         key={entry.id}
                                                                         data-testid={`top-search-row-${entry.kind}`}
-                                                                        className={`flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors duration-100 ${selected ? 'bg-bg-item-active' : 'hover:bg-bg-item-hover'}`}
+                                                                        className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors duration-100 ${selected ? 'bg-bg-item-active' : 'hover:bg-bg-item-hover'}`}
                                                                         onClick={() => handleSelect(index)}
                                                                         onMouseEnter={() => setSelectedIndex(index)}
                                                                     >
@@ -484,87 +401,6 @@ const TopSearchPill: React.FC<TopSearchPillProps> = ({
                                                             })}
                                                         </div>
                                                     ))}
-
-                                                    {(proposalState === 'parsing' || proposalState === 'proposal' || proposalState === 'applying' || proposalState === 'success' || proposalState === 'error') && (
-                                                        <div className="mx-3 mt-2 rounded-md border border-cyan-300/20 bg-cyan-300/[0.055] p-3" data-testid="top-search-proposal">
-                                                            <div className="flex items-center justify-between gap-3">
-                                                                <div>
-                                                                    <div className="text-[13px] font-semibold text-cyan-100">
-                                                                        {proposalState === 'success'
-                                                                            ? t('topSearch.proposal.applied')
-                                                                            : proposalState === 'parsing'
-                                                                                ? t('topSearch.proposal.parsing')
-                                                                                : t('topSearch.proposal.ready')}
-                                                                    </div>
-                                                                    <div className="mt-1 text-[11px] text-text-tertiary">
-                                                                        {proposal
-                                                                            ? t('topSearch.proposal.confidence', { value: Math.round(proposal.confidence * 100) })
-                                                                            : t('topSearch.proposal.noWriteUntilApply')}
-                                                                    </div>
-                                                                </div>
-                                                                <button type="button" className="text-[11px] font-semibold text-text-secondary hover:text-white" onClick={resetProposal}>
-                                                                    {t('topSearch.proposal.clear')}
-                                                                </button>
-                                                            </div>
-
-                                                            {proposalError && <div className="mt-2 text-[12px] text-red-300">{proposalError}</div>}
-
-                                                            {proposal && (
-                                                                <div className="mt-3 space-y-2 text-[12px]">
-                                                                    <div className="grid grid-cols-2 gap-2">
-                                                                        <label className="block">
-                                                                            <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-tertiary">{t('topSearch.proposal.fields.title')}</span>
-                                                                            <input className={PROPOSAL_INPUT_CLASS} value={proposal.application.title ?? ''} onChange={event => updateApplicationField('title', event.target.value)} />
-                                                                        </label>
-                                                                        <label className="block">
-                                                                            <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-tertiary">{t('topSearch.proposal.fields.company')}</span>
-                                                                            <input className={PROPOSAL_INPUT_CLASS} value={proposal.application.company ?? ''} onChange={event => updateApplicationField('company', event.target.value)} />
-                                                                        </label>
-                                                                        <label className="block">
-                                                                            <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-tertiary">{t('topSearch.proposal.fields.role')}</span>
-                                                                            <input className={PROPOSAL_INPUT_CLASS} value={proposal.application.roleTitle ?? ''} onChange={event => updateApplicationField('roleTitle', event.target.value)} />
-                                                                        </label>
-                                                                        {proposal.stage && (
-                                                                            <label className="block">
-                                                                                <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-tertiary">{t('topSearch.proposal.fields.stage')}</span>
-                                                                                <input className={PROPOSAL_INPUT_CLASS} value={proposal.stage.title ?? ''} onChange={event => updateStageField('title', event.target.value)} />
-                                                                            </label>
-                                                                        )}
-                                                                    </div>
-                                                                    {proposal.stage && vacancyContext?.candidateApplications.length ? (
-                                                                        <label className="block">
-                                                                            <span className="mb-1 block text-[10px] uppercase tracking-wide text-text-tertiary">{t('topSearch.proposal.fields.attachToVacancy')}</span>
-                                                                            <select className={PROPOSAL_INPUT_CLASS} value={targetApplicationId} onChange={event => setTargetApplicationId(event.target.value)}>
-                                                                                <option value="">{proposalAction === 'add_stage_from_text' ? t('topSearch.proposal.placeholders.enableApply') : t('topSearch.proposal.placeholders.createNewVacancy')}</option>
-                                                                                {vacancyContext.candidateApplications.map(candidate => (
-                                                                                    <option key={candidate.id} value={candidate.id}>
-                                                                                        {[candidate.title, candidate.company, candidate.roleTitle].filter(Boolean).join(' · ')}
-                                                                                    </option>
-                                                                                ))}
-                                                                            </select>
-                                                                        </label>
-                                                                    ) : null}
-                                                                    {targetSelectionMessage && (
-                                                                        <div className="text-[11px] text-amber-200">{targetSelectionMessage}</div>
-                                                                    )}
-                                                                    {proposal.warnings.length > 0 && (
-                                                                        <div className="text-[11px] text-amber-200">{proposal.warnings.join(', ')}</div>
-                                                                    )}
-                                                                    <div className="flex justify-end">
-                                                                        <button type="button" data-testid="top-search-apply-proposal" onClick={applyProposal} disabled={applyDisabled} className="min-h-10 rounded-md bg-white px-3 text-[12px] font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40">
-                                                                            {proposalState === 'applying'
-                                                                                ? t('topSearch.proposal.actions.applying')
-                                                                                : proposalAction === 'add_stage_from_text'
-                                                                                    ? t('topSearch.proposal.actions.addStage')
-                                                                                    : proposal.stage
-                                                                                        ? t('topSearch.proposal.actions.createVacancyStage')
-                                                                                        : t('topSearch.proposal.actions.createVacancy')}
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </m.div>
                                         )}

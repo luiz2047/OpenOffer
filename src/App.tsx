@@ -573,6 +573,7 @@ const App: React.FC = () => {
                     setIsSettingsOpen(false);
                   }}
                   initialTab={settingsInitialTab}
+                  onOpenProfileContext={() => openProfileExclusive()}
                 />
                 <AnimatePresence>
                   {isProfileOpen && (

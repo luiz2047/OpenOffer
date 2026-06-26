@@ -1189,17 +1189,9 @@ export class InterviewRepository {
           WHERE application_id IN (${applicationPlaceholders})
         `).all<{ legacy_interview_event_id?: string | null }>(...applicationIds).map(row => row.legacy_interview_event_id)
         : [];
-      const orphanArchivedLegacyIds = this.db.prepare(`
-        SELECT e.id
-        FROM interview_events e
-        LEFT JOIN legacy_interview_event_map map ON map.legacy_interview_event_id = e.id
-        WHERE (e.archived_at IS NOT NULL OR e.status = 'archived')
-          AND map.application_id IS NULL
-      `).all<{ id: string }>().map(row => row.id);
       const legacyEventIds = uniqueStrings([
         ...applicationLegacyIds,
         ...mappedLegacyIds,
-        ...orphanArchivedLegacyIds,
       ]);
 
       const detachLinkedRows = (table: string): number => {

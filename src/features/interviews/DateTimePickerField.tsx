@@ -124,7 +124,7 @@ export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({
           role="dialog"
           aria-labelledby={buttonId}
           data-testid="date-time-picker-popover"
-          className="absolute left-0 top-[calc(100%+8px)] z-[80] w-[296px] rounded-md border border-white/[0.08] bg-[#0b0d0f] p-3 shadow-2xl shadow-black/45"
+          className="absolute left-0 top-[calc(100%+8px)] z-[80] w-[296px] rounded-md border border-white/[0.08] bg-bg-card p-3 shadow-2xl shadow-black/45"
         >
           <DayPicker
             mode="single"
@@ -139,7 +139,7 @@ export const DateTimePickerField: React.FC<DateTimePickerFieldProps> = ({
             classNames={dayPickerClassNames}
           />
           <div className="mt-3 flex items-center gap-2 border-t border-white/[0.06] pt-3">
-            <label className="flex min-h-10 flex-1 items-center gap-2 rounded-md border border-white/[0.08] bg-black/20 px-2.5 text-[12px] text-text-secondary">
+            <label className="flex min-h-10 flex-1 items-center gap-2 rounded-md border border-white/[0.08] bg-bg-input px-2.5 text-[12px] text-text-secondary">
               <Clock3 size={14} className="text-text-tertiary" />
               <span className="sr-only">{t('interviews.dateTime.time')}</span>
               <input

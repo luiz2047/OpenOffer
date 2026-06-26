@@ -29,6 +29,7 @@ import type {
   CalendarProvider,
   CalendarProviderId,
   CalendarSnapshot,
+  CalendarSyncStatus,
   CalendarStatusResult,
   InterviewCreatePayload,
   InterviewDetail,
@@ -396,16 +397,16 @@ function groupRequirementLines(lines: string[], defaultLabel: string): Array<{ l
 function statusTone(status: InterviewStatus): string {
   switch (status) {
     case 'offer':
-      return 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20';
+      return 'border-emerald-300/25 bg-emerald-300/[0.08] text-emerald-200';
     case 'rejected':
     case 'withdrawn':
-      return 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20';
+      return 'border-zinc-500/25 bg-zinc-500/[0.08] text-zinc-400';
     case 'interviewing':
-      return 'text-cyan-300 bg-cyan-500/10 border-cyan-500/20';
+      return 'border-[#67E8F9]/30 bg-[#67E8F9]/[0.08] text-[#A5F3FC]';
     case 'screening':
-      return 'text-amber-300 bg-amber-500/10 border-amber-500/20';
+      return 'border-amber-300/25 bg-amber-300/[0.08] text-amber-200';
     default:
-      return 'text-zinc-200 bg-white/[0.04] border-white/[0.08]';
+      return 'border-white/[0.10] bg-white/[0.045] text-zinc-200';
   }
 }
 
@@ -432,6 +433,12 @@ function statusLabelKey(status: InterviewStatus, item?: Pick<InterviewListItem, 
 
 function eventProvider(event: CalendarEventSummary): CalendarProvider {
   return event.source === 'macos' ? 'macos' : 'google';
+}
+
+function calendarProviderLabelKey(provider?: CalendarProvider | null): string | null {
+  if (provider === 'google') return 'interviews.googleCalendar';
+  if (provider === 'macos') return 'interviews.macosCalendar';
+  return null;
 }
 
 function eventSnapshot(event: CalendarEventSummary): CalendarSnapshot {
@@ -567,13 +574,17 @@ function hasPrepPayload(payload?: Pick<PrepBriefPayload, 'expectedTopics' | 'che
   return Boolean(payload.cheatsheet || (payload.expectedTopics?.length ?? 0) > 0 || (payload.riskHandling?.length ?? 0) > 0);
 }
 
-const inputClass = 'min-h-11 w-full rounded-md border border-white/[0.08] bg-[#090b0d] px-3 py-2.5 text-[13px] text-text-primary outline-none transition focus:border-cyan-300/45 focus:bg-black/30';
+const inputClass = 'min-h-11 w-full rounded-md border border-white/[0.08] bg-bg-input px-3 py-2.5 text-[13px] text-text-primary outline-none transition focus:border-cyan-300/45 focus:bg-bg-main';
 const labelClass = 'text-[11px] font-medium uppercase tracking-[0.06em] text-zinc-500';
 const iconButtonClass = 'inline-flex h-11 w-11 items-center justify-center rounded-md text-text-secondary transition hover:bg-white/[0.06] hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60';
 const paneHeaderClass = 'flex min-h-16 items-center justify-between border-b border-white/[0.07] px-4';
 const primaryButtonClass = 'inline-flex min-h-11 min-w-[44px] items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-[13px] font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40';
 const secondaryButtonClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-white/[0.08] px-3 py-2 text-[13px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
 const compactSecondaryButtonClass = 'inline-flex min-h-9 min-w-[44px] items-center justify-center gap-1.5 rounded-md border border-white/[0.08] px-2.5 py-1.5 text-[11px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
+const vacancyPanelClass = 'flex min-h-[560px] flex-col bg-bg-main lg:min-h-0 lg:border-r lg:border-white/[0.07]';
+const vacancyCardBaseClass = 'min-h-24 w-full rounded-md border px-3.5 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60';
+const vacancyCardActiveClass = 'border-[#67E8F9]/40 bg-[linear-gradient(180deg,rgba(103,232,249,0.12),rgba(103,232,249,0.055))] shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]';
+const vacancyCardIdleClass = 'border-white/[0.065] bg-bg-card hover:border-white/[0.12] hover:bg-bg-item-surface';
 
 const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   meetings,
@@ -888,6 +899,15 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const activeStages = stages.filter(stage => stage.status !== 'archived' && !stage.archivedAt);
   const archivedStages = stages.filter(stage => stage.status === 'archived' || stage.archivedAt);
   const formatSchedule = useCallback((ms?: number | null) => (ms ? formatDateTime(ms) : t('interviews.unscheduled')), [t]);
+  const formatCalendarSyncStatus = useCallback((status: CalendarSyncStatus, provider?: CalendarProvider | null) => {
+    const providerKey = calendarProviderLabelKey(provider);
+    if (status === 'linked' && providerKey) {
+      return t('interviews.detail.calendarSyncStatus.linkedWithProvider', {
+        provider: t(providerKey),
+      });
+    }
+    return t(`interviews.detail.calendarSyncStatus.${status}`, status);
+  }, [t]);
   const requirementGroups = useMemo(
     () => groupRequirementLines(splitLines(dossierDraft.requirements), t('interviews.detail.requirements')),
     [dossierDraft.requirements, t],
@@ -1482,10 +1502,10 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   return (
     <div
       data-testid="interview-command-center"
-      className="grid h-full min-h-0 grid-cols-1 overflow-y-auto bg-[#0a0b0c] text-text-primary lg:grid-cols-[minmax(220px,var(--interview-calendar-width))_6px_minmax(280px,var(--interview-vacancy-width))_6px_minmax(var(--interview-detail-min-width),1fr)] lg:overflow-hidden"
+      className="grid h-full min-h-0 grid-cols-1 overflow-y-auto bg-bg-primary text-text-primary lg:grid-cols-[minmax(220px,var(--interview-calendar-width))_6px_minmax(280px,var(--interview-vacancy-width))_6px_minmax(var(--interview-detail-min-width),1fr)] lg:overflow-hidden"
       style={paneLayoutStyle}
     >
-      <aside className="flex min-h-[520px] flex-col bg-[#101214] lg:min-h-0 lg:border-r lg:border-white/[0.07]">
+      <aside className="flex min-h-[520px] flex-col bg-bg-sidebar lg:min-h-0 lg:border-r lg:border-white/[0.07]">
         <div className={paneHeaderClass}>
           <div className="flex items-center gap-2">
             <CalendarDays size={18} className="text-cyan-300" />
@@ -1626,7 +1646,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         onDoubleClick={resetPaneLayout}
       />
 
-      <section className="flex min-h-[560px] flex-col bg-[#0c0e10] lg:min-h-0 lg:border-r lg:border-white/[0.07]">
+      <section className={vacancyPanelClass}>
         <div className={paneHeaderClass}>
           <div>
             <div className="text-[15px] font-semibold">{t('interviews.vacancyOS')}</div>
@@ -1688,32 +1708,37 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
           <div className="space-y-2">
-            {filteredVacancies.map(item => (
-              <button type="button"
-                key={item.id}
-                onClick={() => {
-                  const legacyId = legacyIdForVacancy(item);
-                  if (legacyId) setSelectedId(legacyId);
-                }}
-                className={`min-h-24 w-full rounded-md border p-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60 ${item.stages.some(stage => stage.id === selectedId) || item.selectedInterviewId === selectedId ? 'border-cyan-300/35 bg-cyan-300/[0.08]' : 'border-transparent bg-transparent hover:bg-white/[0.045]'}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-[14px] font-semibold">{item.title}</div>
-                    <div className="mt-1 truncate text-[12px] text-text-secondary">
-                      {[item.company, item.roleTitle].filter(Boolean).join(' · ') || item.stageTitle || t('interviews.noVacancyContext')}
+            {filteredVacancies.map(item => {
+              const selected = item.stages.some(stage => stage.id === selectedId) || item.selectedInterviewId === selectedId;
+              const contextLine = [item.company, item.roleTitle].filter(Boolean).join(' · ') || item.stageTitle || t('interviews.noVacancyContext');
+              const stageMeta = item.stageCount > 1
+                ? t('interviews.stagesCount', { count: item.stageCount })
+                : t('interviews.questionsCount', { count: item.questionCount });
+              return (
+                <button type="button"
+                  key={item.id}
+                  onClick={() => {
+                    const legacyId = legacyIdForVacancy(item);
+                    if (legacyId) setSelectedId(legacyId);
+                  }}
+                  className={`${vacancyCardBaseClass} ${selected ? vacancyCardActiveClass : vacancyCardIdleClass}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-[14px] font-semibold leading-5 text-text-primary">{item.title}</div>
+                      <div className="mt-1 truncate text-[12px] leading-4 text-text-secondary">{contextLine}</div>
                     </div>
+                    <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold leading-4 ${applicationStatusTone(item.status)}`}>
+                      {t(applicationStatusLabelKey(item.status))}
+                    </span>
                   </div>
-                  <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold ${applicationStatusTone(item.status)}`}>
-                    {t(applicationStatusLabelKey(item.status))}
-                  </span>
-                </div>
-                <div className="mt-3 flex items-center justify-between text-[11px] text-text-tertiary">
-                  <span>{formatSchedule(item.startsAt)}</span>
-                  <span>{item.stageCount > 1 ? t('interviews.stagesCount', { count: item.stageCount }) : t('interviews.questionsCount', { count: item.questionCount })}</span>
-                </div>
-              </button>
-            ))}
+                  <div className="mt-3 flex items-center justify-between gap-3 text-[11px] leading-4">
+                    <span className="min-w-0 truncate text-text-tertiary">{formatSchedule(item.startsAt)}</span>
+                    <span className="shrink-0 rounded bg-white/[0.035] px-1.5 py-0.5 text-text-secondary">{stageMeta}</span>
+                  </div>
+                </button>
+              );
+            })}
             {filteredVacancies.length === 0 && (
               <div className="rounded-md bg-white/[0.025] p-4 text-[13px] text-text-tertiary">
                 {t('interviews.noVacanciesYet')}
@@ -1746,7 +1771,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         onDoubleClick={resetPaneLayout}
       />
 
-      <section className="flex min-h-[680px] flex-col bg-[#0a0b0c] lg:min-h-0">
+      <section className="flex min-h-[680px] flex-col bg-bg-main lg:min-h-0">
         <div className="flex min-h-16 items-center justify-between border-b border-white/[0.07] px-5">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-300/10 text-cyan-300">
@@ -1777,7 +1802,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                     await loadInterviews();
                   });
                 }}
-                className="min-h-11 rounded-md border border-white/[0.08] bg-black/20 px-3 text-[12px] outline-none focus:border-cyan-300/45"
+                className="min-h-11 rounded-md border border-white/[0.08] bg-bg-input px-3 text-[12px] outline-none focus:border-cyan-300/45"
               >
                 {APPLICATION_STATUS_OPTIONS.map(status => <option key={status} value={status}>{t(applicationStatusLabelKey(status))}</option>)}
               </select>
@@ -1812,7 +1837,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
               {detailTab === 'Vacancy' && (
                 <div className="space-y-4">
-                  <div data-testid="application-fields-card" className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                  <div data-testid="application-fields-card" className="rounded-md bg-bg-card p-4 ring-1 ring-white/[0.04]">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <div className="text-[15px] font-semibold">{t('interviews.detail.applicationFields')}</div>
@@ -1900,7 +1925,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                  <div className="rounded-md bg-bg-card p-4 ring-1 ring-white/[0.04]">
                     <div className={labelClass}>{t('interviews.detail.summary')}</div>
                     <div className="mt-2 text-[13px] leading-6 text-text-primary">
                       {dossierDraft.description.trim() || t('interviews.detail.noSummary')}
@@ -1923,7 +1948,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       )}
                     </div>
                   </div>
-                  <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                  <div className="rounded-md bg-bg-card p-4 ring-1 ring-white/[0.04]">
                     <div className="flex items-center justify-between gap-3">
                       <div className={labelClass}>{t('interviews.detail.rawVacancyContext')}</div>
                       {detail.rawSourceText && detail.rawSourceText.length > 360 && (
@@ -1995,7 +2020,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                               <div className="h-px flex-1 bg-white/[0.08]" />
                             </div>
                           )}
-                          <div data-testid="interview-stage-card" className={`rounded-md bg-[#101214] p-3 ring-1 ring-white/[0.04] ${isArchived ? 'opacity-70' : ''}`}>
+                          <div data-testid="interview-stage-card" className={`rounded-md bg-bg-card p-3 ring-1 ring-white/[0.04] ${isArchived ? 'opacity-70' : ''}`}>
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <div className="text-[14px] font-semibold text-text-primary">{stage.title}</div>
@@ -2004,7 +2029,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                                   <span className="text-white/[0.16]">/</span>
                                   <span>{t(`interviews.stageStatus.${stage.status}`)}</span>
                                   <span className="text-white/[0.16]">/</span>
-                                  <span>{stage.calendarSyncStatus}</span>
+                                  <span>{formatCalendarSyncStatus(stage.calendarSyncStatus, stage.calendarProvider)}</span>
                                 </div>
                               </div>
                               <div className="flex flex-wrap gap-2">
@@ -2104,7 +2129,11 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                             </div>
                             <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
                               <InfoTile icon={<FileText size={15} />} label={t('interviews.detail.stageRecordings')} value={`${stageMeetings.length}`} valueTestId="stage-recording-count" />
-                              <InfoTile icon={<CalendarDays size={15} />} label={t('interviews.detail.calendarSync')} value={stage.calendarSyncStatus} />
+                              <InfoTile
+                                icon={<CalendarDays size={15} />}
+                                label={t('interviews.detail.calendarSync')}
+                                value={formatCalendarSyncStatus(stage.calendarSyncStatus, stage.calendarProvider)}
+                              />
                               <InfoTile icon={<CircleDot size={15} />} label={t('interviews.detail.stageStatus')} value={t(`interviews.stageStatus.${stage.status}`)} />
                             </div>
                             {!isArchived && (
@@ -2135,7 +2164,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                                     duration: meeting.duration,
                                     summary: '',
                                   })}
-                                  className="flex min-h-9 w-full items-center justify-between rounded bg-black/20 px-2 py-1.5 text-left text-[12px] text-text-secondary transition hover:bg-white/[0.05]"
+                                  className="flex min-h-9 w-full items-center justify-between rounded bg-bg-input px-2 py-1.5 text-left text-[12px] text-text-secondary transition hover:bg-white/[0.05]"
                                 >
                                   <span className="truncate">{meeting.title}</span>
                                   <ChevronRight size={13} className="shrink-0 text-text-tertiary" />
@@ -2189,7 +2218,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       </div>
                     </div>
                   )}
-                  <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                  <div className="rounded-md bg-bg-card p-4 ring-1 ring-white/[0.04]">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className={labelClass}>{t('interviews.detail.aiEvaluation')}</div>
@@ -2226,7 +2255,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                               <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-500">{label}</div>
                               <div className="space-y-1.5">
                                 {items.map((item, index) => (
-                                  <div key={`${label}-${index}`} className="rounded border border-white/[0.06] bg-black/20 px-3 py-2">{item}</div>
+                                  <div key={`${label}-${index}`} className="rounded border border-white/[0.06] bg-bg-input px-3 py-2">{item}</div>
                                 ))}
                               </div>
                             </div>
@@ -2266,7 +2295,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
               {detailTab === 'Questions' && (
                 <div className="space-y-4">
-                  <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                  <div className="rounded-md bg-bg-card p-4 ring-1 ring-white/[0.04]">
                     <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_150px_auto]">
                       <input value={questionText} onChange={event => setQuestionText(event.target.value)} className={inputClass} placeholder={t('interviews.detail.question')} />
                       <input value={questionCategory} onChange={event => setQuestionCategory(event.target.value)} className={inputClass} placeholder={t('interviews.detail.category')} />
@@ -2462,7 +2491,7 @@ const PaneResizeHandle: React.FC<{
     data-testid="interview-pane-resize-handle"
     onPointerDown={onPointerDown}
     onDoubleClick={onDoubleClick}
-    className="group hidden cursor-col-resize items-stretch justify-center bg-[#0a0b0c] outline-none transition hover:bg-cyan-300/[0.08] focus-visible:bg-cyan-300/[0.08] lg:flex"
+    className="group hidden cursor-col-resize items-stretch justify-center bg-bg-primary outline-none transition hover:bg-cyan-300/[0.08] focus-visible:bg-cyan-300/[0.08] lg:flex"
     tabIndex={0}
   >
     <div className="my-3 w-px rounded-full bg-white/[0.08] transition group-hover:bg-cyan-300/40" />

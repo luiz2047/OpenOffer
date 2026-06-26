@@ -32,6 +32,16 @@ test.describe('Interview Command Center', () => {
       const fixedNow = '2026-06-18T00:00:00.000Z';
       let lastCreateFromIntakePayload: any = null;
       let lastStartMeetingPayload: any = null;
+      let lastChatPayload: any = null;
+      let lastRagQuery: string | null = null;
+      let profileMode = true;
+      let profileGetProfileCalls = 0;
+      let profileGetNotesCalls = 0;
+      let profileGetPersonaCalls = 0;
+      let ragQueryGlobalCalls = 0;
+      const geminiTokenListeners = new Set<(token: string) => void>();
+      const geminiDoneListeners = new Set<(data?: { finalText?: string }) => void>();
+      const geminiErrorListeners = new Set<(error: string) => void>();
 
       function result<T>(data: T) {
         return { ok: true, data };
@@ -107,6 +117,7 @@ test.describe('Interview Command Center', () => {
             timezone: row.timezone ?? 'UTC',
             format: 'online',
             meetingUrl: row.meetingUrl ?? null,
+            calendarProvider: row.calendarProvider ?? null,
             calendarSyncStatus: row.calendarSyncStatus ?? 'local_only',
             calendarEventId: row.calendarEventId ?? null,
             rawSourceText: row.rawSourceText ?? null,
@@ -183,6 +194,7 @@ test.describe('Interview Command Center', () => {
           source: intake.application.source ?? application.source ?? 'manual',
           vacancyUrl: application.vacancyUrl ?? intake.application.vacancyUrl ?? null,
           meetingUrl: intake.stage?.meetingUrl ?? null,
+          calendarProvider: null,
           calendarSyncStatus: 'local_only',
           startsAt: intake.stage?.startsAt ?? null,
           endsAt: intake.stage?.endsAt ?? null,
@@ -259,6 +271,65 @@ test.describe('Interview Command Center', () => {
         localWhisperGetModels: async () => [],
         localWhisperGetChannelConfig: async () => ({ micModelId: null, systemModelId: null }),
         localWhisperGetHardware: async () => ({ hasGpu: false, platform: 'darwin' }),
+        profileGetStatus: async () => ({
+          hasProfile: true,
+          profileMode,
+          name: 'Aleksey',
+          role: 'ML Engineer',
+          totalExperienceYears: 7,
+          profileFactsReady: true,
+          resume_profile_facts_ready: true,
+          extractionMode: 'llm',
+        }),
+        profileSetMode: async (enabled: boolean) => {
+          profileMode = enabled;
+          return { success: true };
+        },
+        profileGetProfile: async () => {
+          profileGetProfileCalls += 1;
+          return {
+            identity: { name: 'Aleksey', email: 'aleksey@example.com' },
+            role: 'ML Engineer',
+            totalExperienceYears: 7,
+            skills: {
+              languages: ['Python', 'TypeScript'],
+              ml: ['Computer Vision', 'MLOps'],
+            },
+          };
+        },
+        profileGetNotes: async () => {
+          profileGetNotesCalls += 1;
+          return { success: true, content: 'Prefers concise direct answers for interview preparation.' };
+        },
+        profileGetPersona: async () => {
+          profileGetPersonaCalls += 1;
+          return { success: true, content: 'Answer as a practical interview copilot.' };
+        },
+        ragQueryGlobal: async (query: string) => {
+          ragQueryGlobalCalls += 1;
+          lastRagQuery = query;
+          return { fallback: true };
+        },
+        onGeminiStreamToken: (callback: (token: string) => void) => {
+          geminiTokenListeners.add(callback);
+          return () => geminiTokenListeners.delete(callback);
+        },
+        onGeminiStreamDone: (callback: (data?: { finalText?: string }) => void) => {
+          geminiDoneListeners.add(callback);
+          return () => geminiDoneListeners.delete(callback);
+        },
+        onGeminiStreamError: (callback: (error: string) => void) => {
+          geminiErrorListeners.add(callback);
+          return () => geminiErrorListeners.delete(callback);
+        },
+        streamGeminiChat: async (message: string, imagePaths?: string[], context?: string, options?: any) => {
+          lastChatPayload = { message, imagePaths, context, options };
+          setTimeout(() => {
+            geminiTokenListeners.forEach(callback => callback('Context answer '));
+            geminiDoneListeners.forEach(callback => callback({ finalText: 'Context answer ready.' }));
+          }, 0);
+          return { success: true };
+        },
         modesGetAll: async () => modes,
         modesGetActive: async () => modes[0],
         modesCreate: async () => ({ success: true, mode: modes[0] }),
@@ -296,6 +367,7 @@ test.describe('Interview Command Center', () => {
             source: payload.source ?? 'manual',
             vacancyUrl: payload.vacancyUrl ?? null,
             meetingUrl: payload.meetingUrl ?? null,
+            calendarProvider: null,
             calendarSyncStatus: 'local_only',
             startsAt: payload.startsAt ?? null,
             endsAt: payload.endsAt ?? null,
@@ -489,6 +561,7 @@ test.describe('Interview Command Center', () => {
             source: application.source ?? 'manual',
             vacancyUrl: application.vacancyUrl ?? null,
             meetingUrl: payload.meetingUrl ?? null,
+            calendarProvider: null,
             calendarSyncStatus: 'local_only',
             startsAt: payload.startsAt ?? null,
             endsAt: payload.endsAt ?? null,
@@ -551,7 +624,8 @@ test.describe('Interview Command Center', () => {
         interviewStagesCreateCalendarEvent: async (stageId: string, provider: string) => {
           const row = interviews.find(item => item.selectedStageId === stageId);
           if (!row) return { ok: false, code: 'not_found', message: 'Stage not found.', retryable: false, action: 'none' };
-          row.calendarSyncStatus = provider;
+          row.calendarProvider = provider;
+          row.calendarSyncStatus = 'linked';
           row.calendarEventId = `${provider}_${stageId}`;
           return result(applicationDetail(row.applicationId));
         },
@@ -631,6 +705,30 @@ test.describe('Interview Command Center', () => {
         get lastStartMeetingPayload() {
           return lastStartMeetingPayload;
         },
+        get lastChatPayload() {
+          return lastChatPayload;
+        },
+        get chatMetrics() {
+          return {
+            lastChatPayload,
+            lastRagQuery,
+            profileGetProfileCalls,
+            profileGetNotesCalls,
+            profileGetPersonaCalls,
+            ragQueryGlobalCalls,
+          };
+        },
+        setProfileMode(value: boolean) {
+          profileMode = value;
+        },
+        resetChatMetrics() {
+          lastChatPayload = null;
+          lastRagQuery = null;
+          profileGetProfileCalls = 0;
+          profileGetNotesCalls = 0;
+          profileGetPersonaCalls = 0;
+          ragQueryGlobalCalls = 0;
+        },
       };
 
       (window as any).electronAPI = new Proxy(apiDefaults, {
@@ -646,8 +744,37 @@ test.describe('Interview Command Center', () => {
     });
   });
 
+  test('global chat keeps RAG flow and does not read profile facts when profile context is disabled', async ({ page }) => {
+    await gotoApp(page);
+    await page.evaluate(() => {
+      const state = (window as any).__openOfferTestState;
+      state.setProfileMode(false);
+      state.resetChatMetrics();
+    });
+
+    await page.keyboard.press('Control+K');
+    await page.getByTestId('top-search-input').fill('What meetings do I have this week?');
+    await page.getByTestId('top-search-row-action').filter({ hasText: 'Ask AI' }).click();
+    await expect(page.getByText('Context answer ready.')).toBeVisible({ timeout: 5_000 });
+
+    const metrics = await page.evaluate(() => (window as any).__openOfferTestState.chatMetrics);
+    expect(metrics.ragQueryGlobalCalls).toBe(1);
+    expect(metrics.lastRagQuery).toContain('What meetings do I have this week?');
+    expect(metrics.profileGetProfileCalls).toBe(0);
+    expect(metrics.profileGetNotesCalls).toBe(0);
+    expect(metrics.profileGetPersonaCalls).toBe(0);
+    expect(metrics.lastChatPayload.context).toBeUndefined();
+  });
+
   test('manual process flow covers vacancy edit, stage edit, recording, archive, and pane resize', async ({ page }) => {
     test.setTimeout(60_000);
+    const duplicateKeyWarnings: string[] = [];
+    page.on('console', message => {
+      const text = message.text();
+      if (/Encountered two children with the same key|same key/i.test(text)) {
+        duplicateKeyWarnings.push(text);
+      }
+    });
     await gotoApp(page);
 
     const commandCenter = page.getByTestId('interview-command-center');
@@ -690,6 +817,19 @@ test.describe('Interview Command Center', () => {
     await expect(page.getByText(/characters hidden/)).toBeVisible();
     await page.getByRole('button', { name: 'Show' }).click();
 
+    await page.keyboard.press('Control+K');
+    await page.getByTestId('top-search-input').fill('What should I emphasize for this role?');
+    await page.getByTestId('top-search-row-action').filter({ hasText: 'Ask AI' }).click();
+    await expect(page.getByText('Context answer ready.')).toBeVisible({ timeout: 5_000 });
+    const chatPayload = await page.evaluate(() => (window as any).__openOfferTestState.lastChatPayload);
+    expect(chatPayload.message).toContain('What should I emphasize');
+    expect(chatPayload.context).toContain('OPENOFFER LOCAL VACANCY CONTEXT');
+    expect(chatPayload.context).toContain('OPENOFFER PROFILE CONTEXT');
+    expect(chatPayload.context).toContain('Acme');
+    expect(chatPayload.context).toContain('Computer Vision');
+    expect(chatPayload.options.skipSystemPrompt).toBe(false);
+    await page.keyboard.press('Escape');
+
     const applicationFields = page.getByTestId('application-fields-card');
     await applicationFields.getByRole('textbox', { name: 'Company', exact: true }).fill('Acme Edited');
     await applicationFields.getByRole('button', { name: 'Save' }).click();
@@ -728,7 +868,7 @@ test.describe('Interview Command Center', () => {
     await page.getByTestId('date-time-picker-apply').click();
     await expect(page.getByTestId('date-time-picker-popover')).toHaveCount(0);
     await updatedTechStage.getByRole('button', { name: 'Sync calendar' }).click();
-    await expect(updatedTechStage.getByText('macos', { exact: true }).first()).toBeVisible();
+    await expect(updatedTechStage.getByText('Synced to macOS Calendar', { exact: true }).first()).toBeVisible();
     await updatedTechStage.getByLabel('Attach recording').selectOption({ label: 'Backend interview recording' });
     await updatedTechStage.getByRole('button', { name: 'Link' }).click();
     await expect(page.getByText('Backend interview recording').last()).toBeVisible();
@@ -818,5 +958,6 @@ test.describe('Interview Command Center', () => {
     await expect(ambiguousApply).toBeEnabled();
     await page.keyboard.press('Enter');
     await expect(page.getByText('Ambiguous recruiter sync')).toHaveCount(0);
+    expect(duplicateKeyWarnings, `Duplicate key warnings: ${duplicateKeyWarnings.join(' | ')}`).toHaveLength(0);
   });
 });

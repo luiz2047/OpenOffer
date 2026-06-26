@@ -87,6 +87,10 @@ test('clearArchivedApplications deletes archived vacancies without deleting arch
     INSERT INTO meetings (id, title, created_at, start_time, duration_ms, application_id, interview_stage_id, interview_event_id)
     VALUES ('active-stage-meeting', 'Active archived stage meeting', '2026-06-25T11:00:00.000Z', 1800003600000, 1800000, ?, ?, ?)
   `).run(active.application.id, activeStageId, active.legacyInterview.id);
+  db.prepare(`
+    INSERT INTO interview_events (id, title, status, archived_at, created_at, updated_at)
+    VALUES ('orphan-legacy-archived', 'Standalone archived legacy event', 'archived', '2026-06-25T12:00:00.000Z', '2026-06-25T12:00:00.000Z', '2026-06-25T12:00:00.000Z')
+  `).run();
 
   const result = service.clearArchivedApplications();
 
@@ -104,6 +108,11 @@ test('clearArchivedApplications deletes archived vacancies without deleting arch
   const preserved = db.prepare('SELECT application_id, interview_stage_id, interview_event_id FROM meetings WHERE id = ?').get('active-stage-meeting');
   assert.equal(preserved.application_id, active.application.id);
   assert.equal(preserved.interview_stage_id, activeStageId);
+
+  const orphanLegacy = db.prepare('SELECT id, status, archived_at FROM interview_events WHERE id = ?').get('orphan-legacy-archived');
+  assert.equal(orphanLegacy.id, 'orphan-legacy-archived');
+  assert.equal(orphanLegacy.status, 'archived');
+  assert.equal(orphanLegacy.archived_at, '2026-06-25T12:00:00.000Z');
 });
 
 test('archive clear is wired through IPC, preload, renderer types, and the vacancy archive filter UI', () => {

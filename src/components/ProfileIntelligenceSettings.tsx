@@ -95,7 +95,7 @@ const PI_CSS = `
         color: var(--pi-cta-text);
         font-size: 13px;
         font-weight: 600;
-        letter-spacing: -0.01em;
+        letter-spacing: 0;
         border: none;
         cursor: pointer;
         display: inline-flex; align-items: center; justify-content: center; gap: 10px;
@@ -277,7 +277,7 @@ const PI_CSS = `
         color: var(--pi-cta-text);
         font-size: 13px;
         font-weight: 600;
-        letter-spacing: -0.01em;
+        letter-spacing: 0;
         border: none;
         cursor: pointer;
         display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -589,7 +589,7 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
         <div
             className="pi-root flex flex-col h-full bg-bg-main relative"
             data-theme={isLight ? 'light' : 'dark'}
-            style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Geist", "Satoshi", system-ui, sans-serif', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' as any }}
+            style={{ fontFamily: 'var(--font-ui)', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' as any }}
         >
             <style>{PI_CSS}</style>
             <motion.div
@@ -604,10 +604,10 @@ export function ProfileIntelligenceSettings({ onClose }: { onClose: () => void }
                     </div>
                     <div>
                         <div className="flex items-center gap-2.5 mb-1.5">
-                            <h2 className="text-[22px] font-bold text-text-primary leading-none" style={{ letterSpacing: '-0.025em' }}>{t('profileIntelligenceSettings.title')}</h2>
+                            <h2 className="text-[22px] font-bold text-text-primary leading-none" style={{ letterSpacing: 0 }}>{t('profileIntelligenceSettings.title')}</h2>
                             <span className="pi-beta-badge">{t('common.beta')}</span>
                         </div>
-                        <p className="text-[13px] text-text-secondary" style={{ letterSpacing: '-0.005em' }}>
+                        <p className="text-[13px] text-text-secondary" style={{ letterSpacing: 0 }}>
                             {t('profileIntelligenceSettings.subtitle')}
                         </p>
                     </div>

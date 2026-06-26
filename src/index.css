@@ -19,46 +19,36 @@
 @tailwind utilities;
 
 :root {
-  /* System Fonts - SF Pro */
-  --font-system: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  /* Typography */
+  --font-ui: "Aptos", "Avenir Next", "SF Pro Text", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-display: "Avenir Next", "Aptos Display", "SF Pro Display", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "Geist Mono", "JetBrains Mono", "SF Mono", "SFMono-Regular", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-system: var(--font-ui);
 
   /* --- SEMANTIC TOKEN SYSTEM (DEFAULT: DARK) --- */
-  /* Reference Image Matching */
+  /* Release palette: graphite workbench from DESIGN.md preview. */
+  --bg-primary: #111113;
+  --bg-secondary: #18181B;
   --bg-sidebar: #18181B;
-  /* User Spec: Side Panel */
   --bg-main: #1E1E21;
-  /* User Spec: Main BG */
   --bg-card: #242429;
-  /* User Spec: Detectable Container */
+  --bg-elevated: #242429;
+  --bg-input: #18181B;
 
   --bg-toggle-switch: #303033;
-  /* User Spec: Toggle Button */
   --bg-item-surface: #27272A;
-  /* User Spec: Icons & Input Backgrounds */
-  --bg-item-active: #2C2C2C;
-  /* Selected state */
+  --bg-item-active: rgba(103, 232, 249, 0.08);
+  --bg-component: #242429;
 
-  --bg-primary: #000000;
-  /* Fallback */
-  --bg-secondary: #050505;
-  /* Fallback */
-  --bg-elevated: #151515;
-  /* Fallback */
-  --bg-input: #1A1A1A;
-  /* Fallback */
+  --text-primary: #FFFFFF;
+  --text-secondary: #D7D7D9;
+  --text-tertiary: #8A8A8E;
 
-  --text-primary: #ffffff;
-  --text-secondary: #A0A0A0;
-  --text-tertiary: #606060;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-muted: rgba(255, 255, 255, 0.10);
 
-  --border-subtle: transparent;
-  --border-muted: #333333;
-
-  --accent-primary: #3b82f6;
-  --accent-muted: rgba(59, 130, 246, 0.15);
-
-  --bg-component: #262626;
-  /* Specific legacy value */
+  --accent-primary: #67E8F9;
+  --accent-muted: rgba(103, 232, 249, 0.10);
 
   --overlay-bg: rgba(30, 30, 30, 0.65);
 
@@ -93,8 +83,8 @@
   --overlay-transcript-blur: calc(var(--overlay-opacity) * 6px);
 
   /* Primary Action Button Defaults (Dark) */
-  --btn-primary-bg: #2563EB; /* blue-600 */
-  --btn-primary-hover: #3b82f6; /* blue-500 */
+  --btn-primary-bg: #FFFFFF;
+  --btn-primary-hover: #E4E4E7;
   --btn-primary-disabled-bg: rgba(30, 58, 138, 0.3); /* blue-900/30 */
   --btn-primary-disabled-border: rgba(30, 64, 175, 0.3); /* blue-800/30 */
   --btn-primary-disabled-text: rgba(96, 165, 250, 0.4); /* blue-400/40 */
@@ -1777,11 +1767,26 @@ body,
   overflow: hidden;
   /* Transparent background to let vibrancy show through */
   background: transparent !important;
-  /* System font */
-  font-family: var(--font-system);
+  font-family: var(--font-ui);
   /* Smoother fonts */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+.type-display {
+  font-family: var(--font-display);
+  letter-spacing: 0;
+}
+
+code,
+kbd,
+pre,
+.font-mono {
+  font-family: var(--font-mono);
 }
 
 /* Allow selection in specific areas if needed */
@@ -2229,7 +2234,7 @@ html[data-platform="linux"] body {
 
 [data-interface-theme="liquid-glass"] .natively-api-selector-tab .tab-name {
   font-size: 11.5px !important;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 [data-interface-theme="liquid-glass"] .natively-api-selector-tab .tab-price {
@@ -2797,7 +2802,7 @@ html[data-platform="linux"] body {
 
 [data-interface-theme="modern"] .natively-api-selector-tab .tab-name {
   font-size: 11.5px !important;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 [data-interface-theme="modern"] .natively-api-selector-tab .tab-price {
