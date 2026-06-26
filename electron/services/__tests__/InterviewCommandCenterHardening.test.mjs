@@ -64,7 +64,7 @@ test('interview panes expose desktop resize handles with persisted layout reset'
 test('settings calendar polish removes ambient blobs and keeps fixed widths constrained', () => {
   const source = read('src/components/SettingsOverlay.tsx');
 
-  assert.match(source, /max-w-5xl h-\[80vh\] min-h-\[560px\]/);
+  assert.match(source, /max-w-5xl h-\[calc\(100dvh-16px\)\] max-h-\[80vh\] min-h-0/);
   assert.match(source, /className="flex w-full h-full min-w-0"/);
   assert.match(source, /className="w-56 shrink-0 bg-bg-sidebar/);
   assert.equal(source.includes('blur-[90px]'), false);

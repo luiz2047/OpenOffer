@@ -39,10 +39,12 @@ test('manual interview creation can push an event to Google or Mac calendar', ()
   const api = read('src/features/interviews/api.ts');
   const ui = read('src/features/interviews/InterviewCommandCenter.tsx');
   const resources = read('src/i18n/resources.ts');
+  const coordinator = read('electron/services/CalendarProviderCoordinator.ts');
 
   assert.ok(findSafeHandle(ipc, 'interviews:create-calendar-event') >= 0);
-  assert.match(ipc, /CalendarManager'\)\.CalendarManager\.getInstance\(\)\.createEvent/);
-  assert.match(ipc, /MacCalendarManager'\)\.MacCalendarManager\.getInstance\(\)\.createEvent/);
+  assert.match(ipc, /CalendarProviderCoordinator\.getInstance\(\)\.createEvent/);
+  assert.match(coordinator, /require\(['"]\.\/CalendarManager['"]\)\.CalendarManager\.getInstance\(\)/);
+  assert.match(coordinator, /require\(['"]\.\/MacCalendarManager['"]\)\.MacCalendarManager\.getInstance\(\)/);
   assert.match(preload, /interviewsCreateCalendarEvent: \(interviewId: string, provider: ['"]google['"] \| ['"]macos['"]\)/);
   assert.match(types, /interviewsCreateCalendarEvent: \(interviewId: string, provider: ['"]google['"] \| ['"]macos['"]\)/);
   assert.match(api, /createCalendarEvent\(interviewId: string, provider: ['"]google['"] \| ['"]macos['"]\)/);
@@ -59,11 +61,12 @@ test('stage calendar creation has a first-class local-first IPC contract', () =>
   const preload = read('electron/preload.ts');
   const types = read('src/types/electron.d.ts');
   const api = read('src/features/interviews/api.ts');
+  const coordinator = read('electron/services/CalendarProviderCoordinator.ts');
 
   assert.ok(findSafeHandle(ipc, 'interview-stages:create-calendar-event') >= 0);
   assert.match(ipc, /service\.updateStage\(stage\.id,[\s\S]{0,500}calendarSyncStatus: ['"]linked['"]/);
-  assert.match(ipc, /CalendarManager'\)\.CalendarManager\.getInstance\(\)\.createEvent/);
-  assert.match(ipc, /MacCalendarManager'\)\.MacCalendarManager\.getInstance\(\)\.createEvent/);
+  assert.match(ipc, /CalendarProviderCoordinator\.getInstance\(\)\.createEvent/);
+  assert.match(coordinator, /public async createEvent\(/);
   assert.match(ipc, /calendar_refresh_failed/);
   assert.doesNotMatch(ipc, /interview-stages:create-calendar-event[\s\S]{0,2200}archiveStage/);
   assert.match(preload, /interviewStagesCreateCalendarEvent:\s*\(id: string, provider: InterviewStageCalendarEventPayload\[['"]provider['"]\]\)/);

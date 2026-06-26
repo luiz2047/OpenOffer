@@ -4,6 +4,36 @@
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-06-26
+
+### Added
+
+- **Calendar trust surface**: Settings now shows Google and macOS Calendar as separate providers with real availability, read/write capability, sync target, and provider-specific status copy.
+- **Shared date/time picker**: Stage date fields now use a calendar/time popover instead of relying on raw manual datetime entry.
+- **Settings search**: Added IDE-style settings search with keyboard navigation across visible settings sections.
+- **Design source of truth**: Added `DESIGN.md` with locked calendar/vacancy UX, graphite palette rules, story-first UX principles, and release design completion status.
+
+### Changed
+
+- **Calendar command copy**: Stage sync now reports the actual provider path, including localized macOS Calendar success labels.
+- **Vacancy workflow polish**: Kept the existing vacancy and expanded vacancy workflows, while tightening status filtering, nearest-stage summary, and archived-vacancy cleanup behavior.
+- **Unified AI chat**: Vacancy parsing, stage proposals, and ordinary AI questions now flow through the chat surface with local vacancy context and enabled profile context.
+- **Settings simplification**: Normal settings navigation hides experimental Skills and Modes surfaces and reframes intelligence controls as AI Context.
+- **Visual system**: Updated graphite surface tokens, typography stacks, and compact settings constraints without changing the locked calendar, vacancy list, or expanded vacancy layouts.
+
+### Fixed
+
+- **Archive cleanup safety**: Clearing archived vacancies no longer deletes standalone archived legacy interview events that are not mapped to a vacancy.
+- **Profile context boundary**: AI chat no longer reads profile facts, notes, or persona when profile context is disabled.
+- **Empty context fallback**: AI chat keeps the normal RAG path when there is no selected vacancy, no stage context, and profile context is disabled.
+- **Compact settings bounds**: Settings stays within short and narrow viewports without clipping the close action.
+- **Speech provider smoke contract**: E2E coverage now matches the current provider selector labels and local STT copy.
+
+### Tests
+
+- Added service, i18n, helper, and Playwright coverage for calendar provider states, date/time picker behavior, archive cleanup, nearest-stage summaries, structured error popups, top-search proposals, hidden Skills/Modes entrypoints, settings search, compact settings bounds, duplicate React key warnings, and AI chat profile-context gating.
+- Verified `npm run test`, `npm run i18n:check`, `npm run test:i18n`, `npm run build`, `npm run typecheck:electron`, `npm run build:electron`, and targeted Playwright command-center/basic-smoke flows.
+
 ## [1.5.0] - 2026-06-22
 
 ### Added

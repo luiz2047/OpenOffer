@@ -5,6 +5,7 @@ import type {
   ApplicationIntakeResult,
   ApplicationListInput,
   ApplicationUpdatePatch,
+  ClearArchivedApplicationsResult,
   InterviewCreatePayload,
   InterviewDetail,
   InterviewIpcResult,
@@ -28,16 +29,17 @@ import type {
   VacancyDossier,
   VacancyDossierPayload,
 } from '../../types/interviews';
+import { InterviewClientError, createInterviewUiError } from './interviewErrors';
 
 function requireBridge() {
   const api = window.electronAPI;
-  if (!api) throw new Error('Electron API is unavailable');
+  if (!api) throw createInterviewUiError('bridge_unavailable', 'Electron API is unavailable', true, 'retry');
   return api;
 }
 
 function unwrap<T>(result: InterviewIpcResult<T>): T {
   if (result.ok) return result.data;
-  throw new Error(result.message);
+  throw new InterviewClientError(result);
 }
 
 export function newOperationId(action: string): string {
@@ -139,6 +141,10 @@ export const applicationApi = {
 
   async update(id: string, patch: ApplicationUpdatePatch): Promise<ApplicationDetail> {
     return unwrap(await requireBridge().applicationsUpdate(id, patch));
+  },
+
+  async clearArchived(): Promise<ClearArchivedApplicationsResult> {
+    return unwrap(await requireBridge().applicationsClearArchived());
   },
 
   async createFromIntake(intake: ApplicationIntakeResult, options?: { selectedApplicationId?: string | null }): Promise<ApplicationCreateFromIntakeResult> {

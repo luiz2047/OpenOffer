@@ -15,7 +15,6 @@ import { HelpSettings } from './settings/HelpSettings';
 import { AIProvidersSettings } from './settings/AIProvidersSettings';
 import { PhoneMirrorSettings } from './settings/PhoneMirrorSettings';
 import { IntelligenceSettings } from './settings/IntelligenceSettings';
-import { SkillsSettings } from './settings/SkillsSettings';
 import { LocalWhisperModelPanel } from './LocalWhisperModelPanel';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useShortcuts } from '../hooks/useShortcuts';
@@ -33,6 +32,86 @@ import { KeyRecorder } from './ui/KeyRecorder';
 import icon from './icon.png';
 import { sanitizeSttProvider } from '../lib/legacyStateMigration';
 import type { InterfaceLanguagePreference, InterfaceLocaleOption, InterfaceTranslationsSnapshot } from '../i18n';
+import type { CalendarEventSummary, CalendarProviderId, CalendarProviderStatus, CalendarStatusResult } from '../types/interviews';
+
+const EMPTY_CALENDAR_STATUS: CalendarStatusResult = {
+    providers: [],
+    preferredProvider: null,
+    connected: false,
+};
+
+const CALENDAR_PROVIDER_ORDER: CalendarProviderId[] = ['google', 'macos'];
+
+const fallbackCalendarProviderStatus = (provider: CalendarProviderId): CalendarProviderStatus => ({
+    provider,
+    state: provider === 'google' ? 'needs_setup' : isMac ? 'permission_unknown' : 'unavailable',
+    labelKey: `settings.calendar.providers.${provider}`,
+    detailKey: provider === 'google'
+        ? 'settings.calendar.providerDetails.googleNeedsConnection'
+        : isMac
+            ? 'settings.calendar.providerDetails.macosPermissionUnknown'
+            : 'settings.calendar.providerDetails.macosUnavailable',
+    lastSyncAt: null,
+    lastErrorCode: null,
+    readCapability: 'no',
+    writeCapability: 'no',
+    canConnect: provider === 'google',
+});
+
+const calendarProviderStateKey = (provider: CalendarProviderStatus): string => {
+    switch (provider.state) {
+        case 'connected':
+            return 'settings.calendar.providerStates.connected';
+        case 'available':
+            return 'settings.calendar.providerStates.available';
+        case 'permission_unknown':
+            return 'settings.calendar.providerStates.permissionUnknown';
+        case 'needs_setup':
+            return 'settings.calendar.providerStates.needsSetup';
+        case 'permission_denied':
+            return 'settings.calendar.providerStates.permissionDenied';
+        case 'syncing':
+            return 'settings.calendar.providerStates.syncing';
+        case 'error':
+            return 'settings.calendar.providerStates.error';
+        case 'unavailable':
+        default:
+            return 'settings.calendar.providerStates.unavailable';
+    }
+};
+
+const calendarProviderStatusTone = (provider: CalendarProviderStatus): { dot: string; badge: string; icon: string } => {
+    if (provider.readCapability === 'yes' || provider.writeCapability === 'yes') {
+        return { dot: 'bg-emerald-400', badge: 'bg-emerald-500/10 text-emerald-300 ring-emerald-400/20', icon: 'text-emerald-300 bg-emerald-500/10' };
+    }
+    if (provider.state === 'permission_unknown' || provider.readCapability === 'unknown' || provider.writeCapability === 'unknown') {
+        return { dot: 'bg-amber-300', badge: 'bg-amber-500/10 text-amber-200 ring-amber-300/20', icon: 'text-amber-200 bg-amber-500/10' };
+    }
+    if (provider.state === 'permission_denied' || provider.state === 'error') {
+        return { dot: 'bg-red-300', badge: 'bg-red-500/10 text-red-200 ring-red-300/20', icon: 'text-red-200 bg-red-500/10' };
+    }
+    return { dot: 'bg-white/30', badge: 'bg-white/[0.04] text-text-secondary ring-white/[0.07]', icon: 'text-text-tertiary bg-white/[0.04]' };
+};
+
+type SettingsTab = 'general' | 'ai-providers' | 'intelligence' | 'calendar' | 'audio' | 'keybinds' | 'phone-mirror' | 'help' | 'about';
+
+const SETTINGS_TABS = new Set<SettingsTab>([
+    'general',
+    'ai-providers',
+    'intelligence',
+    'calendar',
+    'audio',
+    'keybinds',
+    'phone-mirror',
+    'help',
+    'about',
+]);
+
+const normalizeSettingsTab = (tab?: string): SettingsTab => {
+    if (tab === 'skills' || tab === 'modes') return 'general';
+    if (tab && SETTINGS_TABS.has(tab as SettingsTab)) return tab as SettingsTab;
+    return 'general';
+};
 
 // ---------------------------------------------------------------------------
 // StarRating — renders filled/empty stars for culture ratings
@@ -354,6 +433,7 @@ interface SettingsOverlayProps {
     isOpen: boolean;
     onClose: () => void;
     initialTab?: string;
+    onOpenProfileContext?: () => void;
 }
 
 type SttRuntimeChannelStatus = {
@@ -399,15 +479,102 @@ type SttRuntimeStatus = {
     error?: string;
 };
 
-const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, initialTab = 'general' }) => {
+const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, initialTab = 'general', onOpenProfileContext }) => {
     const { t } = useTranslation();
     const isLight = useResolvedTheme() === 'light';
-    const [activeTab, setActiveTab] = useState(initialTab);
+    const [activeTab, setActiveTab] = useState(normalizeSettingsTab(initialTab));
+    const [settingsSearchQuery, setSettingsSearchQuery] = useState('');
+    const [settingsSearchActiveIndex, setSettingsSearchActiveIndex] = useState(0);
+    const settingsSearchEntries = useMemo(() => [
+        {
+            tab: 'general' as SettingsTab,
+            label: t('settings.sidebar.general'),
+            description: t('settings.sidebar.searchSections.general'),
+            keywords: 'general overlay theme language privacy login retention mouse passthrough error errors logging logs verbose diagnostics',
+        },
+        {
+            tab: 'ai-providers' as SettingsTab,
+            label: t('settings.sidebar.aiProviders'),
+            description: t('settings.sidebar.searchSections.aiProviders'),
+            keywords: 'ai providers models api keys openai gemini claude groq yandex ollama codex fast response',
+        },
+        {
+            tab: 'intelligence' as SettingsTab,
+            label: t('settings.sidebar.intelligence'),
+            description: t('settings.sidebar.searchSections.intelligence'),
+            keywords: 'intelligence profile context resume skills prompts assistant vacancy jd',
+        },
+        {
+            tab: 'calendar' as SettingsTab,
+            label: t('settings.sidebar.calendar'),
+            description: t('settings.sidebar.searchSections.calendar'),
+            keywords: 'calendar google macos sync provider events permission oauth meetings',
+        },
+        {
+            tab: 'audio' as SettingsTab,
+            label: t('settings.sidebar.audio'),
+            description: t('settings.sidebar.searchSections.audio'),
+            keywords: 'audio microphone speaker stt transcription whisper gigastt devices language',
+        },
+        {
+            tab: 'keybinds' as SettingsTab,
+            label: t('settings.sidebar.keybinds'),
+            description: t('settings.sidebar.searchSections.keybinds'),
+            keywords: 'keybinds keyboard shortcuts hotkeys global',
+        },
+        {
+            tab: 'phone-mirror' as SettingsTab,
+            label: t('settings.sidebar.phoneMirror'),
+            description: t('settings.sidebar.searchSections.phoneMirror'),
+            keywords: 'phone mirror mobile qr lan transcript browser extension',
+        },
+        {
+            tab: 'help' as SettingsTab,
+            label: t('settings.sidebar.setupHelp'),
+            description: t('settings.sidebar.searchSections.help'),
+            keywords: 'help setup permissions diagnostics guide troubleshooting',
+        },
+        {
+            tab: 'about' as SettingsTab,
+            label: t('settings.sidebar.about'),
+            description: t('settings.sidebar.searchSections.about'),
+            keywords: 'about version openoffer release',
+        },
+    ], [t]);
+    const normalizedSettingsSearchQuery = settingsSearchQuery.trim().toLowerCase();
+    const settingsSearchResults = useMemo(() => {
+        if (!normalizedSettingsSearchQuery) return [];
+        return settingsSearchEntries.filter(entry => [
+            entry.label,
+            entry.description,
+            entry.keywords,
+        ].join(' ').toLowerCase().includes(normalizedSettingsSearchQuery)).slice(0, 6);
+    }, [normalizedSettingsSearchQuery, settingsSearchEntries]);
+    useEffect(() => {
+        setSettingsSearchActiveIndex(0);
+    }, [normalizedSettingsSearchQuery, settingsSearchResults.length]);
+    const openSettingsTab = (tab: SettingsTab) => {
+        setActiveTab(tab);
+        setSettingsSearchQuery('');
+    };
+    const handleSettingsSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (!settingsSearchResults.length) return;
+        if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            setSettingsSearchActiveIndex(prev => Math.min(prev + 1, settingsSearchResults.length - 1));
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            setSettingsSearchActiveIndex(prev => Math.max(prev - 1, 0));
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            openSettingsTab(settingsSearchResults[settingsSearchActiveIndex]?.tab ?? settingsSearchResults[0].tab);
+        }
+    };
 
     // Sync active tab when modal opens
     useEffect(() => {
         if (isOpen && initialTab) {
-            setActiveTab(initialTab);
+            setActiveTab(normalizeSettingsTab(initialTab));
 
 
         }
@@ -1301,10 +1468,80 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     };
 
 
-    const [calendarStatus, setCalendarStatus] = useState<{ connected: boolean; email?: string }>({ connected: false });
+    const [calendarStatus, setCalendarStatus] = useState<CalendarStatusResult>(EMPTY_CALENDAR_STATUS);
     const [isCalendarsLoading, setIsCalendarsLoading] = useState(false);
-    const [calendarEvents, setCalendarEvents] = useState<Array<{ id: string; title: string; startTime: string; endTime: string; link?: string }>>([]);
+    const [calendarEvents, setCalendarEvents] = useState<CalendarEventSummary[]>([]);
     const [isCalendarRefreshing, setIsCalendarRefreshing] = useState(false);
+    const calendarProviders = useMemo(() => {
+        const byProvider = new Map<CalendarProviderId, CalendarProviderStatus>();
+        for (const provider of calendarStatus.providers ?? []) {
+            byProvider.set(provider.provider, provider);
+        }
+
+        if (calendarStatus.connected && !byProvider.has('google') && calendarStatus.email) {
+            byProvider.set('google', {
+                ...fallbackCalendarProviderStatus('google'),
+                state: 'connected',
+                detailKey: 'settings.calendar.providerDetails.googleConnected',
+                accountLabel: calendarStatus.email,
+                readCapability: 'yes',
+                writeCapability: 'yes',
+            });
+        }
+
+        return CALENDAR_PROVIDER_ORDER.map(provider => byProvider.get(provider) ?? fallbackCalendarProviderStatus(provider));
+    }, [calendarStatus]);
+    const hasReadableCalendarProvider = calendarProviders.some(provider => provider.readCapability === 'yes');
+    const preferredCalendarProvider = calendarProviders.find(provider => provider.provider === calendarStatus.preferredProvider) ?? null;
+
+    const reloadCalendarStatus = async () => {
+        if (!window.electronAPI?.getCalendarStatus) return calendarStatus;
+        const status = await window.electronAPI.getCalendarStatus();
+        setCalendarStatus(status);
+        return status;
+    };
+
+    const handleGoogleCalendarConnect = async () => {
+        if (!window.electronAPI?.calendarConnect) return;
+        setIsCalendarsLoading(true);
+        try {
+            const res = await window.electronAPI.calendarConnect();
+            if (res.success) await reloadCalendarStatus();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsCalendarsLoading(false);
+        }
+    };
+
+    const handleGoogleCalendarDisconnect = async () => {
+        if (!window.electronAPI?.calendarDisconnect) return;
+        setIsCalendarsLoading(true);
+        try {
+            await window.electronAPI.calendarDisconnect();
+            await reloadCalendarStatus();
+            setCalendarEvents([]);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsCalendarsLoading(false);
+        }
+    };
+
+    const handleCalendarRefresh = async () => {
+        if (!window.electronAPI?.calendarRefresh || !window.electronAPI?.getUpcomingEvents) return;
+        setIsCalendarRefreshing(true);
+        try {
+            const result = await window.electronAPI.calendarRefresh();
+            if (result?.status) setCalendarStatus(result.status);
+            const events = await window.electronAPI.getUpcomingEvents();
+            setCalendarEvents(events || []);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsCalendarRefreshing(false);
+        }
+    };
 
 
     // Load stored credentials on mount
@@ -1418,10 +1655,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         }
     }, [isOpen, selectedInput, selectedOutput]); // Re-run if isOpen changes, or if selected devices are cleared
 
-    // Fetch upcoming calendar events while the Calendar tab is open and connected.
+    // Fetch upcoming calendar events while the Calendar tab is open and at least
+    // one provider can read events.
     // Polls every 60s to mirror the Launcher's cadence.
     useEffect(() => {
-        if (!isOpen || activeTab !== 'calendar' || !calendarStatus.connected) return;
+        if (!isOpen || activeTab !== 'calendar' || !hasReadableCalendarProvider) return;
         if (!window.electronAPI?.getUpcomingEvents) return;
 
         let cancelled = false;
@@ -1433,7 +1671,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
         fetchEvents();
         const interval = setInterval(fetchEvents, 60_000);
         return () => { cancelled = true; clearInterval(interval); };
-    }, [isOpen, activeTab, calendarStatus.connected]);
+    }, [isOpen, activeTab, hasReadableCalendarProvider]);
 
     // Listen for device-selection-applied so the user can see when their saved
     // device couldn't be opened and audio fell back to the system default.
@@ -1545,7 +1783,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.2 }}
                     id="settings-backdrop"
-                    className={`fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 lg:p-8 transition-colors duration-150 ${isPreviewingOpacity ? 'bg-transparent backdrop-blur-none' : 'bg-black/75 backdrop-blur-[2px]'}`}
+                    className={`fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-6 lg:p-8 transition-colors duration-150 ${isPreviewingOpacity ? 'bg-transparent backdrop-blur-none' : 'bg-black/75 backdrop-blur-[2px]'}`}
                 >
                     <motion.div
                         id="settings-panel-wrapper"
@@ -1558,66 +1796,107 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                             damping: 32,
                             mass: 1
                         }}
-                        className="bg-bg-elevated w-full max-w-5xl h-[80vh] min-h-[560px] rounded-2xl border border-border-subtle shadow-2xl overflow-hidden relative"
+                        className="bg-bg-elevated w-full max-w-5xl h-[calc(100dvh-16px)] max-h-[80vh] min-h-0 rounded-2xl border border-border-subtle shadow-2xl overflow-hidden relative sm:h-[80vh]"
                     >
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            aria-label={t('common.close')}
+                            title={t('common.close')}
+                            className="absolute right-2 top-2 z-[5] inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle bg-bg-elevated/95 text-text-secondary shadow-lg shadow-black/20 transition hover:bg-bg-item-active hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60 sm:right-3 sm:top-3"
+                        >
+                            <X size={18} />
+                        </button>
                         <div
                             id="settings-panel"
                             className="flex w-full h-full min-w-0"
                             style={{ visibility: isPreviewingOpacity ? 'hidden' : 'visible' }}
                         >
                         {/* Sidebar */}
-                        <div className="w-56 shrink-0 bg-bg-sidebar flex flex-col border-r border-border-subtle xl:w-64">
+                        <div className="w-56 shrink-0 bg-bg-sidebar flex flex-col border-r border-border-subtle overflow-y-auto xl:w-64">
                             <div className="p-6">
                                 <h2 className="font-semibold text-gray-400 text-xs uppercase tracking-wider mb-2">{t('settings.sidebar.title')}</h2>
+                                <div className="relative mb-4">
+                                    <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+                                    <input
+                                        type="search"
+                                        value={settingsSearchQuery}
+                                        onChange={event => setSettingsSearchQuery(event.target.value)}
+                                        onKeyDown={handleSettingsSearchKeyDown}
+                                        placeholder={t('settings.sidebar.searchPlaceholder')}
+                                        aria-label={t('settings.sidebar.searchAriaLabel')}
+                                        data-testid="settings-search-input"
+                                        className="min-h-10 w-full rounded-lg border border-border-subtle bg-bg-input pl-9 pr-3 text-[13px] text-text-primary outline-none transition placeholder:text-text-tertiary focus:border-accent-primary"
+                                    />
+                                    {normalizedSettingsSearchQuery && (
+                                        <div
+                                            data-testid="settings-search-results"
+                                            className="mt-2 overflow-hidden rounded-lg border border-border-subtle bg-bg-elevated shadow-lg"
+                                        >
+                                            {settingsSearchResults.length ? (
+                                                settingsSearchResults.map((result, index) => (
+                                                    <button
+                                                        key={result.tab}
+                                                        type="button"
+                                                        onClick={() => openSettingsTab(result.tab)}
+                                                        onMouseEnter={() => setSettingsSearchActiveIndex(index)}
+                                                        className={`flex w-full flex-col gap-0.5 px-3 py-2 text-left transition ${settingsSearchActiveIndex === index ? 'bg-bg-item-active text-text-primary' : 'hover:bg-bg-item-active/60'}`}
+                                                    >
+                                                        <span className="text-[13px] font-semibold text-text-primary">{result.label}</span>
+                                                        <span className="max-h-8 overflow-hidden text-[11px] leading-4 text-text-tertiary">{result.description}</span>
+                                                    </button>
+                                                ))
+                                            ) : (
+                                                <div className="px-3 py-2 text-[12px] text-text-tertiary">
+                                                    {t('settings.sidebar.searchNoResults')}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                                 <nav className="space-y-1">
                                     <div className="px-3 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-tertiary">{t('settings.sidebar.groups.core')}</div>
                                     <button type="button"
-                                        onClick={() => setActiveTab('general')}
+                                        onClick={() => openSettingsTab('general')}
                                         className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'general' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
                                         <Monitor size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.general')}</span>
                                     </button>
                                     <div className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-tertiary">{t('settings.sidebar.groups.aiData')}</div>
                                     <button type="button"
-                                        onClick={() => setActiveTab('ai-providers')}
+                                        onClick={() => openSettingsTab('ai-providers')}
                                         className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'ai-providers' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
                                         <FlaskConical size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.aiProviders')}</span>
                                     </button>
                                     <button type="button"
-                                        onClick={() => setActiveTab('skills')}
-                                        className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'skills' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
-                                    >
-                                        <Sparkles size={16} className={`shrink-0 ${activeTab === 'skills' ? 'text-accent-primary' : 'text-text-secondary'}`} /> <span className="min-w-0 truncate">{t('settings.sidebar.skills')}</span>
-                                    </button>
-                                    <button type="button"
-                                        onClick={() => setActiveTab('intelligence')}
+                                        onClick={() => openSettingsTab('intelligence')}
                                         className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'intelligence' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
                                         <Cpu size={16} className={`shrink-0 ${activeTab === 'intelligence' ? 'text-accent-primary' : ''}`} /> <span className="min-w-0 truncate">{t('settings.sidebar.intelligence')}</span>
                                     </button>
                                     <div className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-tertiary">{t('settings.sidebar.groups.setup')}</div>
                                     <button type="button"
-                                        onClick={() => setActiveTab('calendar')}
+                                        onClick={() => openSettingsTab('calendar')}
                                         className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'calendar' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
                                         <Calendar size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.calendar')}</span>
                                     </button>
                                     <button type="button"
-                                        onClick={() => setActiveTab('audio')}
+                                        onClick={() => openSettingsTab('audio')}
                                         className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'audio' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
                                         <Mic size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.audio')}</span>
                                     </button>
                                     <button type="button"
-                                        onClick={() => setActiveTab('keybinds')}
+                                        onClick={() => openSettingsTab('keybinds')}
                                         className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'keybinds' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
                                         <Keyboard size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.keybinds')}</span>
                                     </button>
 
                                     <button type="button"
-                                        onClick={() => setActiveTab('phone-mirror')}
+                                        onClick={() => openSettingsTab('phone-mirror')}
                                         className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'phone-mirror' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
                                         <Smartphone size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.phoneMirror')}</span>
@@ -1625,14 +1904,14 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
 
                                     <div className="px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-text-tertiary">{t('settings.sidebar.groups.support')}</div>
                                     <button type="button"
-                                        onClick={() => setActiveTab('help')}
+                                        onClick={() => openSettingsTab('help')}
                                         className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-[13px] font-medium transition-colors flex items-center gap-3 ${activeTab === 'help' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
                                         <HelpCircle size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.setupHelp')}</span>
                                     </button>
 
                                     <button type="button"
-                                        onClick={() => setActiveTab('about')}
+                                        onClick={() => openSettingsTab('about')}
                                         className={`w-full min-w-0 text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${activeTab === 'about' ? 'bg-bg-item-active text-text-primary' : 'text-text-secondary hover:text-text-primary hover:bg-bg-item-active/50'}`}
                                     >
                                         <Info size={16} className="shrink-0" /> <span className="min-w-0 truncate">{t('settings.sidebar.about')}</span>
@@ -2411,9 +2690,6 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                             {activeTab === 'ai-providers' && (
                                 <AIProvidersSettings />
                             )}
-                            {activeTab === 'skills' && (
-                                <SkillsSettings />
-                            )}
                             {activeTab === 'keybinds' && (
                                 <div className="space-y-5 animated fadeIn select-text pb-4">
                                     <div className="flex items-start justify-between">
@@ -3183,42 +3459,113 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                     </div>
 
                                     <div className="bg-bg-card rounded-xl border border-border-subtle overflow-hidden">
-                                        {calendarStatus.connected ? (
-                                            <>
-                                                {/* Connection header */}
-                                                <div className="p-6 flex items-center justify-between">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
-                                                            <Calendar size={20} />
+                                        <div className="divide-y divide-white/[0.05]">
+                                            {calendarProviders.map(provider => {
+                                                const tone = calendarProviderStatusTone(provider);
+                                                const providerLabel = t(`settings.calendar.providers.${provider.provider}`);
+                                                const isPreferred = preferredCalendarProvider?.provider === provider.provider;
+                                                const canConnectGoogle = provider.provider === 'google' && provider.canConnect && provider.state !== 'connected';
+                                                const canDisconnectGoogle = provider.provider === 'google' && provider.state === 'connected';
+
+                                                return (
+                                                    <div
+                                                        key={provider.provider}
+                                                        data-testid={`calendar-provider-${provider.provider}`}
+                                                        className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"
+                                                    >
+                                                        <div className="min-w-0 flex items-start gap-4">
+                                                            <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${tone.icon}`}>
+                                                                <Calendar size={19} />
+                                                            </div>
+                                                            <div className="min-w-0 space-y-2">
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                    <h4 className="text-sm font-semibold text-text-primary">{providerLabel}</h4>
+                                                                    <span className={`inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[10px] font-semibold ring-1 ${tone.badge}`}>
+                                                                        <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
+                                                                        {t(calendarProviderStateKey(provider))}
+                                                                    </span>
+                                                                    {isPreferred && (
+                                                                        <span className="inline-flex items-center gap-1 rounded-md bg-cyan-500/10 px-2 py-1 text-[10px] font-semibold text-cyan-200 ring-1 ring-cyan-300/20">
+                                                                            <CheckCircle size={11} />
+                                                                            {t('settings.calendar.primaryProvider')}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-xs leading-relaxed text-text-secondary">
+                                                                    {t(provider.detailKey || 'settings.calendar.providerDetails.unknown')}
+                                                                </p>
+                                                                {provider.accountLabel && (
+                                                                    <p className="text-[11px] text-text-tertiary">
+                                                                        {t('settings.calendar.connectedAs', { email: provider.accountLabel })}
+                                                                    </p>
+                                                                )}
+                                                                {provider.lastErrorCode && (
+                                                                    <p className="inline-flex items-center gap-1.5 text-[11px] text-red-200">
+                                                                        <AlertCircle size={12} />
+                                                                        {t('settings.calendar.lastError', { code: provider.lastErrorCode })}
+                                                                    </p>
+                                                                )}
+                                                                <div className="flex flex-wrap gap-1.5">
+                                                                    <span className="rounded-md bg-white/[0.04] px-2 py-1 text-[10px] font-medium text-text-tertiary ring-1 ring-white/[0.06]">
+                                                                        {provider.readCapability === 'yes'
+                                                                            ? t('settings.calendar.capabilities.readYes')
+                                                                            : provider.readCapability === 'unknown'
+                                                                                ? t('settings.calendar.capabilities.readUnknown')
+                                                                                : t('settings.calendar.capabilities.readNo')}
+                                                                    </span>
+                                                                    <span className="rounded-md bg-white/[0.04] px-2 py-1 text-[10px] font-medium text-text-tertiary ring-1 ring-white/[0.06]">
+                                                                        {provider.writeCapability === 'yes'
+                                                                            ? t('settings.calendar.capabilities.writeYes')
+                                                                            : provider.writeCapability === 'unknown'
+                                                                                ? t('settings.calendar.capabilities.writeUnknown')
+                                                                                : t('settings.calendar.capabilities.writeNo')}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <h4 className="text-sm font-medium text-text-primary">Google Calendar</h4>
-                                                            <p className="text-xs text-text-secondary">{t('settings.calendar.connectedAs', { email: calendarStatus.email || 'User' })}</p>
+
+                                                        <div className="flex shrink-0 items-center gap-2 sm:self-center">
+                                                            {provider.provider === 'macos' && provider.state === 'permission_unknown' && (
+                                                                <span className="max-w-[220px] text-right text-[11px] leading-relaxed text-text-tertiary">
+                                                                    {t('settings.calendar.macosRefreshHint')}
+                                                                </span>
+                                                            )}
+                                                            {canDisconnectGoogle && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={handleGoogleCalendarDisconnect}
+                                                                    disabled={isCalendarsLoading}
+                                                                    className="px-3 py-1.5 bg-bg-input hover:bg-bg-elevated border border-border-subtle text-text-primary rounded-md text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                                                                >
+                                                                    {isCalendarsLoading ? t('settings.calendar.disconnecting') : t('settings.calendar.disconnect')}
+                                                                </button>
+                                                            )}
+                                                            {canConnectGoogle && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={handleGoogleCalendarConnect}
+                                                                    disabled={isCalendarsLoading}
+                                                                    className={`px-4 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-2.5 disabled:cursor-not-allowed disabled:opacity-50 ${isLight ? 'bg-bg-component hover:bg-bg-item-surface text-text-primary border border-border-subtle' : 'bg-[#303033] hover:bg-[#3A3A3D] text-white'}`}
+                                                                >
+                                                                    <svg viewBox="0 0 24 24" width="14" height="14" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                                                        <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
+                                                                            <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z" />
+                                                                            <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z" />
+                                                                            <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.734 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z" />
+                                                                            <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z" />
+                                                                        </g>
+                                                                    </svg>
+                                                                    {isCalendarsLoading ? t('settings.calendar.connectingGoogle') : t('settings.calendar.connectGoogle')}
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
+                                                );
+                                            })}
+                                        </div>
 
-                                                    <button type="button"
-                                                        onClick={async () => {
-                                                            setIsCalendarsLoading(true);
-                                                            try {
-                                                                await window.electronAPI.calendarDisconnect();
-                                                                const status = await window.electronAPI.getCalendarStatus();
-                                                                setCalendarStatus(status);
-                                                                setCalendarEvents([]);
-                                                            } catch (e) {
-                                                                console.error(e);
-                                                            } finally {
-                                                                setIsCalendarsLoading(false);
-                                                            }
-                                                        }}
-                                                        disabled={isCalendarsLoading}
-                                                        className="px-3 py-1.5 bg-bg-input hover:bg-bg-elevated border border-border-subtle text-text-primary rounded-md text-xs font-medium transition-colors"
-                                                    >
-                                                        {isCalendarsLoading ? t('settings.calendar.disconnecting') : t('settings.calendar.disconnect')}
-                                                    </button>
-                                                </div>
-
-                                                <div className="relative border-t border-white/[0.05]">
+                                        {hasReadableCalendarProvider ? (
+                                            <div className="relative border-t border-white/[0.05]">
                                                     <div className="relative flex items-end justify-between gap-4 px-6 pt-5 pb-3">
                                                         <div className="min-w-0 space-y-2">
                                                             <span className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 bg-white/[0.04] ring-1 ring-white/[0.06] text-[9px] font-medium tracking-[0.18em] text-text-secondary uppercase">
@@ -3228,23 +3575,13 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             <p className="text-[11px] text-text-tertiary tracking-[0.01em]">
                                                                 {calendarEvents.length > 0
                                                                     ? t('settings.calendar.upcomingCount', { count: calendarEvents.length })
-                                                                    : t('settings.calendar.nextSevenDays')}
+                                                                    : preferredCalendarProvider
+                                                                        ? t('settings.calendar.nextSevenDaysFromProvider', { provider: t(`settings.calendar.providers.${preferredCalendarProvider.provider}`) })
+                                                                        : t('settings.calendar.nextSevenDays')}
                                                             </p>
                                                         </div>
                                                         <button type="button"
-                                                            onClick={async () => {
-                                                                if (!window.electronAPI?.calendarRefresh) return;
-                                                                setIsCalendarRefreshing(true);
-                                                                try {
-                                                                    await window.electronAPI.calendarRefresh();
-                                                                    const events = await window.electronAPI.getUpcomingEvents();
-                                                                    setCalendarEvents(events || []);
-                                                                } catch (e) {
-                                                                    console.error(e);
-                                                                } finally {
-                                                                    setIsCalendarRefreshing(false);
-                                                                }
-                                                            }}
+                                                            onClick={handleCalendarRefresh}
                                                             disabled={isCalendarRefreshing}
                                                             aria-label={t('settings.calendar.refreshUpcoming')}
                                                             className="group h-8 w-8 shrink-0 rounded-md bg-white/[0.04] hover:bg-white/[0.08] ring-1 ring-white/[0.07] text-text-secondary hover:text-text-primary transition active:scale-[0.96] flex items-center justify-center"
@@ -3377,44 +3714,18 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             })}
                                                         </ul>
                                                     )}
-                                                </div>
-                                            </>
+                                            </div>
                                         ) : (
-                                            <div className="w-full p-6">
-                                                <div className="mb-4">
-                                                    <Calendar size={24} className="text-text-tertiary mb-3" />
-                                                    <h4 className="text-sm font-bold text-text-primary mb-1">Нет календарей</h4>
-                                                    <p className="text-xs text-text-secondary">Начните с подключения Google-аккаунта.</p>
+                                            <div className="border-t border-white/[0.05] p-6">
+                                                <div className="rounded-xl bg-bg-input/60 ring-1 ring-white/[0.04] px-6 py-8 text-center">
+                                                    <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-lg bg-white/[0.04] text-text-tertiary ring-1 ring-white/[0.06]">
+                                                        <Calendar size={18} strokeWidth={1.5} />
+                                                    </div>
+                                                    <h4 className="text-sm font-semibold text-text-primary">{t('settings.calendar.noReadableTitle')}</h4>
+                                                    <p className="mx-auto mt-1 max-w-[360px] text-xs leading-relaxed text-text-tertiary">
+                                                        {t('settings.calendar.noReadableDescription')}
+                                                    </p>
                                                 </div>
-
-                                                <button type="button"
-                                                    onClick={async () => {
-                                                        setIsCalendarsLoading(true);
-                                                        try {
-                                                            const res = await window.electronAPI.calendarConnect();
-                                                            if (res.success) {
-                                                                const status = await window.electronAPI.getCalendarStatus();
-                                                                setCalendarStatus(status);
-                                                            }
-                                                        } catch (e) {
-                                                            console.error(e);
-                                                        } finally {
-                                                            setIsCalendarsLoading(false);
-                                                        }
-                                                    }}
-                                                    disabled={isCalendarsLoading}
-                                                    className={`px-4 py-2 rounded-lg text-xs font-medium transition-all flex items-center gap-2.5 ${isLight ? 'bg-bg-component hover:bg-bg-item-surface text-text-primary border border-border-subtle' : 'bg-[#303033] hover:bg-[#3A3A3D] text-white'}`}
-                                                >
-                                                    <svg viewBox="0 0 24 24" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
-                                                        <g transform="matrix(1, 0, 0, 1, 27.009001, -39.238998)">
-                                                            <path fill="#4285F4" d="M -3.264 51.509 C -3.264 50.719 -3.334 49.969 -3.454 49.239 L -14.754 49.239 L -14.754 53.749 L -8.284 53.749 C -8.574 55.229 -9.424 56.479 -10.684 57.329 L -10.684 60.329 L -6.824 60.329 C -4.564 58.239 -3.264 55.159 -3.264 51.509 Z" />
-                                                            <path fill="#34A853" d="M -14.754 63.239 C -11.514 63.239 -8.804 62.159 -6.824 60.329 L -10.684 57.329 C -11.764 58.049 -13.134 58.489 -14.754 58.489 C -17.884 58.489 -20.534 56.379 -21.484 53.529 L -25.464 53.529 L -25.464 56.619 C -23.494 60.539 -19.444 63.239 -14.754 63.239 Z" />
-                                                            <path fill="#FBBC05" d="M -21.484 53.529 C -21.734 52.809 -21.864 52.039 -21.864 51.239 C -21.864 50.439 -21.734 49.669 -21.484 48.949 L -21.484 45.859 L -25.464 45.859 C -26.284 47.479 -26.754 49.299 -26.754 51.239 C -26.754 53.179 -26.284 54.999 -25.464 56.619 L -21.484 53.529 Z" />
-                                                            <path fill="#EA4335" d="M -14.754 43.989 C -12.984 43.989 -11.404 44.599 -10.154 45.789 L -6.734 42.369 C -8.804 40.429 -11.514 39.239 -14.754 39.239 C -19.444 39.239 -23.494 41.939 -25.464 45.859 L -21.484 48.949 C -20.534 46.099 -17.884 43.989 -14.754 43.989 Z" />
-                                                        </g>
-                                                    </svg>
-                                                    {isCalendarsLoading ? 'Подключение...' : 'Подключить Google'}
-                                                </button>
                                             </div>
                                         )}
                                     </div>
@@ -3426,11 +3737,11 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                             )}
 
                             {activeTab === 'intelligence' && (
-                                <IntelligenceSettings />
+                                <IntelligenceSettings onOpenProfileContext={onOpenProfileContext} />
                             )}
 
                             {activeTab === 'help' && (
-                                <HelpSettings onNavigate={setActiveTab} />
+                                <HelpSettings onNavigate={tab => openSettingsTab(normalizeSettingsTab(tab))} />
                             )}
 
                             {activeTab === 'about' && (

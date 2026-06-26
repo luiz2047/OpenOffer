@@ -2,10 +2,14 @@ import type {
   ApplicationCreateFromIntakePayload,
   ApplicationCreateFromIntakeResult,
   ApplicationDetail,
+  ClearArchivedApplicationsResult,
   ApplicationIntakeInput,
   ApplicationIntakeResult,
   ApplicationListInput,
   ApplicationUpdatePatch,
+  CalendarEventSummary,
+  CalendarRefreshResult,
+  CalendarStatusResult,
   InterviewCreatePayload,
   InterviewDetail,
   InterviewIpcResult,
@@ -356,6 +360,7 @@ export interface ElectronAPI {
   applicationsList: (input?: ApplicationListInput) => Promise<InterviewIpcResult<ApplicationDetail[]>>
   applicationsGet: (id: string) => Promise<InterviewIpcResult<ApplicationDetail>>
   applicationsUpdate: (id: string, patch: ApplicationUpdatePatch) => Promise<InterviewIpcResult<ApplicationDetail>>
+  applicationsClearArchived: () => Promise<InterviewIpcResult<ClearArchivedApplicationsResult>>
   applicationsCreateFromIntake: (operationId: string, payload: ApplicationCreateFromIntakePayload) => Promise<InterviewIpcResult<ApplicationCreateFromIntakeResult>>
   interviewStagesCreate: (payload: InterviewStageCreatePayload) => Promise<InterviewIpcResult<ApplicationDetail>>
   interviewStagesUpdate: (id: string, patch: InterviewStageUpdatePatch) => Promise<InterviewIpcResult<ApplicationDetail>>
@@ -510,9 +515,9 @@ export interface ElectronAPI {
   // Calendar
   calendarConnect: () => Promise<{ success: boolean; error?: string }>
   calendarDisconnect: () => Promise<{ success: boolean; error?: string }>
-  getCalendarStatus: () => Promise<{ connected: boolean; email?: string }>
-  getUpcomingEvents: () => Promise<Array<{ id: string; title: string; startTime: string; endTime: string; link?: string; source: 'google' | 'macos'; attendees?: Array<{ email: string; name?: string; photoUrl?: string; response?: 'accepted' | 'declined' | 'tentative' | 'needsAction' }> }>>
-  calendarRefresh: () => Promise<{ success: boolean; error?: string }>
+  getCalendarStatus: () => Promise<CalendarStatusResult>
+  getUpcomingEvents: () => Promise<CalendarEventSummary[]>
+  calendarRefresh: () => Promise<CalendarRefreshResult>
 
   // Auto-Update
   onUpdateAvailable: (callback: (info: any) => void) => () => void

@@ -1,4 +1,4 @@
-import { Brain, Check, Loader2, Wifi, WifiOff } from 'lucide-react';
+import { Brain, Check, ExternalLink, Loader2, Shield, User, Wifi, WifiOff } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -33,6 +33,16 @@ const GROUP_ORDER = ['memory', 'search', 'answerQuality', 'lectureDiagrams', 'ad
 
 interface FlagRow { key: string; enabled: boolean; setting: string; env: string; default: boolean }
 interface HindsightCfg { baseUrl: string; hasApiKey: boolean; autoStart: boolean; serverCommand: string; llmProvider: string; available: boolean }
+interface ProfileContextStatus {
+  hasProfile: boolean;
+  profileMode: boolean;
+  name?: string;
+  role?: string;
+  totalExperienceYears?: number;
+  resume_profile_facts_ready?: boolean;
+  profileFactsReady?: boolean;
+  extractionMode?: 'llm' | 'heuristic' | 'none';
+}
 
 const Toggle: React.FC<{ on: boolean; disabled?: boolean; onClick: () => void }> = ({ on, disabled, onClick }) => (
   <button
@@ -46,10 +56,12 @@ const Toggle: React.FC<{ on: boolean; disabled?: boolean; onClick: () => void }>
   </button>
 );
 
-export const IntelligenceSettings: React.FC = () => {
+export const IntelligenceSettings: React.FC<{ onOpenProfileContext?: () => void }> = ({ onOpenProfileContext }) => {
   const { t } = useTranslation();
   const [flags, setFlags] = useState<FlagRow[]>([]);
   const [cfg, setCfg] = useState<HindsightCfg | null>(null);
+  const [profileStatus, setProfileStatus] = useState<ProfileContextStatus>({ hasProfile: false, profileMode: false });
+  const [profileLoading, setProfileLoading] = useState(false);
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [autoStart, setAutoStart] = useState(true);
@@ -63,6 +75,15 @@ export const IntelligenceSettings: React.FC = () => {
   const [tryBusy, setTryBusy] = useState<null | 'lecture' | 'diagram' | 'search'>(null);
   const [tryOut, setTryOut] = useState<{ kind: string; text: string } | null>(null);
   const [searchQ, setSearchQ] = useState('');
+  const profileFactsReady = Boolean(profileStatus.profileFactsReady ?? profileStatus.resume_profile_facts_ready);
+  const profileContextActive = Boolean(profileStatus.hasProfile && profileStatus.profileMode);
+
+  const refreshProfileStatus = useCallback(async () => {
+    try {
+      const status = await window.electronAPI.profileGetStatus?.();
+      if (status) setProfileStatus(status);
+    } catch { /* settings panel never throws */ }
+  }, []);
 
   const flagOn = useCallback((key: string) => flags.find((f) => f.key === key)?.enabled ?? false, [flags]);
 
@@ -98,7 +119,25 @@ export const IntelligenceSettings: React.FC = () => {
     } catch { /* settings panel never throws */ }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    refresh();
+    refreshProfileStatus();
+  }, [refresh, refreshProfileStatus]);
+
+  const onToggleProfileContext = useCallback(async () => {
+    if (!profileStatus.hasProfile) return;
+    const next = !profileStatus.profileMode;
+    setProfileLoading(true);
+    setProfileStatus(prev => ({ ...prev, profileMode: next }));
+    try {
+      const res = await window.electronAPI.profileSetMode?.(next);
+      if (!res?.success) await refreshProfileStatus();
+    } catch {
+      await refreshProfileStatus();
+    } finally {
+      setProfileLoading(false);
+    }
+  }, [profileStatus.hasProfile, profileStatus.profileMode, refreshProfileStatus]);
 
   const onToggleFlag = useCallback(async (row: FlagRow) => {
     // Optimistic flip; reconcile from the round-trip.
@@ -147,10 +186,73 @@ export const IntelligenceSettings: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div className="flex items-center gap-2">
-        <Brain size={18} className="text-accent-primary" />
-        <h2 className="text-base font-semibold text-text-primary">{t('intelligenceSettings.title')}</h2>
+      <div>
+        <div className="flex items-center gap-2">
+          <Brain size={18} className="text-accent-primary" />
+          <h2 className="text-base font-semibold text-text-primary">{t('intelligenceSettings.title')}</h2>
+        </div>
+        <p className="mt-1 text-xs text-text-secondary">{t('intelligenceSettings.subtitle')}</p>
       </div>
+
+      <section data-testid="profile-context-settings-card" className="rounded-xl border border-border-subtle bg-bg-item-surface p-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 flex items-start gap-3">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${profileContextActive ? 'border-cyan-300/25 bg-cyan-300/10 text-cyan-200' : 'border-border-subtle bg-bg-input text-text-tertiary'}`}>
+              <User size={18} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-sm font-semibold text-text-primary">{t('intelligenceSettings.profileContextTitle')}</h3>
+                <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold ${profileContextActive ? 'bg-cyan-300/10 text-cyan-200 ring-1 ring-cyan-300/20' : 'bg-bg-input text-text-tertiary ring-1 ring-border-subtle'}`}>
+                  <Shield size={11} />
+                  {profileContextActive ? t('intelligenceSettings.profileContextActive') : t('intelligenceSettings.profileContextInactive')}
+                </span>
+              </div>
+              <p className="mt-1 text-xs leading-relaxed text-text-secondary">
+                {profileContextActive
+                  ? t('intelligenceSettings.profileContextActiveDescription')
+                  : profileStatus.hasProfile
+                    ? t('intelligenceSettings.profileContextDisabledDescription')
+                    : t('intelligenceSettings.profileContextEmptyDescription')}
+              </p>
+              <div className="mt-3 grid grid-cols-1 gap-2 text-[11px] text-text-secondary sm:grid-cols-3">
+                <div className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2">
+                  <div className="font-semibold text-text-primary">{profileStatus.name || t('intelligenceSettings.profileContextNoName')}</div>
+                  <div>{t('intelligenceSettings.profileContextLoadedProfile')}</div>
+                </div>
+                <div className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2">
+                  <div className="font-semibold text-text-primary">{profileFactsReady ? t('intelligenceSettings.profileContextFactsReady') : t('intelligenceSettings.profileContextFactsMissing')}</div>
+                  <div>{t('intelligenceSettings.profileContextResumeFacts')}</div>
+                </div>
+                <div className="rounded-lg border border-border-subtle bg-bg-input px-3 py-2">
+                  <div className="font-semibold text-text-primary">{profileStatus.role || t('intelligenceSettings.profileContextNoRole')}</div>
+                  <div>{t('intelligenceSettings.profileContextUseInChat')}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <Toggle on={profileContextActive} disabled={!profileStatus.hasProfile || profileLoading} onClick={onToggleProfileContext} />
+            {onOpenProfileContext && (
+              <button
+                type="button"
+                onClick={onOpenProfileContext}
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border-subtle bg-bg-input px-3 text-xs font-medium text-text-primary hover:bg-bg-elevated"
+              >
+                {t('intelligenceSettings.profileContextManage')}
+                <ExternalLink size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <details data-testid="intelligence-advanced-controls" className="rounded-xl border border-border-subtle bg-bg-card p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-text-primary">
+          {t('intelligenceSettings.advancedControlsTitle')}
+          <span className="ml-2 text-xs font-normal text-text-tertiary">{t('intelligenceSettings.advancedControlsDescription')}</span>
+        </summary>
+        <div className="mt-4 space-y-6">
 
       {/* ── Long-term memory (Hindsight) ─────────────────────────── */}
       <section className="rounded-xl border border-border-subtle bg-bg-item-active/30 p-4 space-y-3">
@@ -284,6 +386,8 @@ export const IntelligenceSettings: React.FC = () => {
           <pre className="max-h-48 overflow-auto rounded-lg bg-bg-input p-3 text-[11px] text-text-secondary whitespace-pre-wrap">{tryOut.text}</pre>
         ) : null}
       </section>
+        </div>
+      </details>
     </div>
   );
 };

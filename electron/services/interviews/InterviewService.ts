@@ -27,6 +27,7 @@ import type {
   InterviewStageUpdatePatch,
   InterviewStageType,
   InterviewUpdatePatch,
+  ClearArchivedApplicationsResult,
   PrepBrief,
   PrepBriefPayload,
   ReadinessResult,
@@ -1208,6 +1209,10 @@ export class InterviewService {
 
   archive(id: string): { archived: boolean } {
     return { archived: this.repo.archive(assertId(id)) };
+  }
+
+  clearArchivedApplications(): ClearArchivedApplicationsResult {
+    return this.repo.clearArchivedApplications();
   }
 
   delete(id: string, includeLinkedMeetings = false): { deleted: boolean } {

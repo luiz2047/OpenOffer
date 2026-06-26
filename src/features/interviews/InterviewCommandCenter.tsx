@@ -25,10 +25,15 @@ import type {
   ApplicationIntakeResult,
   ApplicationStatus,
   ApplicationUpdatePatch,
+  CalendarEventSummary,
   CalendarProvider,
+  CalendarProviderId,
   CalendarSnapshot,
+  CalendarSyncStatus,
+  CalendarStatusResult,
   InterviewCreatePayload,
   InterviewDetail,
+  InterviewErrorCode,
   InterviewListItem,
   InterviewPriority,
   InterviewQuestionPayload,
@@ -47,7 +52,18 @@ import type {
   VacancyDossierPayload,
 } from '../../types/interviews';
 import { applicationApi, interviewApi, stageApi } from './api';
+import { CalendarDatePickerButton } from './CalendarDatePickerButton';
+import { DateTimePickerField } from './DateTimePickerField';
+import { createInterviewUiError, normalizeInterviewError, type InterviewUiError } from './interviewErrors';
+import {
+  formatCalendarDayLabel,
+  isStageDateRangeInvalid,
+  normalizeEpoch,
+  normalizeStageDateRange,
+  type StageDateRangeField,
+} from './dateTime';
 import type { TopSearchResultRow, VacancyTopSearchContext } from './topSearchHelpers';
+import { getNearestStage } from './vacancySelectors';
 
 interface MeetingSummary {
   id: string;
@@ -55,16 +71,6 @@ interface MeetingSummary {
   date: string;
   duration: string;
   summary: string;
-}
-
-interface CalendarEventSummary {
-  id: string;
-  title: string;
-  startTime: string;
-  endTime: string;
-  link?: string;
-  source: 'google' | 'macos' | string;
-  attendees?: Array<{ email: string; name?: string; photoUrl?: string; response?: string }>;
 }
 
 export interface InterviewMeetingStartMetadata {
@@ -256,19 +262,6 @@ function isSameLocalDay(left: Date, right: Date): boolean {
   return startOfDay(left).getTime() === startOfDay(right).getTime();
 }
 
-function toLocalInputValue(ms?: number | null): string {
-  if (!ms) return '';
-  const date = new Date(ms);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}
-
-function fromLocalInputValue(value: string): number | null {
-  if (!value) return null;
-  const ms = new Date(value).getTime();
-  return Number.isFinite(ms) ? ms : null;
-}
-
 function emptyToNull(value: string): string | null {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
@@ -404,16 +397,16 @@ function groupRequirementLines(lines: string[], defaultLabel: string): Array<{ l
 function statusTone(status: InterviewStatus): string {
   switch (status) {
     case 'offer':
-      return 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20';
+      return 'border-emerald-300/25 bg-emerald-300/[0.08] text-emerald-200';
     case 'rejected':
     case 'withdrawn':
-      return 'text-zinc-400 bg-zinc-500/10 border-zinc-500/20';
+      return 'border-zinc-500/25 bg-zinc-500/[0.08] text-zinc-400';
     case 'interviewing':
-      return 'text-cyan-300 bg-cyan-500/10 border-cyan-500/20';
+      return 'border-[#67E8F9]/30 bg-[#67E8F9]/[0.08] text-[#A5F3FC]';
     case 'screening':
-      return 'text-amber-300 bg-amber-500/10 border-amber-500/20';
+      return 'border-amber-300/25 bg-amber-300/[0.08] text-amber-200';
     default:
-      return 'text-zinc-200 bg-white/[0.04] border-white/[0.08]';
+      return 'border-white/[0.10] bg-white/[0.045] text-zinc-200';
   }
 }
 
@@ -440,6 +433,12 @@ function statusLabelKey(status: InterviewStatus, item?: Pick<InterviewListItem, 
 
 function eventProvider(event: CalendarEventSummary): CalendarProvider {
   return event.source === 'macos' ? 'macos' : 'google';
+}
+
+function calendarProviderLabelKey(provider?: CalendarProvider | null): string | null {
+  if (provider === 'google') return 'interviews.googleCalendar';
+  if (provider === 'macos') return 'interviews.macosCalendar';
+  return null;
 }
 
 function eventSnapshot(event: CalendarEventSummary): CalendarSnapshot {
@@ -512,7 +511,7 @@ function applicationDraftFromDetail(application: ApplicationDetail | null) {
     compensationText: application?.compensationText ?? '',
     locationFormat: application?.locationFormat ?? '',
     nextAction: application?.nextAction ?? '',
-    nextActionDueAt: toLocalInputValue(application?.nextActionDueAt),
+    nextActionDueAt: normalizeEpoch(application?.nextActionDueAt),
     rawSourceText: application?.rawSourceText ?? '',
   };
 }
@@ -522,8 +521,8 @@ function stageDraftFromStage(stage: InterviewStage) {
     title: stage.title,
     stageType: stage.stageType,
     status: stage.status,
-    startsAt: toLocalInputValue(stage.startsAt),
-    endsAt: toLocalInputValue(stage.endsAt),
+    startsAt: normalizeEpoch(stage.startsAt),
+    endsAt: normalizeEpoch(stage.endsAt),
     timezone: stage.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
     format: stage.format ?? 'unknown' as InterviewStageFormat,
     meetingUrl: stage.meetingUrl ?? '',
@@ -575,12 +574,17 @@ function hasPrepPayload(payload?: Pick<PrepBriefPayload, 'expectedTopics' | 'che
   return Boolean(payload.cheatsheet || (payload.expectedTopics?.length ?? 0) > 0 || (payload.riskHandling?.length ?? 0) > 0);
 }
 
-const inputClass = 'min-h-11 w-full rounded-md border border-white/[0.08] bg-[#090b0d] px-3 py-2.5 text-[13px] text-text-primary outline-none transition focus:border-cyan-300/45 focus:bg-black/30';
+const inputClass = 'min-h-11 w-full rounded-md border border-white/[0.08] bg-bg-input px-3 py-2.5 text-[13px] text-text-primary outline-none transition focus:border-cyan-300/45 focus:bg-bg-main';
 const labelClass = 'text-[11px] font-medium uppercase tracking-[0.06em] text-zinc-500';
 const iconButtonClass = 'inline-flex h-11 w-11 items-center justify-center rounded-md text-text-secondary transition hover:bg-white/[0.06] hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60';
 const paneHeaderClass = 'flex min-h-16 items-center justify-between border-b border-white/[0.07] px-4';
 const primaryButtonClass = 'inline-flex min-h-11 min-w-[44px] items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-[13px] font-semibold text-black transition hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40';
 const secondaryButtonClass = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-white/[0.08] px-3 py-2 text-[13px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
+const compactSecondaryButtonClass = 'inline-flex min-h-9 min-w-[44px] items-center justify-center gap-1.5 rounded-md border border-white/[0.08] px-2.5 py-1.5 text-[11px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
+const vacancyPanelClass = 'flex min-h-[560px] flex-col bg-bg-main lg:min-h-0 lg:border-r lg:border-white/[0.07]';
+const vacancyCardBaseClass = 'min-h-24 w-full rounded-md border px-3.5 py-3 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60';
+const vacancyCardActiveClass = 'border-[#67E8F9]/40 bg-[linear-gradient(180deg,rgba(103,232,249,0.12),rgba(103,232,249,0.055))] shadow-[inset_0_1px_0_rgba(255,255,255,0.045)]';
+const vacancyCardIdleClass = 'border-white/[0.065] bg-bg-card hover:border-white/[0.12] hover:bg-bg-item-surface';
 
 const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   meetings,
@@ -594,7 +598,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   onCalendarConnected,
   onSearchContextChange,
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [interviews, setInterviews] = useState<InterviewListItem[]>([]);
   const [applications, setApplications] = useState<ApplicationDetail[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -603,7 +607,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const [retroPrompt, setRetroPrompt] = useState<RetroPromptDecision | null>(null);
   const [retroEvaluation, setRetroEvaluation] = useState<InterviewRetroEvaluation | null>(null);
   const [retroEvaluating, setRetroEvaluating] = useState(false);
-  const [calendarStatus, setCalendarStatus] = useState<{ connected: boolean; email?: string } | null>(null);
+  const [calendarStatus, setCalendarStatus] = useState<CalendarStatusResult | null>(null);
   const [selectedDate, setSelectedDate] = useState(() => startOfDay(new Date()));
   const [rawSourceExpanded, setRawSourceExpanded] = useState(false);
   const [detailTab, setDetailTab] = useState<DetailTab>('Vacancy');
@@ -639,7 +643,22 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const [questionCategory, setQuestionCategory] = useState('');
   const [attachMeetingIds, setAttachMeetingIds] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<InterviewUiError | null>(null);
+
+  const preferredWritableCalendarProvider = useMemo<CalendarProviderId | null>(() => {
+    const providers = calendarStatus?.providers ?? [];
+    const isWritable = (provider: typeof providers[number]) => (
+      provider.writeCapability !== 'no'
+      && !['needs_setup', 'permission_denied', 'unavailable', 'error'].includes(provider.state)
+    );
+    const preferred = providers.find(provider => provider.provider === calendarStatus?.preferredProvider);
+    if (preferred && isWritable(preferred)) return preferred.provider;
+    return providers.find(isWritable)?.provider ?? null;
+  }, [calendarStatus]);
+
+  const showError = useCallback((err: unknown, fallbackCode: InterviewErrorCode = 'unexpected_error') => {
+    setError(normalizeInterviewError(err, fallbackCode));
+  }, []);
 
   const loadInterviews = useCallback(async () => {
     try {
@@ -660,9 +679,9 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         return applicationLegacyId ?? rows[0]?.id ?? null;
       });
     } catch (err: any) {
-      setError(err?.message || 'Could not load interviews.');
+      showError(err);
     }
-  }, []);
+  }, [showError]);
 
   const loadCalendarStatus = useCallback(async () => {
     try {
@@ -672,7 +691,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         onCalendarConnected(Boolean(status.connected));
       }
     } catch {
-      setCalendarStatus({ connected: false });
+      setCalendarStatus(null);
       onCalendarConnected(false);
     }
   }, [onCalendarConnected]);
@@ -722,13 +741,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         });
         setQuestionDrafts(nextDetail.questions ?? []);
       } catch (err: any) {
-        if (!cancelled) setError(err?.message || 'Could not open interview.');
+        if (!cancelled) showError(err, 'not_found');
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [selectedId]);
+  }, [selectedId, showError]);
 
   useEffect(() => {
     if (!applicationDetail?.id) return;
@@ -769,6 +788,10 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const filteredVacancies = useMemo(() => {
     return statusFilteredVacancies;
   }, [statusFilteredVacancies]);
+  const archivedVacancyCount = useMemo(
+    () => vacancyItems.filter(item => item.status === 'archived').length,
+    [vacancyItems],
+  );
 
   const topSearchRows = useMemo<TopSearchResultRow[]>(() => {
     const rows: TopSearchResultRow[] = [];
@@ -866,10 +889,25 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   }, [interviews, selectedDate]);
 
   const selectedDayCount = selectedDayEvents.length + selectedDayInterviews.length;
+  const selectedDayLabel = useMemo(() => formatCalendarDayLabel(
+    selectedDate,
+    { today: t('interviews.today'), tomorrow: t('interviews.tomorrow') },
+    i18n.language,
+  ), [i18n.language, selectedDate, t]);
   const stages = applicationDetail?.stages ?? [];
+  const nearestStage = useMemo(() => getNearestStage(stages), [stages]);
   const activeStages = stages.filter(stage => stage.status !== 'archived' && !stage.archivedAt);
   const archivedStages = stages.filter(stage => stage.status === 'archived' || stage.archivedAt);
   const formatSchedule = useCallback((ms?: number | null) => (ms ? formatDateTime(ms) : t('interviews.unscheduled')), [t]);
+  const formatCalendarSyncStatus = useCallback((status: CalendarSyncStatus, provider?: CalendarProvider | null) => {
+    const providerKey = calendarProviderLabelKey(provider);
+    if (status === 'linked' && providerKey) {
+      return t('interviews.detail.calendarSyncStatus.linkedWithProvider', {
+        provider: t(providerKey),
+      });
+    }
+    return t(`interviews.detail.calendarSyncStatus.${status}`, status);
+  }, [t]);
   const requirementGroups = useMemo(
     () => groupRequirementLines(splitLines(dossierDraft.requirements), t('interviews.detail.requirements')),
     [dossierDraft.requirements, t],
@@ -881,7 +919,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     try {
       await action();
     } catch (err: any) {
-      setError(err?.message || 'Action failed.');
+      showError(err);
     } finally {
       setBusy(false);
     }
@@ -903,12 +941,12 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       setSelectedId(result.legacyInterview?.id ?? result.application.legacyInterviewEventId ?? null);
       return result;
     } catch (err: any) {
-      setError(err?.message || 'Action failed.');
+      showError(err);
       throw err;
     } finally {
       setBusy(false);
     }
-  }, [loadInterviews]);
+  }, [loadInterviews, showError]);
 
   const topSearchContext = useMemo<VacancyTopSearchContext>(() => ({
     isActive: true,
@@ -962,21 +1000,40 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     await Promise.all([Promise.resolve(onRefresh()), loadInterviews(), loadCalendarStatus()]);
   };
 
+  const clearArchivedApplications = async () => {
+    if (archivedVacancyCount < 1) return;
+    if (!window.confirm(t('interviews.clearArchiveConfirm', { count: archivedVacancyCount }))) return;
+    await run(async () => {
+      await applicationApi.clearArchived();
+      setSelectedId(null);
+      setDetail(null);
+      setApplicationDetail(null);
+      setStatusFilter('active');
+      await loadInterviews();
+    });
+  };
+
   const applyIntakePreviewToForm = (preview: ApplicationIntakeResult) => {
-    setCreateForm(prev => ({
-      ...prev,
-      title: prev.title.trim() || preview.application.title || prev.title,
-      company: prev.company?.trim() ? prev.company : preview.application.company ?? prev.company,
-      roleTitle: prev.roleTitle?.trim() ? prev.roleTitle : preview.application.roleTitle ?? prev.roleTitle,
-      stage: prev.stage?.trim() && prev.stage !== 'Recruiter screen' ? prev.stage : preview.stage?.title ?? prev.stage,
-      source: preview.application.source ?? prev.source,
-      vacancyUrl: prev.vacancyUrl?.trim() ? prev.vacancyUrl : preview.application.vacancyUrl ?? prev.vacancyUrl,
-      meetingUrl: prev.meetingUrl?.trim() ? prev.meetingUrl : preview.stage?.meetingUrl ?? prev.meetingUrl,
-      startsAt: prev.startsAt ?? preview.stage?.startsAt ?? null,
-      endsAt: prev.endsAt ?? preview.stage?.endsAt ?? null,
-      timezone: preview.stage?.timezone ?? prev.timezone,
-      rawSourceText: preview.application.rawSourceText ?? prev.rawSourceText,
-    }));
+    setCreateForm(prev => {
+      const range = normalizeStageDateRange({
+        startsAt: prev.startsAt ?? preview.stage?.startsAt ?? null,
+        endsAt: prev.endsAt ?? preview.stage?.endsAt ?? null,
+      }, 'startsAt');
+      return {
+        ...prev,
+        title: prev.title.trim() || preview.application.title || prev.title,
+        company: prev.company?.trim() ? prev.company : preview.application.company ?? prev.company,
+        roleTitle: prev.roleTitle?.trim() ? prev.roleTitle : preview.application.roleTitle ?? prev.roleTitle,
+        stage: prev.stage?.trim() && prev.stage !== 'Recruiter screen' ? prev.stage : preview.stage?.title ?? prev.stage,
+        source: preview.application.source ?? prev.source,
+        vacancyUrl: prev.vacancyUrl?.trim() ? prev.vacancyUrl : preview.application.vacancyUrl ?? prev.vacancyUrl,
+        meetingUrl: prev.meetingUrl?.trim() ? prev.meetingUrl : preview.stage?.meetingUrl ?? prev.meetingUrl,
+        startsAt: range.startsAt,
+        endsAt: range.endsAt,
+        timezone: preview.stage?.timezone ?? prev.timezone,
+        rawSourceText: preview.application.rawSourceText ?? prev.rawSourceText,
+      };
+    });
   };
 
   const parseSourceText = async (useAi = false) => {
@@ -990,6 +1047,10 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   };
 
   const createInterview = async () => {
+    if (isStageDateRangeInvalid({ startsAt: createForm.startsAt ?? null, endsAt: createForm.endsAt ?? null })) {
+      setError(createInterviewUiError('invalid_stage_time_range'));
+      return;
+    }
     await run(async () => {
       const preview = intakePreview ?? await applicationApi.parseIntake({ text: createForm.rawSourceText ?? createForm.title, useAi: false });
       const result = await applicationApi.createFromIntake({
@@ -1017,7 +1078,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         try {
           await interviewApi.createCalendarEvent(legacyId, createCalendarProvider);
         } catch (err: any) {
-          setError(`Created locally. Calendar sync failed: ${err?.message || 'unknown error'}`);
+          showError(err, 'calendar_refresh_failed');
         }
       }
       setShowCreate(false);
@@ -1083,7 +1144,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       compensationText: emptyToNull(applicationDraft.compensationText),
       locationFormat: emptyToNull(applicationDraft.locationFormat),
       nextAction: emptyToNull(applicationDraft.nextAction),
-      nextActionDueAt: fromLocalInputValue(applicationDraft.nextActionDueAt),
+      nextActionDueAt: applicationDraft.nextActionDueAt,
       rawSourceText: emptyToNull(applicationDraft.rawSourceText),
     };
     await run(async () => {
@@ -1109,14 +1170,45 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     setStageSaveStatus(prev => ({ ...prev, [stageId]: 'dirty' }));
   };
 
+  const updateCreateFormDate = (key: StageDateRangeField, value: number | null) => {
+    setCreateForm(prev => ({
+      ...prev,
+      ...normalizeStageDateRange({
+        startsAt: key === 'startsAt' ? value : prev.startsAt ?? null,
+        endsAt: key === 'endsAt' ? value : prev.endsAt ?? null,
+      }, key),
+    }));
+  };
+
+  const updateStageDraftDate = (stage: InterviewStage, key: StageDateRangeField, value: number | null) => {
+    setStageDrafts(prev => {
+      const current = prev[stage.id] ?? stageDraftFromStage(stage);
+      return {
+        ...prev,
+        [stage.id]: {
+          ...current,
+          ...normalizeStageDateRange({
+            startsAt: key === 'startsAt' ? value : current.startsAt,
+            endsAt: key === 'endsAt' ? value : current.endsAt,
+          }, key),
+        },
+      };
+    });
+    setStageSaveStatus(prev => ({ ...prev, [stage.id]: 'dirty' }));
+  };
+
   const saveStage = async (stage: InterviewStage) => {
     const draft = stageDrafts[stage.id] ?? stageDraftFromStage(stage);
+    if (isStageDateRangeInvalid({ startsAt: draft.startsAt, endsAt: draft.endsAt })) {
+      setError(createInterviewUiError('invalid_stage_time_range'));
+      return;
+    }
     const patch: InterviewStageUpdatePatch = {
       title: draft.title,
       stageType: draft.stageType,
       status: draft.status,
-      startsAt: fromLocalInputValue(draft.startsAt),
-      endsAt: fromLocalInputValue(draft.endsAt),
+      startsAt: draft.startsAt,
+      endsAt: draft.endsAt,
       timezone: emptyToNull(draft.timezone),
       format: draft.format,
       meetingUrl: emptyToNull(draft.meetingUrl),
@@ -1171,7 +1263,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     });
   };
 
-  const createStageCalendarEvent = async (stage: InterviewStage, provider: 'google' | 'macos') => {
+  const createStageCalendarEvent = async (stage: InterviewStage, provider: CalendarProviderId) => {
     await run(async () => {
       const updated = await stageApi.createCalendarEvent(stage.id, provider);
       setApplicationDetail(updated);
@@ -1261,7 +1353,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       const evaluation = await interviewApi.generateRetroEvaluation(detail.id);
       setRetroEvaluation(evaluation);
     } catch (err: any) {
-      setError(err?.message || 'Could not generate retro evaluation.');
+      showError(err);
     } finally {
       setRetroEvaluating(false);
     }
@@ -1410,10 +1502,10 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   return (
     <div
       data-testid="interview-command-center"
-      className="grid h-full min-h-0 grid-cols-1 overflow-y-auto bg-[#0a0b0c] text-text-primary lg:grid-cols-[minmax(220px,var(--interview-calendar-width))_6px_minmax(280px,var(--interview-vacancy-width))_6px_minmax(var(--interview-detail-min-width),1fr)] lg:overflow-hidden"
+      className="grid h-full min-h-0 grid-cols-1 overflow-y-auto bg-bg-primary text-text-primary lg:grid-cols-[minmax(220px,var(--interview-calendar-width))_6px_minmax(280px,var(--interview-vacancy-width))_6px_minmax(var(--interview-detail-min-width),1fr)] lg:overflow-hidden"
       style={paneLayoutStyle}
     >
-      <aside className="flex min-h-[520px] flex-col bg-[#101214] lg:min-h-0 lg:border-r lg:border-white/[0.07]">
+      <aside className="flex min-h-[520px] flex-col bg-bg-sidebar lg:min-h-0 lg:border-r lg:border-white/[0.07]">
         <div className={paneHeaderClass}>
           <div className="flex items-center gap-2">
             <CalendarDays size={18} className="text-cyan-300" />
@@ -1460,12 +1552,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
             >
               <ChevronLeft size={16} />
             </button>
-            <button type="button"
-              className="min-h-11 flex-1 rounded-md border border-white/[0.08] px-3 text-[12px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white"
-              onClick={() => setSelectedDate(startOfDay(new Date()))}
-            >
-              {selectedDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
-            </button>
+            <CalendarDatePickerButton
+              value={selectedDate}
+              label={selectedDayLabel}
+              ariaLabel={t('interviews.chooseDate')}
+              onChange={date => setSelectedDate(startOfDay(date))}
+              className="min-w-0 flex-1"
+            />
             <button type="button"
               className={iconButtonClass}
               onClick={() => setSelectedDate(prev => addDays(prev, 7))}
@@ -1498,7 +1591,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
           <div className="mb-2 flex items-center justify-between">
-            <span className={labelClass}>{t('interviews.selectedDay')}</span>
+            <span className={labelClass}>{selectedDayLabel}</span>
             <span className="text-[11px] text-text-tertiary">{selectedDayCount}</span>
           </div>
           <div className="space-y-2">
@@ -1553,7 +1646,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         onDoubleClick={resetPaneLayout}
       />
 
-      <section className="flex min-h-[560px] flex-col bg-[#0c0e10] lg:min-h-0 lg:border-r lg:border-white/[0.07]">
+      <section className={vacancyPanelClass}>
         <div className={paneHeaderClass}>
           <div>
             <div className="text-[15px] font-semibold">{t('interviews.vacancyOS')}</div>
@@ -1569,59 +1662,83 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         </div>
 
         <div className="border-b border-white/[0.07] p-3">
-          <div className="grid grid-cols-3 gap-1.5">
-            {([
-              ['active', t('interviews.filters.active')],
-              ['all', t('interviews.filters.all')],
-              ['lead_found', t(applicationStatusLabelKey('lead_found'))],
-              ['applied', t(applicationStatusLabelKey('applied'))],
-              ['screening', t(applicationStatusLabelKey('screening'))],
-              ['interviewing', t(applicationStatusLabelKey('interviewing'))],
-              ['offer', t(applicationStatusLabelKey('offer'))],
-              ['rejected', t(applicationStatusLabelKey('rejected'))],
-              ['withdrawn', t(applicationStatusLabelKey('withdrawn'))],
-              ['archived', t(applicationStatusLabelKey('archived'))],
-            ] as Array<[VacancyStatusFilter, string]>).map(([value, label]) => (
+          <label className="flex min-h-11 items-center justify-between gap-3 rounded-md border border-white/[0.08] bg-white/[0.025] px-3">
+            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.06em] text-text-tertiary">
+              {t('interviews.filters.status')}
+            </span>
+            <select
+              value={statusFilter}
+              onChange={event => setStatusFilter(event.target.value as VacancyStatusFilter)}
+              className="min-h-9 min-w-0 flex-1 bg-transparent text-right text-[12px] font-semibold text-text-primary outline-none"
+              aria-label={t('interviews.filters.status')}
+            >
+              {([
+                ['active', t('interviews.filters.active')],
+                ['all', t('interviews.filters.all')],
+                ['lead_found', t(applicationStatusLabelKey('lead_found'))],
+                ['applied', t(applicationStatusLabelKey('applied'))],
+                ['screening', t(applicationStatusLabelKey('screening'))],
+                ['interviewing', t(applicationStatusLabelKey('interviewing'))],
+                ['offer', t(applicationStatusLabelKey('offer'))],
+                ['rejected', t(applicationStatusLabelKey('rejected'))],
+                ['withdrawn', t(applicationStatusLabelKey('withdrawn'))],
+                ['archived', t(applicationStatusLabelKey('archived'))],
+              ] as Array<[VacancyStatusFilter, string]>).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          {statusFilter === 'archived' && (
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-md bg-white/[0.025] px-2 py-2">
+              <span className="text-[11px] text-text-tertiary">
+                {t('interviews.archivedVacancyCount', { count: archivedVacancyCount })}
+              </span>
               <button
                 type="button"
-                key={value}
-                onClick={() => setStatusFilter(value)}
-                className={`min-h-9 rounded-md px-2 text-[11px] font-semibold transition ${statusFilter === value ? 'bg-cyan-300/12 text-cyan-100 ring-1 ring-cyan-300/25' : 'bg-white/[0.025] text-text-secondary hover:bg-white/[0.06] hover:text-white'}`}
+                onClick={clearArchivedApplications}
+                disabled={busy || archivedVacancyCount < 1}
+                className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-md border border-white/[0.08] px-2.5 text-[11px] font-semibold text-text-secondary transition hover:bg-white/[0.06] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {label}
+                <Trash2 size={13} />
+                {t('interviews.clearArchive')}
               </button>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
           <div className="space-y-2">
-            {filteredVacancies.map(item => (
-              <button type="button"
-                key={item.id}
-                onClick={() => {
-                  const legacyId = legacyIdForVacancy(item);
-                  if (legacyId) setSelectedId(legacyId);
-                }}
-                className={`min-h-24 w-full rounded-md border p-3 text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60 ${item.stages.some(stage => stage.id === selectedId) || item.selectedInterviewId === selectedId ? 'border-cyan-300/35 bg-cyan-300/[0.08]' : 'border-transparent bg-transparent hover:bg-white/[0.045]'}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-[14px] font-semibold">{item.title}</div>
-                    <div className="mt-1 truncate text-[12px] text-text-secondary">
-                      {[item.company, item.roleTitle].filter(Boolean).join(' · ') || item.stageTitle || t('interviews.noVacancyContext')}
+            {filteredVacancies.map(item => {
+              const selected = item.stages.some(stage => stage.id === selectedId) || item.selectedInterviewId === selectedId;
+              const contextLine = [item.company, item.roleTitle].filter(Boolean).join(' · ') || item.stageTitle || t('interviews.noVacancyContext');
+              const stageMeta = item.stageCount > 1
+                ? t('interviews.stagesCount', { count: item.stageCount })
+                : t('interviews.questionsCount', { count: item.questionCount });
+              return (
+                <button type="button"
+                  key={item.id}
+                  onClick={() => {
+                    const legacyId = legacyIdForVacancy(item);
+                    if (legacyId) setSelectedId(legacyId);
+                  }}
+                  className={`${vacancyCardBaseClass} ${selected ? vacancyCardActiveClass : vacancyCardIdleClass}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-[14px] font-semibold leading-5 text-text-primary">{item.title}</div>
+                      <div className="mt-1 truncate text-[12px] leading-4 text-text-secondary">{contextLine}</div>
                     </div>
+                    <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold leading-4 ${applicationStatusTone(item.status)}`}>
+                      {t(applicationStatusLabelKey(item.status))}
+                    </span>
                   </div>
-                  <span className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold ${applicationStatusTone(item.status)}`}>
-                    {t(applicationStatusLabelKey(item.status))}
-                  </span>
-                </div>
-                <div className="mt-3 flex items-center justify-between text-[11px] text-text-tertiary">
-                  <span>{formatSchedule(item.startsAt)}</span>
-                  <span>{item.stageCount > 1 ? t('interviews.stagesCount', { count: item.stageCount }) : t('interviews.questionsCount', { count: item.questionCount })}</span>
-                </div>
-              </button>
-            ))}
+                  <div className="mt-3 flex items-center justify-between gap-3 text-[11px] leading-4">
+                    <span className="min-w-0 truncate text-text-tertiary">{formatSchedule(item.startsAt)}</span>
+                    <span className="shrink-0 rounded bg-white/[0.035] px-1.5 py-0.5 text-text-secondary">{stageMeta}</span>
+                  </div>
+                </button>
+              );
+            })}
             {filteredVacancies.length === 0 && (
               <div className="rounded-md bg-white/[0.025] p-4 text-[13px] text-text-tertiary">
                 {t('interviews.noVacanciesYet')}
@@ -1654,7 +1771,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         onDoubleClick={resetPaneLayout}
       />
 
-      <section className="flex min-h-[680px] flex-col bg-[#0a0b0c] lg:min-h-0">
+      <section className="flex min-h-[680px] flex-col bg-bg-main lg:min-h-0">
         <div className="flex min-h-16 items-center justify-between border-b border-white/[0.07] px-5">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-md bg-cyan-300/10 text-cyan-300">
@@ -1685,7 +1802,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                     await loadInterviews();
                   });
                 }}
-                className="min-h-11 rounded-md border border-white/[0.08] bg-black/20 px-3 text-[12px] outline-none focus:border-cyan-300/45"
+                className="min-h-11 rounded-md border border-white/[0.08] bg-bg-input px-3 text-[12px] outline-none focus:border-cyan-300/45"
               >
                 {APPLICATION_STATUS_OPTIONS.map(status => <option key={status} value={status}>{t(applicationStatusLabelKey(status))}</option>)}
               </select>
@@ -1702,13 +1819,6 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
             </div>
           )}
         </div>
-
-        {error && (
-          <div className="mx-5 mt-4 flex items-center gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-[12px] text-red-200">
-            <AlertCircle size={14} />
-            {error}
-          </div>
-        )}
 
         {detail ? (
           <div className="min-h-0 flex-1">
@@ -1727,7 +1837,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
               {detailTab === 'Vacancy' && (
                 <div className="space-y-4">
-                  <div data-testid="application-fields-card" className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                  <div data-testid="application-fields-card" className="rounded-md bg-bg-card p-4 ring-1 ring-white/[0.04]">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <div className="text-[15px] font-semibold">{t('interviews.detail.applicationFields')}</div>
@@ -1741,11 +1851,29 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                                 : t('interviews.detail.synced')}
                         </div>
                       </div>
-                      <button type="button" onClick={saveApplication} disabled={busy || !applicationDetail || !applicationDraft.title.trim()} className={primaryButtonClass}>
-                        {t('common.save')}
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+	                      <button type="button" onClick={saveApplication} disabled={busy || !applicationDetail || !applicationDraft.title.trim()} className={primaryButtonClass}>
+	                        {t('common.save')}
+	                      </button>
+	                    </div>
+	                    {nearestStage && (
+	                      <button
+	                        type="button"
+	                        onClick={() => setDetailTab('Stages')}
+	                        className="mb-4 flex w-full items-start justify-between gap-3 rounded-md border border-cyan-300/15 bg-cyan-300/[0.06] p-3 text-left transition hover:border-cyan-300/30 hover:bg-cyan-300/[0.09] focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-300/60"
+	                      >
+	                        <div className="min-w-0">
+	                          <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-cyan-200/80">{t('interviews.detail.nearestStage')}</div>
+	                          <div className="mt-1 truncate text-[14px] font-semibold text-text-primary">{nearestStage.title}</div>
+	                          <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-text-secondary">
+	                            <span>{formatSchedule(nearestStage.startsAt)}</span>
+	                            <span className="text-white/[0.16]">/</span>
+	                            <span>{t(`interviews.stageStatus.${nearestStage.status}`)}</span>
+	                          </div>
+	                        </div>
+	                        <ChevronRight size={16} className="mt-1 flex-none text-cyan-100/70" />
+	                      </button>
+	                    )}
+	                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                       <Field label={t('interviews.detail.title')}>
                         <input className={inputClass} value={applicationDraft.title} onChange={event => updateApplicationDraft('title', event.target.value)} />
                       </Field>
@@ -1790,20 +1918,14 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       <Field label={t('interviews.detail.locationFormat')}>
                         <input className={inputClass} value={applicationDraft.locationFormat} onChange={event => updateApplicationDraft('locationFormat', event.target.value)} />
                       </Field>
-                      <Field label={t('interviews.detail.nextAction')}>
-                        <input className={inputClass} value={applicationDraft.nextAction} onChange={event => updateApplicationDraft('nextAction', event.target.value)} />
-                      </Field>
-                      <Field label={t('interviews.detail.nextActionDueAt')}>
-                        <input className={inputClass} type="datetime-local" value={applicationDraft.nextActionDueAt} onChange={event => updateApplicationDraft('nextActionDueAt', event.target.value)} />
-                      </Field>
-                      <div className="md:col-span-2">
+	                      <div className="md:col-span-2">
                         <Field label={t('interviews.detail.sourceText')}>
                           <textarea className={`${inputClass} min-h-[120px] resize-y`} value={applicationDraft.rawSourceText} onChange={event => updateApplicationDraft('rawSourceText', event.target.value)} />
                         </Field>
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                  <div className="rounded-md bg-bg-card p-4 ring-1 ring-white/[0.04]">
                     <div className={labelClass}>{t('interviews.detail.summary')}</div>
                     <div className="mt-2 text-[13px] leading-6 text-text-primary">
                       {dossierDraft.description.trim() || t('interviews.detail.noSummary')}
@@ -1826,7 +1948,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       )}
                     </div>
                   </div>
-                  <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                  <div className="rounded-md bg-bg-card p-4 ring-1 ring-white/[0.04]">
                     <div className="flex items-center justify-between gap-3">
                       <div className={labelClass}>{t('interviews.detail.rawVacancyContext')}</div>
                       {detail.rawSourceText && detail.rawSourceText.length > 360 && (
@@ -1898,7 +2020,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                               <div className="h-px flex-1 bg-white/[0.08]" />
                             </div>
                           )}
-                          <div data-testid="interview-stage-card" className={`rounded-md bg-[#101214] p-3 ring-1 ring-white/[0.04] ${isArchived ? 'opacity-70' : ''}`}>
+                          <div data-testid="interview-stage-card" className={`rounded-md bg-bg-card p-3 ring-1 ring-white/[0.04] ${isArchived ? 'opacity-70' : ''}`}>
                             <div className="flex flex-wrap items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <div className="text-[14px] font-semibold text-text-primary">{stage.title}</div>
@@ -1907,7 +2029,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                                   <span className="text-white/[0.16]">/</span>
                                   <span>{t(`interviews.stageStatus.${stage.status}`)}</span>
                                   <span className="text-white/[0.16]">/</span>
-                                  <span>{stage.calendarSyncStatus}</span>
+                                  <span>{formatCalendarSyncStatus(stage.calendarSyncStatus, stage.calendarProvider)}</span>
                                 </div>
                               </div>
                               <div className="flex flex-wrap gap-2">
@@ -1916,11 +2038,17 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                                     {isMeetingActive ? t('common.openLive') : t('interviews.detail.startRecording')}
                                   </button>
                                 )}
-                                <button type="button" onClick={() => createStageCalendarEvent(stage, 'google')} disabled={busy || isArchived || !stage.startsAt || !stage.endsAt} className={secondaryButtonClass}>
-                                  {t('interviews.detail.createInGoogleCalendar')}
-                                </button>
-                                <button type="button" onClick={() => createStageCalendarEvent(stage, 'macos')} disabled={busy || isArchived || !stage.startsAt || !stage.endsAt} className={secondaryButtonClass}>
-                                  {t('interviews.detail.createInMacCalendar')}
+                                <button
+                                  type="button"
+                                  onClick={() => preferredWritableCalendarProvider && createStageCalendarEvent(stage, preferredWritableCalendarProvider)}
+                                  disabled={busy || isArchived || !stage.startsAt || !stage.endsAt || !preferredWritableCalendarProvider}
+                                  className={compactSecondaryButtonClass}
+                                  title={preferredWritableCalendarProvider
+                                    ? t('interviews.detail.syncCalendarWithProvider', { provider: preferredWritableCalendarProvider === 'macos' ? t('interviews.mac') : t('interviews.google') })
+                                    : t('interviews.detail.calendarProviderUnavailable')}
+                                >
+                                  <CalendarDays size={13} />
+                                  {t('interviews.detail.syncCalendar')}
                                 </button>
                                 {!isArchived ? (
                                   <button type="button" onClick={() => archiveStage(stage)} disabled={busy} className={iconButtonClass} title={t('interviews.detail.archiveStage')}>
@@ -1953,10 +2081,20 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                                 </select>
                               </Field>
                               <Field label={t('interviews.detail.starts')}>
-                                <input className={inputClass} type="datetime-local" value={stageDraft.startsAt} onChange={event => updateStageDraft(stage.id, 'startsAt', event.target.value)} />
+                                <DateTimePickerField
+                                  value={stageDraft.startsAt}
+                                  placeholder={t('interviews.unscheduled')}
+                                  invalid={isStageDateRangeInvalid({ startsAt: stageDraft.startsAt, endsAt: stageDraft.endsAt })}
+                                  onChange={value => updateStageDraftDate(stage, 'startsAt', value)}
+                                />
                               </Field>
                               <Field label={t('interviews.detail.ends')}>
-                                <input className={inputClass} type="datetime-local" value={stageDraft.endsAt} onChange={event => updateStageDraft(stage.id, 'endsAt', event.target.value)} />
+                                <DateTimePickerField
+                                  value={stageDraft.endsAt}
+                                  placeholder={t('interviews.unscheduled')}
+                                  invalid={isStageDateRangeInvalid({ startsAt: stageDraft.startsAt, endsAt: stageDraft.endsAt })}
+                                  onChange={value => updateStageDraftDate(stage, 'endsAt', value)}
+                                />
                               </Field>
                               <Field label={t('interviews.detail.timezone')}>
                                 <input className={inputClass} value={stageDraft.timezone} onChange={event => updateStageDraft(stage.id, 'timezone', event.target.value)} />
@@ -1991,7 +2129,11 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                             </div>
                             <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
                               <InfoTile icon={<FileText size={15} />} label={t('interviews.detail.stageRecordings')} value={`${stageMeetings.length}`} valueTestId="stage-recording-count" />
-                              <InfoTile icon={<CalendarDays size={15} />} label={t('interviews.detail.calendarSync')} value={stage.calendarSyncStatus} />
+                              <InfoTile
+                                icon={<CalendarDays size={15} />}
+                                label={t('interviews.detail.calendarSync')}
+                                value={formatCalendarSyncStatus(stage.calendarSyncStatus, stage.calendarProvider)}
+                              />
                               <InfoTile icon={<CircleDot size={15} />} label={t('interviews.detail.stageStatus')} value={t(`interviews.stageStatus.${stage.status}`)} />
                             </div>
                             {!isArchived && (
@@ -2022,7 +2164,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                                     duration: meeting.duration,
                                     summary: '',
                                   })}
-                                  className="flex min-h-9 w-full items-center justify-between rounded bg-black/20 px-2 py-1.5 text-left text-[12px] text-text-secondary transition hover:bg-white/[0.05]"
+                                  className="flex min-h-9 w-full items-center justify-between rounded bg-bg-input px-2 py-1.5 text-left text-[12px] text-text-secondary transition hover:bg-white/[0.05]"
                                 >
                                   <span className="truncate">{meeting.title}</span>
                                   <ChevronRight size={13} className="shrink-0 text-text-tertiary" />
@@ -2076,7 +2218,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                       </div>
                     </div>
                   )}
-                  <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                  <div className="rounded-md bg-bg-card p-4 ring-1 ring-white/[0.04]">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className={labelClass}>{t('interviews.detail.aiEvaluation')}</div>
@@ -2113,7 +2255,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                               <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-500">{label}</div>
                               <div className="space-y-1.5">
                                 {items.map((item, index) => (
-                                  <div key={`${label}-${index}`} className="rounded border border-white/[0.06] bg-black/20 px-3 py-2">{item}</div>
+                                  <div key={`${label}-${index}`} className="rounded border border-white/[0.06] bg-bg-input px-3 py-2">{item}</div>
                                 ))}
                               </div>
                             </div>
@@ -2153,7 +2295,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
               {detailTab === 'Questions' && (
                 <div className="space-y-4">
-                  <div className="rounded-md bg-[#101214] p-4 ring-1 ring-white/[0.04]">
+                  <div className="rounded-md bg-bg-card p-4 ring-1 ring-white/[0.04]">
                     <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_150px_auto]">
                       <input value={questionText} onChange={event => setQuestionText(event.target.value)} className={inputClass} placeholder={t('interviews.detail.question')} />
                       <input value={questionCategory} onChange={event => setQuestionCategory(event.target.value)} className={inputClass} placeholder={t('interviews.detail.category')} />
@@ -2262,8 +2404,22 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                   {PRIORITY_OPTIONS.map(priority => <option key={priority} value={priority}>{priority}</option>)}
                 </select>
               </Field>
-              <Field label={t('interviews.detail.starts')}><input className={inputClass} type="datetime-local" value={toLocalInputValue(createForm.startsAt)} onChange={event => setCreateForm(prev => ({ ...prev, startsAt: fromLocalInputValue(event.target.value) }))} /></Field>
-              <Field label={t('interviews.detail.ends')}><input className={inputClass} type="datetime-local" value={toLocalInputValue(createForm.endsAt)} onChange={event => setCreateForm(prev => ({ ...prev, endsAt: fromLocalInputValue(event.target.value) }))} /></Field>
+              <Field label={t('interviews.detail.starts')}>
+                <DateTimePickerField
+                  value={createForm.startsAt}
+                  placeholder={t('interviews.unscheduled')}
+                  invalid={isStageDateRangeInvalid({ startsAt: createForm.startsAt ?? null, endsAt: createForm.endsAt ?? null })}
+                  onChange={value => updateCreateFormDate('startsAt', value)}
+                />
+              </Field>
+              <Field label={t('interviews.detail.ends')}>
+                <DateTimePickerField
+                  value={createForm.endsAt}
+                  placeholder={t('interviews.unscheduled')}
+                  invalid={isStageDateRangeInvalid({ startsAt: createForm.startsAt ?? null, endsAt: createForm.endsAt ?? null })}
+                  onChange={value => updateCreateFormDate('endsAt', value)}
+                />
+              </Field>
               <Field label={t('interviews.detail.vacancyUrl')}><input className={inputClass} value={createForm.vacancyUrl ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, vacancyUrl: event.target.value }))} /></Field>
               <Field label={t('interviews.detail.meetingUrl')}><input className={inputClass} value={createForm.meetingUrl ?? ''} onChange={event => setCreateForm(prev => ({ ...prev, meetingUrl: event.target.value }))} /></Field>
               <Field label={t('interviews.detail.calendarSync')}>
@@ -2286,6 +2442,29 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {error && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="fixed bottom-5 right-5 z-[140] flex w-[min(420px,calc(100vw-32px))] items-start gap-3 rounded-md border border-rose-400/25 bg-[#180d10] p-4 text-left shadow-2xl shadow-black/45"
+        >
+          <AlertCircle size={18} className="mt-0.5 flex-none text-rose-300" />
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-semibold text-rose-100">{t(error.i18nKey)}</div>
+            <div className="mt-1 font-mono text-[11px] text-rose-200/70">code: {error.code}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            className="inline-flex h-8 w-8 flex-none items-center justify-center rounded-md text-rose-200/70 transition hover:bg-white/[0.06] hover:text-white"
+            title={t('common.dismiss')}
+            aria-label={t('common.dismiss')}
+          >
+            <X size={15} />
+          </button>
         </div>
       )}
     </div>
@@ -2312,7 +2491,7 @@ const PaneResizeHandle: React.FC<{
     data-testid="interview-pane-resize-handle"
     onPointerDown={onPointerDown}
     onDoubleClick={onDoubleClick}
-    className="group hidden cursor-col-resize items-stretch justify-center bg-[#0a0b0c] outline-none transition hover:bg-cyan-300/[0.08] focus-visible:bg-cyan-300/[0.08] lg:flex"
+    className="group hidden cursor-col-resize items-stretch justify-center bg-bg-primary outline-none transition hover:bg-cyan-300/[0.08] focus-visible:bg-cyan-300/[0.08] lg:flex"
     tabIndex={0}
   >
     <div className="my-3 w-px rounded-full bg-white/[0.08] transition group-hover:bg-cyan-300/40" />

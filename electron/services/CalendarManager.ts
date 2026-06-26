@@ -51,6 +51,10 @@ export interface CalendarCreateEventInput {
     calendarId?: string;
 }
 
+export interface CalendarReadOptions {
+    throwOnError?: boolean;
+}
+
 export class CalendarManager extends EventEmitter {
     private static instance: CalendarManager;
     private accessToken: string | null = null;
@@ -79,6 +83,10 @@ export class CalendarManager extends EventEmitter {
         return !!CALENDAR_PROXY_URL;
     }
 
+    public isClientConfigured(): boolean {
+        return GOOGLE_CLIENT_ID !== "YOUR_CLIENT_ID_HERE";
+    }
+
     public getConnectionStatus(): { connected: boolean; email?: string, lastSync?: number, disabled?: boolean, reason?: string } {
         // We don't store email in tokens usually, but we could fetch it.
         // For now, simpler boolean.
@@ -87,6 +95,13 @@ export class CalendarManager extends EventEmitter {
                 connected: false,
                 disabled: true,
                 reason: 'Calendar is disabled until OPENOFFER_CALENDAR_PROXY_URL or CALENDAR_PROXY_URL is set.',
+            };
+        }
+        if (!this.isClientConfigured()) {
+            return {
+                connected: false,
+                disabled: true,
+                reason: 'Google Calendar client ID is not configured.',
             };
         }
         return { connected: this.isConnected };
@@ -411,15 +426,18 @@ export class CalendarManager extends EventEmitter {
     // Fetch Logic
     // =========================================================================
 
-    public async getUpcomingEvents(force: boolean = false): Promise<CalendarEvent[]> {
-        if (!this.isConnected || !this.accessToken) return [];
+    public async getUpcomingEvents(force: boolean = false, options: CalendarReadOptions = {}): Promise<CalendarEvent[]> {
+        if (!this.isConnected || !this.accessToken) {
+            if (options.throwOnError) throw new Error('Google Calendar is not connected.');
+            return [];
+        }
 
         // Check expiry
         if (this.expiryDate && Date.now() >= this.expiryDate - 60000) {
             await this.refreshAccessToken();
         }
 
-        const events = await this.fetchEventsInternal();
+        const events = await this.fetchEventsInternal(options);
         this.scheduleReminders(events);
         return events;
     }
@@ -469,8 +487,11 @@ export class CalendarManager extends EventEmitter {
         };
     }
 
-    private async fetchEventsInternal(): Promise<CalendarEvent[]> {
-        if (!this.accessToken) return [];
+    private async fetchEventsInternal(options: CalendarReadOptions = {}): Promise<CalendarEvent[]> {
+        if (!this.accessToken) {
+            if (options.throwOnError) throw new Error('Google Calendar access token is missing.');
+            return [];
+        }
 
         const now = new Date();
         const horizon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -492,6 +513,9 @@ export class CalendarManager extends EventEmitter {
             );
             if (!response.ok) {
                 console.error(`[CalendarManager] Google Calendar fetch failed: HTTP ${response.status}`);
+                if (options.throwOnError) {
+                    throw new Error(`Google Calendar fetch failed: HTTP ${response.status}`);
+                }
                 return [];
             }
             const data = await response.json() as any;
@@ -534,6 +558,7 @@ export class CalendarManager extends EventEmitter {
 
         } catch (error) {
             console.error('[CalendarManager] Failed to fetch events:', error);
+            if (options.throwOnError) throw error;
             return [];
         }
     }

@@ -5303,26 +5303,18 @@ export function initializeIpcHandlers(appState: AppState): void {
   });
 
   safeHandle('get-calendar-status', async () => {
-    const { CalendarManager } = require('./services/CalendarManager');
-    return CalendarManager.getInstance().getConnectionStatus();
+    const { CalendarProviderCoordinator } = require('./services/CalendarProviderCoordinator');
+    return CalendarProviderCoordinator.getInstance().getStatus();
   });
 
   safeHandle('get-upcoming-events', async () => {
-    const { CalendarManager } = require('./services/CalendarManager');
-    const { MacCalendarManager } = require('./services/MacCalendarManager');
-    const [googleEvents, macEvents] = await Promise.all([
-      CalendarManager.getInstance().getUpcomingEvents(),
-      MacCalendarManager.getInstance().getUpcomingEvents(),
-    ]);
-    return [...googleEvents, ...macEvents].sort((a: any, b: any) =>
-      new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
-    );
+    const { CalendarProviderCoordinator } = require('./services/CalendarProviderCoordinator');
+    return CalendarProviderCoordinator.getInstance().getUpcomingEvents();
   });
 
   safeHandle('calendar-refresh', async () => {
-    const { CalendarManager } = require('./services/CalendarManager');
-    await CalendarManager.getInstance().refreshState();
-    return { success: true };
+    const { CalendarProviderCoordinator } = require('./services/CalendarProviderCoordinator');
+    return CalendarProviderCoordinator.getInstance().refresh();
   });
 
   // ==========================================
@@ -6151,6 +6143,10 @@ export function initializeIpcHandlers(appState: AppState): void {
     safeInterviewHandle(() => getInterviewService().updateApplication(id, patch))
   ));
 
+  safeHandle('applications:clear-archived', async () => (
+    safeInterviewHandle(() => getInterviewService().clearArchivedApplications())
+  ));
+
   safeHandle('interview-stages:create', async (_, payload: unknown) => (
     safeInterviewHandle(() => getInterviewService().createStage(payload))
   ));
@@ -6198,23 +6194,15 @@ export function initializeIpcHandlers(appState: AppState): void {
       ].filter(Boolean).join('\n');
       let event: any;
       try {
-        event = provider === 'google'
-          ? await require('./services/CalendarManager').CalendarManager.getInstance().createEvent({
-            title: stage.title || application.title,
-            startTime: new Date(stage.startsAt).toISOString(),
-            endTime: new Date(stage.endsAt).toISOString(),
-            description,
-            link: stage.meetingUrl ?? undefined,
-            calendarId: 'primary',
-          })
-          : await require('./services/MacCalendarManager').MacCalendarManager.getInstance().createEvent({
-            title: stage.title || application.title,
-            startTime: new Date(stage.startsAt).toISOString(),
-            endTime: new Date(stage.endsAt).toISOString(),
-            description,
-            link: stage.meetingUrl ?? undefined,
-            calendarId: 'macos',
-          });
+        const { CalendarProviderCoordinator } = require('./services/CalendarProviderCoordinator');
+        event = await CalendarProviderCoordinator.getInstance().createEvent(provider, {
+          title: stage.title || application.title,
+          startTime: new Date(stage.startsAt).toISOString(),
+          endTime: new Date(stage.endsAt).toISOString(),
+          description,
+          link: stage.meetingUrl ?? undefined,
+          calendarId: provider === 'google' ? 'primary' : 'macos',
+        });
       } catch (error: any) {
         throw new InterviewDomainError(
           'calendar_refresh_failed',
@@ -6282,23 +6270,15 @@ export function initializeIpcHandlers(appState: AppState): void {
       ].filter(Boolean).join('\n');
       let event: any;
       try {
-        event = provider === 'google'
-          ? await require('./services/CalendarManager').CalendarManager.getInstance().createEvent({
-            title: detail.title,
-            startTime: new Date(detail.startsAt).toISOString(),
-            endTime: new Date(detail.endsAt).toISOString(),
-            description,
-            link: detail.meetingUrl ?? undefined,
-            calendarId: 'primary',
-          })
-          : await require('./services/MacCalendarManager').MacCalendarManager.getInstance().createEvent({
-            title: detail.title,
-            startTime: new Date(detail.startsAt).toISOString(),
-            endTime: new Date(detail.endsAt).toISOString(),
-            description,
-            link: detail.meetingUrl ?? undefined,
-            calendarId: 'macos',
-          });
+        const { CalendarProviderCoordinator } = require('./services/CalendarProviderCoordinator');
+        event = await CalendarProviderCoordinator.getInstance().createEvent(provider, {
+          title: detail.title,
+          startTime: new Date(detail.startsAt).toISOString(),
+          endTime: new Date(detail.endsAt).toISOString(),
+          description,
+          link: detail.meetingUrl ?? undefined,
+          calendarId: provider === 'google' ? 'primary' : 'macos',
+        });
       } catch (error: any) {
         throw new InterviewDomainError(
           'calendar_refresh_failed',
