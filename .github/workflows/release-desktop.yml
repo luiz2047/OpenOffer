@@ -374,19 +374,19 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Download macOS artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: openoffer-macos-${{ needs.build-macos.outputs.artifact_label }}
           path: release-artifacts
 
       - name: Download Windows artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: openoffer-windows-x64-unsigned
           path: release-artifacts
 
       - name: Download release body
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: openoffer-release-body
           path: release-body
