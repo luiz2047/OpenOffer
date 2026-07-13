@@ -4,55 +4,100 @@
 
 # OpenOffer
 
-Local-first, open-source workspace for recruiter chats, job-search processes, interviews, and meeting notes.
+**Your recruiter chat, interview recording, live hints, transcript, and retro in one local workspace.**
 
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=flat-square)](LICENSE)
-[![Community Quality](https://github.com/luiz2047/OpenOffer/actions/workflows/community-quality.yml/badge.svg)](https://github.com/luiz2047/OpenOffer/actions/workflows/community-quality.yml)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-blueviolet?style=flat-square)](#system-requirements)
 [![Version](https://img.shields.io/badge/Version-1.5.1-success?style=flat-square)](#project-status)
 
-<img src="assets/demo/openoffer-01-command-center.png" alt="OpenOffer dashboard showing vacancies, interview stages, prep, and linked workflow context" width="960" />
+<a href="assets/demo/openoffer-real-interview-loop.mp4">
+  <img src="assets/demo/openoffer-real-interview-loop-poster.png" alt="OpenOffer real interview loop: live answer hint, transcript, coaching, and retro attached to one ExampleAI process" width="960" />
+</a>
+
+[Watch the 18-second interview loop](assets/demo/openoffer-real-interview-loop.mp4) · [Try the recruiter-chat demo](docs/demo/recruiter-chat-to-process.md) · [Install the preview release](https://github.com/luiz2047/OpenOffer/releases)
 
 </div>
 
-OpenOffer helps you turn messy career context into a local process you control. Paste a recruiter chat, vacancy text, calendar note, or interview transcript, and keep the resulting vacancy dossier, stage timeline, prep brief, questions, retro, and recordings together on your machine.
+OpenOffer turns messy recruiter messages and interview calls into an inspectable job-search process. Paste a recruiter message, approve the extracted vacancy and stages, start the interview from the right stage, get concise live assistance where it is permitted, and turn the recording into a transcript, overview, coaching, and next actions.
 
-The project is built for sensitive workflows: technical interviews, job-search preparation, recruiter conversations, professional calls, lectures, and follow-up notes. Local providers are the preferred privacy path; bring-your-own-key cloud providers are optional.
+There is no required OpenOffer account or hosted workspace. Workflow state stays on your machine; local providers are the preferred privacy path, and bring-your-own-key cloud providers are optional.
 
-## First Demo
+## The Workflow
 
-OpenOffer's current wedge is simple:
+1. **Before the interview:** turn an HH, Getmatch, Telegram, email, or vacancy message into an editable local process.
+2. **During the interview:** start the recording from its stage and keep concise live context close to the call.
+3. **After the interview:** review the transcript, overview, coaching, retro, and follow-up actions without losing which vacancy and stage they belong to.
+
+## 1. From Recruiter Chat to Process
+
+OpenOffer proposes changes instead of silently mutating your job-search data:
 
 1. Paste a redacted recruiter message or vacancy text.
-2. Let OpenOffer propose the vacancy, stage, schedule, meeting link, prep context, and follow-up tasks.
-3. Keep transcripts, notes, questions, retros, and recordings attached to the right process locally.
+2. Review the proposed vacancy, stage, schedule, meeting link, compensation, and prep context.
+3. Edit anything that was parsed incorrectly, then save the process locally.
 
 ![OpenOffer creating an editable ExampleAI vacancy process from a fictional recruiter chat](assets/demo/recruiter-chat-to-process.png)
 
-See the full walkthrough in [Recruiter Chat to Process](docs/demo/recruiter-chat-to-process.md).
-Demo media and capture rules live under [`assets/demo/`](assets/demo/README.md).
+See the exact fictional input and expected output in [Recruiter Chat to Process](docs/demo/recruiter-chat-to-process.md).
+
+## 2. During and After a Real Interview
+
+The recording is linked to the interview stage instead of being dropped into an unrelated meeting list. Live hints stay short enough to scan while speaking. After the call, the transcript becomes stage memory: an overview, interview signals, coaching, structured retro, and follow-up work.
+
+![OpenOffer real interview loop from stage recording through live hint, transcript, overview, and retro](assets/demo/openoffer-real-interview-loop.gif)
+
+<table>
+  <tr>
+    <td width="50%">
+      <a href="assets/demo/openoffer-15-stage-recording.png"><img src="assets/demo/openoffer-15-stage-recording.png" alt="ExampleAI technical stage with Start recording and a linked interview recording" /></a>
+      <br /><strong>Recording stays with the stage.</strong><br />Start or reopen the right recording from the vacancy timeline.
+    </td>
+    <td width="50%">
+      <a href="assets/demo/openoffer-16-live-answer.png"><img src="assets/demo/openoffer-16-live-answer.png" alt="OpenOffer live assistant proposing a concise answer to an OCR quality question" /></a>
+      <br /><strong>A concise answer hint appears during the call.</strong><br />Use live assistance only where interview rules permit it.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <a href="assets/demo/openoffer-17-transcript.png"><img src="assets/demo/openoffer-17-transcript.png" alt="Readable ExampleAI interview transcript with interviewer and candidate turns" /></a>
+      <br /><strong>The recording becomes a readable transcript.</strong><br />Speaker turns stay readable and attached to the meeting.
+    </td>
+    <td width="50%">
+      <a href="assets/demo/openoffer-18-stage-overview.png"><img src="assets/demo/openoffer-18-stage-overview.png" alt="ExampleAI stage overview with next steps, interview signals, and coaching" /></a>
+      <br /><strong>The transcript becomes an overview.</strong><br />Keep signals, risks, coaching, and next steps in one reviewable place.
+    </td>
+  </tr>
+</table>
+
+<a href="assets/demo/openoffer-19-retro.png"><img src="assets/demo/openoffer-19-retro.png" alt="Post-call retro with coaching, strong moments, weak moments, new facts, and follow-up actions" /></a>
+
+**The retro survives the call.** Strong moments, weak moments, new facts, and follow-up actions remain available before the next round.
+
+The complete synthetic scenario and recapture instructions are in [Real Interview Loop](docs/demo/real-interview-loop.md). Demo media rules live under [`assets/demo/`](assets/demo/README.md).
 
 ## What Works Today
 
-- Interview Command Center for active vacancies, interview stages, prep briefs, questions, retros, and linked recordings.
-- Top search AI assistant for vacancy/stage lookup, meeting search, and reviewed recruiter/vacancy intake proposals.
-- Recruiter/vacancy text parsing into either a new vacancy or a stage on an existing process.
-- Live microphone and system-audio capture for interviews and meetings.
-- Speech-to-text provider routing, including local and BYOK cloud options.
-- LLM provider routing for text, vision/screenshot, and meeting assistance.
-- Local SQLite-backed session history and retrieval.
+- Reviewed recruiter and vacancy intake into either a new process or a stage on an existing vacancy.
+- Interview Command Center for vacancies, stage timelines, schedules, meeting links, and linked recordings.
+- Stage-level microphone and system-audio recording for interviews and professional calls.
+- Live transcription and concise meeting assistance through local or BYOK providers.
+- Readable transcripts, post-call summaries, interview signals, coaching, and follow-up actions.
+- Local SQLite-backed meeting history, job-search state, and retrieval.
+- Provider routing for speech-to-text, text, vision/screenshot, and meeting assistance.
 - English and Russian interface locales plus custom translation packs.
 - Electron desktop preview releases for macOS and Windows, with Linux packaging configured for native-platform builds.
 
 ## Who It Is For
 
-OpenOffer is especially useful for developers who are actively interviewing and want an inspectable assistant instead of a hosted black box.
+OpenOffer is especially useful for developers who are actively interviewing and want a workflow they can inspect, edit, and keep on their own machine instead of a hosted black box.
 
 It is intentionally friendly to Russian-speaking job-search workflows: Telegram/HH/Getmatch-style recruiter text, mixed Russian/English interviews, local STT experiments, and BYOK provider setups are first-class contribution areas.
 
 ## Privacy Model
 
-OpenOffer starts local-first:
+Recruiter chats, compensation, resume facts, meeting links, interview transcripts, and retro notes are sensitive career data. OpenOffer keeps the workflow state, recordings, notes, settings, and local retrieval data on your machine by default.
+
+Local data includes:
 
 - Audio captures
 - Screen captures
@@ -63,7 +108,7 @@ OpenOffer starts local-first:
 - Local SQLite data
 - Local embeddings and retrieval state
 
-Data leaves your device only when you configure a provider that needs it.
+Data leaves your device only when you configure a provider that needs it. For example, a cloud speech provider receives audio needed for transcription, while a local Whisper setup keeps that path local.
 
 Examples:
 
@@ -216,7 +261,7 @@ OpenOffer is a source-first public beta:
 
 The near-term roadmap is community-launch focused:
 
-- Make the recruiter-chat-to-process demo impossible to miss.
+- Keep the recruiter-chat and real-interview demos aligned with the current public UI.
 - Improve first-run local provider setup.
 - Harden Russian local STT diagnostics.
 - Expand focused E2E and contract tests around Interview Command Center.
@@ -231,7 +276,9 @@ The best first contributions are small and concrete:
 
 - Try the recruiter-chat demo and report where the process feels unclear.
 - Add redacted workflow examples for HH, Getmatch, Telegram, or calendar text.
+- Test the real-interview loop on macOS or Windows and improve transcript, overview, or retro capture.
 - Improve Russian copy, i18n coverage, or local STT setup docs.
+- Document recording consent and responsible live-assistance use in another jurisdiction or interview format.
 - Tighten provider setup diagnostics.
 - Add focused smoke tests for existing workflows.
 - Improve release QA and screenshots.
@@ -242,7 +289,7 @@ Start with [CONTRIBUTING.md](CONTRIBUTING.md). Maintainer expectations are in [M
 
 OpenOffer is intended for learning, interview preparation, accessibility, note-taking, professional meeting support, and local experimentation with AI-assisted career workflows.
 
-Users are responsible for following workplace policies, academic rules, interview guidelines, recording-consent rules, and local laws. OpenOffer is not positioned as a bypass tool for proctoring, recording, or policy enforcement systems.
+Use live assistance only where it is permitted. Users are responsible for following workplace policies, academic rules, interview guidelines, recording-consent rules, and local laws. OpenOffer is not positioned as a bypass tool for proctoring, recording, or policy enforcement systems.
 
 ## Attribution
 
@@ -270,7 +317,7 @@ That is the preferred privacy path. Use a local speech provider and a local mode
 
 ### Can I use it for technical interviews?
 
-OpenOffer includes technical-interview and screen-context workflows. You are responsible for following the rules of the interview, assessment platform, employer, school, or event.
+OpenOffer includes technical-interview, recording, transcription, and screen-context workflows. Use assistance and recording only when the interview, assessment platform, employer, school, or event permits them.
 
 ### Where should I ask questions?
 

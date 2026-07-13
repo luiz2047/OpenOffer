@@ -7,6 +7,7 @@ OpenOffer is a local-first, free, open-source assistant for job-search processes
 - Product overview: [README](../README.md)
 - Community launch plan: [Community Launch](community-launch.md)
 - Demo walkthrough: [Recruiter Chat to Process](demo/recruiter-chat-to-process.md)
+- Real interview walkthrough: [Recording, Transcript, Overview, and Retro](demo/real-interview-loop.md)
 - Release process: [Release Guide](RELEASE.md)
 - Local STT setup: [Local STT OpenOffer Setup](LOCAL_STT_OPENOFFER_SETUP.md)
 - Interview workspace architecture: [Interview Command Center](engineering/interview-command-center.md)
