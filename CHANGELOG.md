@@ -4,6 +4,22 @@
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-07-13
+
+### Added
+
+- **Real interview story**: The README now shows the full career workflow from a recruiter chat through a stage recording, permitted live hint, transcript, overview, coaching, and retro in one fictional ExampleAI process.
+- **Public interview media pack**: Added a compact walkthrough GIF and MP4, a static poster fallback, and five readable proof states for recording, live answer, transcript, overview, and retro.
+- **Canonical demo walkthrough**: Documented the synthetic scenario, privacy rules, recapture checklist, and asset map for keeping future public media consistent.
+
+### Changed
+
+- **Public product framing**: Reordered the README around the observable before, during, and after interview loop, with local-first privacy and responsible-use context where it matters.
+
+### Tests
+
+- Added an opt-in Playwright capture scenario that regenerates the canonical real-interview frames from deterministic ExampleAI data.
+
 ## [1.5.1] - 2026-06-26
 
 ### Added

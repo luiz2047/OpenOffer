@@ -4,6 +4,8 @@ This demo is the first public OpenOffer story: turn a messy recruiter chat into 
 
 Use fictional or redacted data when recording screenshots or filing issues.
 
+The story continues in [Real Interview Loop](real-interview-loop.md), where the same ExampleAI process is recorded, transcribed, summarized, and reviewed after the call.
+
 ## Sample Input
 
 ```text
@@ -43,6 +45,8 @@ OpenOffer should propose:
 4. Review the editable proposal and explicitly choose whether OpenOffer should create a new vacancy or attach a stage to an existing vacancy.
 5. Review the generated prep brief and question bank.
 6. After a test call or mock transcript, link the recording/transcript to the stage and write a retro.
+
+Continue with the canonical [real interview walkthrough](real-interview-loop.md) for the recording, live hint, transcript, overview, and retro media.
 
 ## Demo Media Capture
 
