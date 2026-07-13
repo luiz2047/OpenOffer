@@ -2,6 +2,7 @@ import { test, expect, Page } from '@playwright/test';
 
 const CI = process.env.CI === 'true';
 const ALLOW_CI_SMOKE = process.env.OPENOFFER_E2E_CI_SMOKE === '1';
+const CAPTURE_DEMO = process.env.OPENOFFER_CAPTURE_DEMO === '1';
 const APP_PORT = parseInt(process.env.ELECTRON_APP_PORT ?? '5173', 10);
 
 async function gotoApp(page: Page) {
@@ -221,6 +222,7 @@ test.describe('Interview Command Center', () => {
         getThemeMode: async () => ({ mode: 'dark', resolved: 'dark' }),
         getKeybinds: async () => [],
         getRecentMeetings: async () => meetings,
+        getMeetingDetails: async (id: string) => meetings.find(meeting => meeting.id === id) ?? null,
         getUpcomingEvents: async () => [],
         getMeetingActive: async () => false,
         getUndetectable: async () => false,
@@ -959,5 +961,226 @@ test.describe('Interview Command Center', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByText('Ambiguous recruiter sync')).toHaveCount(0);
     expect(duplicateKeyWarnings, `Duplicate key warnings: ${duplicateKeyWarnings.join(' | ')}`).toHaveLength(0);
+  });
+
+  test('captures canonical real interview media', async ({ page }) => {
+    test.skip(!CAPTURE_DEMO, 'Set OPENOFFER_CAPTURE_DEMO=1 to write public demo assets.');
+    test.setTimeout(60_000);
+
+    await page.setViewportSize({ width: 1440, height: 980 });
+    await gotoApp(page);
+    await page.evaluate(() => {
+      const state = (window as any).__openOfferTestState;
+      const applicationId = 'app_exampleai';
+      const interviewId = 'interview_exampleai';
+      const stageId = 'stage_exampleai_technical';
+      const meetingId = 'meeting_exampleai_technical';
+      const title = 'ExampleAI - Senior / Lead ML Engineer';
+
+      state.applications.splice(0, state.applications.length, {
+        id: applicationId,
+        title,
+        company: 'ExampleAI',
+        roleTitle: 'Senior / Lead ML Engineer',
+        status: 'interviewing',
+        priority: 'high',
+        source: 'Recruiter chat',
+        vacancyUrl: null,
+        rawSourceText: 'Fictional recruiter chat for the public OpenOffer demo. Meeting link: [redacted].',
+        legacyInterviewEventId: interviewId,
+        createdAt: '2026-07-10T09:00:00.000Z',
+        updatedAt: '2026-07-13T10:00:00.000Z',
+        dossier: {
+          id: 'dossier_exampleai',
+          interviewEventId: interviewId,
+          description: 'ExampleAI is hiring a Senior / Lead ML Engineer to own production OCR quality, evaluation, and rollout decisions.',
+          requirements: ['Production ML', 'Computer Vision and OCR', 'Evaluation and observability', 'Technical leadership'],
+          compensationText: '7-9k EUR gross',
+          fitHypothesis: 'Strong fit for production CV, backend/platform work, and technical leadership.',
+          risks: ['Quantify SLO and review-cost ownership'],
+          questionsToAsk: ['How is OCR quality measured today?', 'Who owns manual-review capacity?'],
+        },
+      });
+
+      state.interviews.splice(0, state.interviews.length, {
+        id: interviewId,
+        title,
+        company: 'ExampleAI',
+        roleTitle: 'Senior / Lead ML Engineer',
+        stage: 'Technical interview',
+        stageType: 'technical_screen',
+        stageStatus: 'waiting_feedback',
+        status: 'interviewing',
+        priority: 'high',
+        source: 'Recruiter chat',
+        vacancyUrl: null,
+        meetingUrl: 'https://meet.example/[redacted]',
+        calendarProvider: 'macos',
+        calendarSyncStatus: 'linked',
+        calendarEventId: 'macos_exampleai_technical',
+        startsAt: Date.parse('2026-07-15T13:00:00+03:00'),
+        endsAt: Date.parse('2026-07-15T14:00:00+03:00'),
+        timezone: 'Europe/Moscow',
+        rawSourceText: 'Technical interview for the fictional ExampleAI OCR platform role.',
+        applicationId,
+        selectedStageId: stageId,
+        createdAt: '2026-07-10T09:00:00.000Z',
+        updatedAt: '2026-07-15T11:00:00.000Z',
+        questions: [],
+        retros: [],
+      });
+
+      state.meetings.splice(0, state.meetings.length, {
+        id: meetingId,
+        title: 'ExampleAI technical interview',
+        date: '2026-07-15T10:00:00.000Z',
+        duration: '3180000',
+        summary: 'Production OCR quality, drift response, and guarded rollout.',
+        applicationId,
+        interviewStageId: stageId,
+        interviewEventId: interviewId,
+        detailedSummary: {
+          schemaVersion: 2,
+          overview: 'The technical interview focused on operating an OCR system after launch. The candidate defined quality as a mix of field accuracy, calibration, manual-review rate, latency, and document-level regression slices. The strongest signal was connecting metrics to rollout gates and a concrete drift investigation. The next round should test system-design depth, SLO ownership, and cost trade-offs.',
+          actionItemsTitle: 'Next steps',
+          actionItems: [
+            'Prepare the system-design round around OCR serving and feedback loops.',
+            'Ask ExampleAI about document volume, latency SLOs, and review capacity.',
+            'Send a short follow-up confirming the next round.',
+          ],
+          keyPointsTitle: 'Interview signals',
+          keyPoints: [
+            'Strong production ML signal: metrics were tied to alerts and rollout decisions.',
+            'Good failure analysis: isolate the affected document type before retraining.',
+            'Open question: quantify SLOs, traffic volume, and manual-review cost.',
+          ],
+          coachingInsights: [
+            {
+              id: 'coaching_slo',
+              type: 'answer_precision',
+              title: 'Make the SLOs concrete',
+              detail: 'The production reasoning was strong, but the answer would be sharper with explicit accuracy, latency, and rollback thresholds.',
+              severity: 'opportunity',
+              evidence: 'Each metric needs an alert and a rollout gate.',
+            },
+            {
+              id: 'coaching_cost',
+              type: 'ownership',
+              title: 'Name the review owner and cost limit',
+              detail: 'Clarify who owns manual-review capacity and how review cost changes the rollout decision.',
+              severity: 'warning',
+              evidence: 'Route low-confidence cases to manual review.',
+            },
+          ],
+          sections: [
+            {
+              title: 'Strong moments',
+              bullets: [
+                'Connected offline model metrics to review rate, latency, alerts, and rollout gates.',
+                'Started the drift investigation with a narrow document-type slice before retraining.',
+              ],
+            },
+            {
+              title: 'Weak moments',
+              bullets: [
+                'Did not quantify target latency, accuracy, or rollback thresholds.',
+                'The cost and ownership model for manual review stayed too abstract.',
+              ],
+            },
+            {
+              title: 'New facts',
+              bullets: [
+                'ExampleAI evaluates OCR quality per field and document type.',
+                'The next round covers OCR serving architecture and feedback-loop design.',
+              ],
+            },
+            {
+              title: 'Follow-up actions',
+              bullets: [
+                'Prepare concrete SLO numbers and a canary rollback policy.',
+                'Draw the OCR inference, review, labeling, and retraining loop.',
+                'Ask who owns manual-review capacity and production alerts.',
+              ],
+            },
+          ],
+        },
+        transcript: [
+          {
+            speaker: 'interviewer',
+            text: 'How would you measure OCR model quality after release?',
+            timestamp: Date.parse('2026-07-15T13:02:00+03:00'),
+          },
+          {
+            speaker: 'user',
+            text: 'I would combine field-level accuracy with confidence calibration, manual-review rate, latency, and regression slices by document type. Each metric needs an alert and a rollout gate.',
+            timestamp: Date.parse('2026-07-15T13:03:00+03:00'),
+          },
+          {
+            speaker: 'interviewer',
+            text: 'What would you do if confidence drops only for one new document type?',
+            timestamp: Date.parse('2026-07-15T13:05:00+03:00'),
+          },
+          {
+            speaker: 'user',
+            text: 'I would isolate that traffic slice, inspect low-confidence samples, compare it with the frozen baseline, and use the findings for targeted relabeling or retraining.',
+            timestamp: Date.parse('2026-07-15T13:06:00+03:00'),
+          },
+          {
+            speaker: 'interviewer',
+            text: 'How would you roll out the fix without hurting users?',
+            timestamp: Date.parse('2026-07-15T13:08:00+03:00'),
+          },
+        ],
+        usage: [
+          {
+            type: 'assist',
+            timestamp: Date.parse('2026-07-15T13:02:10+03:00'),
+            question: 'How would you measure OCR model quality after release?',
+            answer: 'Track field-level accuracy, confidence calibration, manual-review rate, latency, and regressions by document type. Tie each metric to a rollout gate.',
+          },
+        ],
+      });
+    });
+
+    const commandCenter = page.getByTestId('interview-command-center');
+    await commandCenter.getByTitle('Refresh').click();
+    await expect(commandCenter.getByText('ExampleAI - Senior / Lead ML Engineer').first()).toBeVisible();
+    await page.waitForTimeout(6_000);
+
+    await commandCenter.getByRole('button', { name: 'Stages', exact: true }).click();
+    const stageCard = commandCenter.getByTestId('interview-stage-card').filter({ hasText: 'Technical interview' });
+    await expect(stageCard).toContainText('ExampleAI technical interview');
+    await page.screenshot({
+      path: 'assets/demo/openoffer-15-stage-recording.png',
+      animations: 'disabled',
+    });
+
+    await stageCard.getByRole('button', { name: 'ExampleAI technical interview' }).click();
+    await expect(page.getByText('ExampleAI technical interview', { exact: true }).first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'Transcript', exact: true }).click();
+    await expect(page.getByText('How would you measure OCR model quality after release?')).toBeVisible();
+    await page.waitForTimeout(500);
+    await page.screenshot({
+      path: 'assets/demo/openoffer-17-transcript.png',
+      animations: 'disabled',
+    });
+
+    await page.getByRole('button', { name: 'Summary', exact: true }).click();
+    await expect(page.getByText('Interview signals', { exact: true })).toBeVisible();
+    await page.waitForTimeout(500);
+    await page.screenshot({
+      path: 'assets/demo/openoffer-18-stage-overview.png',
+      animations: 'disabled',
+    });
+
+    const weakMoments = page.getByText('Weak moments', { exact: true });
+    await weakMoments.evaluate(element => element.scrollIntoView({ block: 'center' }));
+    await expect(weakMoments).toBeVisible();
+    await page.waitForTimeout(250);
+    await page.screenshot({
+      path: 'assets/demo/openoffer-19-retro.png',
+      animations: 'disabled',
+    });
   });
 });
