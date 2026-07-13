@@ -6,7 +6,7 @@ The goal is not to be a generic chatbot wrapper. The goal is to help users turn 
 
 ## Now
 
-- Make the recruiter-chat-to-process demo the primary first-run story.
+- Keep the linked recruiter-chat-to-process and real-interview demos as the primary first-run story.
 - Keep the README, release docs, issue templates, and contribution guide aligned with the current product.
 - Publish the first GitHub Release as an unsigned macOS preview, then replace it with signed/notarized artifacts once signing secrets are configured.
 - Add contributor-oriented labels and starter issues.
@@ -17,7 +17,7 @@ The goal is not to be a generic chatbot wrapper. The goal is to help users turn 
 - Better parsing for HH, Getmatch, Telegram, calendar, and email-style recruiter text.
 - Clearer first-run provider setup for Ollama, Local Whisper, GigaSTT, Yandex AI Studio, and OpenAI-compatible endpoints.
 - More Russian local STT diagnostics and test fixtures.
-- Stage-level transcript, retro, and follow-up workflows.
+- Improve stage-level transcript, retro, and follow-up workflows with better editing, export, and review quality.
 - Release QA checklist with preview install verification now and signed macOS artifact verification once Apple credentials are configured.
 - Good-first-issue docs for local setup, demo recording, screenshots, and translation packs.
 

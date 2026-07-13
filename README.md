@@ -78,12 +78,13 @@ The complete synthetic scenario and recapture instructions are in [Real Intervie
 ## What Works Today
 
 - Reviewed recruiter and vacancy intake into either a new process or a stage on an existing vacancy.
-- Interview Command Center for vacancies, stage timelines, schedules, meeting links, and linked recordings.
+- Interview Command Center for vacancies, stage timelines, schedules, meeting links, linked recordings, and Google/macOS Calendar sync.
 - Stage-level microphone and system-audio recording for interviews and professional calls.
 - Live transcription and concise meeting assistance through local or BYOK providers.
 - Readable transcripts, post-call summaries, interview signals, coaching, and follow-up actions.
 - Local SQLite-backed meeting history, job-search state, and retrieval.
 - Provider routing for speech-to-text, text, vision/screenshot, and meeting assistance.
+- Searchable settings for provider connections, calendar status, and local AI Context.
 - English and Russian interface locales plus custom translation packs.
 - Electron desktop preview releases for macOS and Windows, with Linux packaging configured for native-platform builds.
 
@@ -162,7 +163,7 @@ Until Apple Developer ID signing and Windows Authenticode signing are configured
 3. Download `SHA256SUMS.txt` and verify the file before opening it:
 
    ```bash
-   FILE="OpenOffer-1.5.1-arm64.dmg" # or the asset you downloaded
+   FILE="OpenOffer-1.5.2-arm64.dmg" # or the asset you downloaded
    grep "  $FILE$" SHA256SUMS.txt | shasum -a 256 -c -
    ```
 

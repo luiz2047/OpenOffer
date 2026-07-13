@@ -6,11 +6,11 @@ This document turns the approved community-launch direction into concrete public
 
 OpenOffer is a local-first, open-source workspace for job-search processes, interviews, recruiter chats, meetings, and notes.
 
-The first tribe is developers who are actively interviewing and want an inspectable assistant they can run, audit, and adapt. The first demo is recruiter chat to local process.
+The first tribe is developers who are actively interviewing and want an inspectable assistant they can run, audit, and adapt. The public demo starts with recruiter chat to a local process, then follows one stage through recording, transcript, overview, and retro.
 
 ## Launch Checklist
 
-- [x] README leads with recruiter chat to process.
+- [x] README leads with the linked recruiter-chat-to-process and real-interview workflow.
 - [x] Project status says the current public version.
 - [x] Release guide is OpenOffer-specific.
 - [x] Stale funding link removed.
@@ -76,7 +76,7 @@ Recommended topics:
 
 ### GitHub Discussion
 
-Title: `OpenOffer 1.4.0: local-first interview and job-search workspace`
+Title: `OpenOffer 1.5.2: local-first interview and job-search workspace`
 
 Body:
 
