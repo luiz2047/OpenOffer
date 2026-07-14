@@ -5,7 +5,8 @@ name: Release (desktop artifacts)
 #
 # Current release set:
 #   - macOS: dmg + zip for arm64 and x64.
-#   - Windows: unsigned x64 NSIS installer + portable exe.
+#   - Windows: Authenticode-signed x64 artifacts when signing secrets exist;
+#     otherwise explicitly labelled unsigned preview artifacts.
 #
 # macOS release modes:
 #   - signed: Developer ID-signed, notarized, stapled. Requires all Apple
@@ -14,9 +15,9 @@ name: Release (desktop artifacts)
 #     Developer ID credentials are configured; GitHub marks these as prereleases
 #     and the release body explains the Gatekeeper install workaround.
 #
-# Windows artifacts are not Authenticode-signed yet, so SmartScreen warnings are
-# expected. Keep Windows x64-only until the native module build produces every
-# Windows arch packaged by Electron Builder.
+# Windows signing is optional for maintainer previews and required before a
+# stable Windows channel is promoted. Keep Windows x64-only until the native
+# module build produces every Windows arch packaged by Electron Builder.
 #
 # OPTIONAL REPOSITORY SECRETS FOR SIGNED macOS RELEASES
 #   MACOS_CERT_P12_BASE64   base64 of the exported "Developer ID Application" .p12
@@ -25,6 +26,8 @@ name: Release (desktop artifacts)
 #   APPLE_API_KEY_P8_BASE64 base64 of the App Store Connect API key .p8 file
 #   APPLE_API_KEY_ID        the key id (e.g. T9GPZ92M7K)
 #   APPLE_API_ISSUER        the issuer UUID (App Store Connect -> Users and Access -> Integrations)
+#   WINDOWS_CERT_P12_BASE64 base64 of the Authenticode certificate .p12
+#   WINDOWS_CERT_PASSWORD   password set when exporting the certificate
 
 on:
   push:
@@ -36,7 +39,59 @@ permissions:
   contents: write
 
 jobs:
+  # Platform-independent release gates run before either artifact job. They
+  # exercise the deterministic fixture and privacy/release contracts without
+  # requiring signing credentials or hardware audio.
+  quality-gates:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and typecheck
+        run: |
+          npm run build
+          npm run typecheck:electron
+
+      - name: Verify docs, localization, and deterministic intake
+        run: |
+          npm run public-docs:check
+          npm run i18n:check
+          npm run build:electron
+          ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron --test \
+            electron/services/__tests__/CanonicalIntakeFixture.test.mjs \
+            electron/services/__tests__/StageWorkspaceDogfood.test.mjs \
+            electron/services/__tests__/StageWorkspaceService.test.mjs \
+            electron/services/__tests__/StageWorkspaceRecovery.test.mjs \
+            electron/services/__tests__/StageWorkspaceInvalidation.test.mjs \
+            electron/services/__tests__/ReleaseTruth.test.mjs \
+            electron/services/__tests__/UpdaterConsent.test.mjs \
+            electron/services/__tests__/ReleaseManifest.test.mjs \
+            electron/services/__tests__/PackagedSmokeContract.test.mjs \
+            electron/services/__tests__/LegacySchemaFixture.test.mjs \
+            electron/services/__tests__/UpgradeRecoveryMatrix.test.mjs \
+            electron/services/__tests__/StageProviderPreflight.test.mjs \
+            electron/services/__tests__/CleanLaunchNetworkPolicy.test.mjs \
+            electron/services/__tests__/StageStartBoundary.test.mjs \
+            tests/legacy-state-migration.test.mjs
+
+      - name: Full regression suite
+        run: npm test
+
   build-macos:
+    needs: quality-gates
     runs-on: macos-14
     timeout-minutes: 90
     outputs:
@@ -173,6 +228,16 @@ jobs:
             xcrun stapler validate "$APP"
             echo "::endgroup::"
           done
+
+      - name: Packaged macOS launch smoke
+        run: |
+          set -euo pipefail
+          found=0
+          while IFS= read -r -d '' APP; do
+            found=1
+            node scripts/packaged-launch-smoke.mjs "$APP/Contents/MacOS/OpenOffer"
+          done < <(find release -type d -name 'OpenOffer.app' -print0)
+          if [ "$found" -eq 0 ]; then echo "No packaged macOS app found"; exit 1; fi
           shopt -s nullglob
           DMGS=(release/*.dmg)
           if [ ${#DMGS[@]} -eq 0 ]; then echo "No DMGs found in release/"; exit 1; fi
@@ -182,6 +247,13 @@ jobs:
             spctl -a -vvv -t open --context context:primary-signature "$DMG" || true
             echo "::endgroup::"
           done
+
+      - name: Clean-launch network smoke
+        run: |
+          set -euo pipefail
+          APP=$(find release -type d -name 'OpenOffer.app' -print -quit)
+          if [ -z "$APP" ]; then echo "No packaged macOS app found"; exit 1; fi
+          OPENOFFER_REQUIRE_NETWORK_CAPTURE=1 node scripts/clean-launch-network-smoke.mjs "$APP/Contents/MacOS/OpenOffer"
 
       - name: Verify unsigned macOS preview artifacts
         if: steps.release_mode.outputs.mode == 'unsigned-preview'
@@ -250,6 +322,7 @@ jobs:
           for ASSET in "${ASSETS[@]}"; do
             cp "$ASSET" release-artifacts-macos/
           done
+          node scripts/verify-release-manifest.mjs release-artifacts-macos
 
           NOTE_PATH=".github/release-notes/${GITHUB_REF_NAME}.md"
           if [ -f "$NOTE_PATH" ]; then
@@ -276,14 +349,14 @@ jobs:
               echo 'open /Applications/OpenOffer.app'
               echo '```'
               echo
-              echo "Windows artifacts are unsigned and may trigger SmartScreen until Authenticode signing is configured."
+              echo "Windows artifacts are built on a native runner; Authenticode status is recorded by the Windows verification job."
             } > release-body/RELEASE_BODY.md
           fi
 
           if [ "${OPENOFFER_RELEASE_MODE:-}" = "unsigned-preview" ]; then
             cat > release-body/UNSIGNED_NOTICE.md <<'EOF'
           > [!WARNING]
-          > This release contains unsigned/ad-hoc signed macOS preview artifacts and unsigned Windows artifacts. macOS will identify the app as coming from an unidentified developer, and Windows SmartScreen may warn about an unknown publisher. Verify checksums before installing, and use the temporary Gatekeeper workaround documented below only for artifacts downloaded from this GitHub Release.
+          > This release contains unsigned/ad-hoc signed macOS preview artifacts. macOS will identify the app as coming from an unidentified developer. Verify checksums before installing, and use the temporary Gatekeeper workaround documented below only for artifacts downloaded from this GitHub Release.
 
           EOF
             cat release-body/UNSIGNED_NOTICE.md release-body/RELEASE_BODY.md > release-body/RELEASE_BODY.tmp
@@ -305,8 +378,12 @@ jobs:
           if-no-files-found: error
 
   build-windows:
+    needs: quality-gates
     runs-on: windows-latest
     timeout-minutes: 60
+    outputs:
+      artifact_label: ${{ steps.windows_mode.outputs.artifact_label }}
+      signed: ${{ steps.windows_mode.outputs.signed }}
     steps:
       - name: Checkout (with submodules)
         uses: actions/checkout@v7
@@ -325,8 +402,57 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Resolve Windows release mode
+        id: windows_mode
+        shell: pwsh
+        env:
+          WINDOWS_CERT_P12_BASE64: ${{ secrets.WINDOWS_CERT_P12_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:WINDOWS_CERT_P12_BASE64 -and $env:WINDOWS_CERT_PASSWORD) {
+            $certPath = Join-Path $env:RUNNER_TEMP 'openoffer-authenticode.p12'
+            [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:WINDOWS_CERT_P12_BASE64))
+            "WIN_CSC_LINK=$certPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "WIN_CSC_KEY_PASSWORD=$env:WINDOWS_CERT_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+            "artifact_label=signed" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            "signed=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            Write-Host 'Windows Authenticode secrets configured; building signed artifacts.'
+          } else {
+            "artifact_label=unsigned-preview" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            "signed=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            Write-Warning 'Windows signing secrets are absent; building explicitly labelled unsigned preview artifacts.'
+          }
+
       - name: Build Windows x64 preview
         run: npm run app:build:win
+
+      - name: Verify Windows Authenticode signatures
+        if: steps.windows_mode.outputs.signed == 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $executables = Get-ChildItem -Path release -Filter '*.exe' -File
+          if ($executables.Count -eq 0) { throw 'No Windows executables found for Authenticode verification' }
+          foreach ($file in $executables) {
+            $signature = Get-AuthenticodeSignature -FilePath $file.FullName
+            if ($signature.Status -ne 'Valid') {
+              throw "Authenticode verification failed for $($file.Name): $($signature.Status)"
+            }
+            Write-Host "$($file.Name): $($signature.Status) — $($signature.SignerCertificate.Subject)"
+          }
+
+      - name: Verify unsigned Windows preview artifacts
+        if: steps.windows_mode.outputs.signed != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $executables = Get-ChildItem -Path release -Filter '*.exe' -File
+          if ($executables.Count -eq 0) { throw 'No Windows executables found for preview verification' }
+          foreach ($file in $executables) {
+            $signature = Get-AuthenticodeSignature -FilePath $file.FullName
+            Write-Warning "$($file.Name): unsigned preview status is $($signature.Status)"
+          }
 
       - name: Prepare Windows release assets
         shell: pwsh
@@ -357,11 +483,27 @@ jobs:
             Copy-Item -LiteralPath $file.FullName -Destination (Join-Path release-artifacts-windows $assetName)
             Write-Host "Prepared Windows asset: $assetName"
           }
+          node scripts/verify-release-manifest.mjs release-artifacts-windows
+
+      - name: Packaged Windows launch smoke
+        shell: pwsh
+        run: |
+          $portable = Get-ChildItem -Path release -Filter '*portable*.exe' -File | Select-Object -First 1
+          if (-not $portable) { throw 'No Windows portable executable found for packaged smoke' }
+          node scripts/packaged-launch-smoke.mjs $portable.FullName
+
+      - name: Clean-launch network smoke (Windows)
+        shell: pwsh
+        run: |
+          $portable = Get-ChildItem -Path release -Filter '*portable*.exe' -File | Select-Object -First 1
+          if (-not $portable) { throw 'No Windows portable executable found for network smoke' }
+          $env:OPENOFFER_REQUIRE_NETWORK_CAPTURE = '1'
+          node scripts/clean-launch-network-smoke.mjs $portable.FullName
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: openoffer-windows-x64-unsigned
+          name: openoffer-windows-x64-${{ steps.windows_mode.outputs.artifact_label }}
           path: release-artifacts-windows/*
           if-no-files-found: error
 
@@ -382,8 +524,19 @@ jobs:
       - name: Download Windows artifacts
         uses: actions/download-artifact@v4
         with:
-          name: openoffer-windows-x64-unsigned
+          name: openoffer-windows-x64-${{ needs.build-windows.outputs.artifact_label }}
           path: release-artifacts
+
+      - name: Add Windows signing notice when needed
+        if: needs.build-windows.outputs.signed != 'true'
+        run: |
+          set -euo pipefail
+          cat > release-body/WINDOWS_UNSIGNED_NOTICE.md <<'EOF'
+          > Windows executables are unsigned preview artifacts and may trigger SmartScreen. Authenticode signing is required before a stable Windows channel is promoted.
+
+          EOF
+          cat release-body/WINDOWS_UNSIGNED_NOTICE.md release-body/RELEASE_BODY.md > release-body/RELEASE_BODY.tmp
+          mv release-body/RELEASE_BODY.tmp release-body/RELEASE_BODY.md
 
       - name: Download release body
         uses: actions/download-artifact@v4

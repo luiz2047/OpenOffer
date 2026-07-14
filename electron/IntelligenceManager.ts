@@ -223,6 +223,14 @@ export class IntelligenceManager extends EventEmitter {
         return this.persistence.recoverUnprocessedMeetings();
     }
 
+    async retryStageArtifacts(meetingId: string): Promise<void> {
+        return this.persistence.retryStageArtifacts(meetingId);
+    }
+
+    async generateStageReview(meetingId: string): Promise<void> {
+        return this.persistence.generateStageReview(meetingId);
+    }
+
     // ============================================
     // Mode Context Management
     // ============================================

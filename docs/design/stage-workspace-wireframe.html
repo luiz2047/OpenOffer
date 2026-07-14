@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenOffer Stage Workspace — rough wireframe</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --shell: #111;
+      --pane: #1b1b1b;
+      --surface: #232323;
+      --line: #555;
+      --muted: #a5a5a5;
+      --text: #f2f2f2;
+      --soft: #d0d0d0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--shell);
+      color: var(--text);
+      font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    button, textarea { font: inherit; }
+    .page { width: min(1480px, calc(100vw - 32px)); margin: 24px auto 64px; }
+    .intro { margin-bottom: 18px; color: var(--soft); }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { font-size: 20px; font-weight: 650; margin-bottom: 6px; }
+    h2 { font-size: 15px; font-weight: 650; margin-bottom: 10px; }
+    h3 { font-size: 13px; font-weight: 650; margin-bottom: 7px; }
+    .note { color: var(--muted); font-size: 12px; }
+    .frame { border: 1px solid var(--line); margin-top: 26px; background: var(--pane); }
+    .frame-label { padding: 8px 10px; border-bottom: 1px dashed var(--line); color: var(--muted); }
+    .app { min-height: 650px; display: grid; grid-template-columns: 230px 310px minmax(560px, 1fr); }
+    .pane { min-width: 0; padding: 14px; border-right: 1px solid var(--line); }
+    .pane:last-child { border-right: 0; }
+    .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .pill, .button, .status, .step { border: 1px solid var(--line); border-radius: 5px; padding: 7px 9px; }
+    .button { background: transparent; color: var(--text); }
+    .button.primary { background: var(--text); color: var(--shell); border-color: var(--text); font-weight: 650; }
+    .button[disabled] { color: #777; border-color: #444; }
+    .stack { display: grid; gap: 8px; }
+    .item { border: 1px solid var(--line); padding: 10px; border-radius: 5px; }
+    .item.selected { outline: 2px solid var(--soft); outline-offset: -2px; }
+    .item strong { display: block; margin-bottom: 3px; }
+    .meta { color: var(--muted); font-size: 12px; }
+    .timeline { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 12px 0 16px; }
+    .step { padding: 8px; color: var(--muted); font-size: 12px; }
+    .step strong { display: block; color: var(--text); font-size: 13px; margin-bottom: 2px; }
+    .step.current { border-width: 2px; padding: 7px; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(240px, .8fr); gap: 10px; }
+    .section { border: 1px solid var(--line); padding: 12px; border-radius: 5px; background: var(--surface); }
+    .section + .section { margin-top: 10px; }
+    .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .between { justify-content: space-between; }
+    .check { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; align-items: center; padding: 8px 0; border-top: 1px dashed #444; }
+    .check:first-of-type { border-top: 0; }
+    .box { width: 14px; height: 14px; border: 1px solid var(--soft); display: inline-grid; place-items: center; font-size: 10px; }
+    .text-block { border: 1px dashed var(--line); padding: 10px; min-height: 82px; color: var(--soft); }
+    textarea { width: 100%; min-height: 120px; resize: vertical; background: #171717; color: var(--text); border: 1px solid var(--line); padding: 10px; }
+    .callout { border-left: 3px solid var(--soft); padding: 9px 11px; background: #181818; }
+    .transcript { display: grid; gap: 7px; }
+    .utterance { border-left: 2px solid var(--line); padding-left: 9px; }
+    .empty { min-height: 330px; display: grid; place-items: center; text-align: center; border: 1px dashed var(--line); padding: 30px; }
+    .empty > div { max-width: 520px; }
+    .progress-line { height: 8px; border: 1px solid var(--line); margin-top: 7px; }
+    .progress-line span { display: block; width: 72%; height: 100%; background: var(--soft); }
+    @media (max-width: 1050px) {
+      .app { grid-template-columns: 190px 240px minmax(480px, 1fr); overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="intro">
+      <h1>OpenOffer — Stage Workspace</h1>
+      <p>Rough interaction sketch. The locked calendar and vacancy panes stay intact; only the selected-vacancy pane becomes stage-scoped.</p>
+    </div>
+
+    <!-- State 1 proves value before permissions or provider setup. -->
+    <section class="frame">
+      <div class="frame-label">STATE 1 · First value without keys or permissions</div>
+      <div class="app">
+        <aside class="pane">
+          <div class="toolbar"><strong>14 July</strong><span class="meta">Today</span></div>
+          <div class="stack">
+            <div class="item"><strong>Nothing scheduled</strong><span class="meta">Calendar stays optional here</span></div>
+          </div>
+        </aside>
+        <aside class="pane">
+          <div class="toolbar"><strong>Vacancies</strong><button class="button">＋</button></div>
+          <div class="empty">
+            <div><strong>No active processes yet</strong><p class="note">Paste a recruiter message on the right. OpenOffer will propose a vacancy and stage for review.</p></div>
+          </div>
+        </aside>
+        <section class="pane">
+          <div class="toolbar"><div><h2>Turn a recruiter message into a process</h2><span class="meta">No AI key, microphone, or screen permission required</span></div></div>
+          <div class="section">
+            <textarea>Hi Alexey — we'd like to invite you to a technical interview for Senior ML Engineer at ExampleAI. Tuesday, 16 July at 15:00 MSK. We'll cover production ML systems and computer vision.</textarea>
+            <div class="row between" style="margin-top:10px"><span class="note">Nothing is saved until you approve the proposal.</span><button class="button primary">Review extracted process →</button></div>
+          </div>
+          <div class="section">
+            <h3>Proposed write</h3>
+            <div class="check"><span class="box">✓</span><span>Vacancy · Senior ML Engineer · ExampleAI</span><span class="meta">new</span></div>
+            <div class="check"><span class="box">✓</span><span>Stage · Technical interview · 16 Jul, 15:00</span><span class="meta">new</span></div>
+            <div class="row between"><span class="note">Source text retained locally</span><button class="button">Create vacancy and stage</button></div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- State 2 gives one obvious next action while preserving access to the full context. -->
+    <section class="frame">
+      <div class="frame-label">STATE 2 · Selected stage: prepare and verify readiness</div>
+      <div class="app">
+        <aside class="pane">
+          <div class="toolbar"><strong>14 July</strong><span class="meta">Today</span></div>
+          <div class="stack">
+            <div class="item selected"><strong>Technical interview</strong><span class="meta">Tue · 15:00 · ExampleAI</span></div>
+            <div class="item"><strong>Recruiter screen</strong><span class="meta">Completed · Northstar</span></div>
+          </div>
+        </aside>
+        <aside class="pane">
+          <div class="toolbar"><strong>Vacancies</strong><span class="status">3 active</span></div>
+          <div class="stack">
+            <div class="item selected"><strong>ExampleAI</strong><span>Senior ML Engineer</span><div class="meta">Technical interview · in 2 days</div></div>
+            <div class="item"><strong>Northstar</strong><span>Computer Vision Lead</span><div class="meta">Waiting for feedback</div></div>
+          </div>
+        </aside>
+        <section class="pane">
+          <div class="toolbar"><div><h2>ExampleAI · Technical interview</h2><span class="meta">16 July, 15:00 · stage_tech_01</span></div><button class="button">•••</button></div>
+          <div class="timeline">
+            <div class="step"><strong>Context</strong>Ready</div>
+            <div class="step current"><strong>Prepare</strong>Next</div>
+            <div class="step"><strong>Preflight</strong>2 checks</div>
+            <div class="step"><strong>Interview</strong>Not started</div>
+            <div class="step"><strong>Review</strong>After call</div>
+          </div>
+          <div class="workspace">
+            <div>
+              <div class="section">
+                <div class="row between"><h3>Prepare for this stage</h3><button class="button primary">Build prep draft</button></div>
+                <div class="text-block"><strong>Your 60-second pitch</strong><br>Production ML engineer focused on computer vision systems, backend integration, and technical leadership…</div>
+                <div class="text-block" style="margin-top:8px"><strong>Likely questions</strong><br>1. How did you take a CV model from experiment to production?<br>2. How do you design monitoring around model quality?</div>
+              </div>
+              <div class="section">
+                <div class="row between"><h3>Interview readiness</h3><button class="button">Run preflight</button></div>
+                <div class="check"><span class="box">✓</span><span>Stage context snapshot</span><span class="meta">ExampleAI + CV resume</span></div>
+                <div class="check"><span class="box">✓</span><span>AI model</span><span class="meta">Local / ready</span></div>
+                <div class="check"><span class="box">!</span><span>Speech-to-text</span><button class="button">Set up</button></div>
+                <div class="check"><span class="box">!</span><span>Microphone and system audio</span><button class="button">Test</button></div>
+              </div>
+            </div>
+            <aside>
+              <div class="section">
+                <h3>Next action</h3>
+                <p>Finish the two readiness checks before Tuesday.</p>
+                <button class="button primary" style="width:100%">Continue preflight →</button>
+              </div>
+              <div class="section">
+                <h3>Context used in this interview</h3>
+                <p class="note">Vacancy description<br>Selected resume/profile facts<br>Prep brief v2<br>Your private notes</p>
+                <button class="button" style="width:100%">Inspect data flow</button>
+              </div>
+            </aside>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- State 3 makes processing visible and never blocks manual reflection on AI. -->
+    <section class="frame">
+      <div class="frame-label">STATE 3 · Stop → processing → review → next action</div>
+      <div class="app">
+        <aside class="pane">
+          <div class="toolbar"><strong>16 July</strong><span class="meta">Today</span></div>
+          <div class="stack"><div class="item selected"><strong>Technical interview</strong><span class="meta">Completed · 48 min</span></div></div>
+        </aside>
+        <aside class="pane">
+          <div class="toolbar"><strong>Vacancies</strong><span class="status">3 active</span></div>
+          <div class="stack"><div class="item selected"><strong>ExampleAI</strong><span>Senior ML Engineer</span><div class="meta">Review ready</div></div></div>
+        </aside>
+        <section class="pane">
+          <div class="toolbar"><div><h2>ExampleAI · Technical interview</h2><span class="meta">Recording saved locally · transcript ready</span></div><button class="button">Export stage</button></div>
+          <div class="timeline">
+            <div class="step"><strong>Context</strong>Used</div>
+            <div class="step"><strong>Prepare</strong>Complete</div>
+            <div class="step"><strong>Preflight</strong>Passed</div>
+            <div class="step"><strong>Interview</strong>48 min</div>
+            <div class="step current"><strong>Review</strong>Next</div>
+          </div>
+          <div class="workspace">
+            <div>
+              <div class="section">
+                <div class="row between"><h3>Conversation</h3><span class="meta">Strictly linked to this stage</span></div>
+                <div class="transcript">
+                  <div class="utterance"><strong>Interviewer · 15:18</strong><div>How would you monitor a computer vision model after deployment?</div></div>
+                  <div class="utterance"><strong>You · 15:19</strong><div>I separate system health, data drift, and task-quality signals…</div></div>
+                </div>
+              </div>
+              <div class="section">
+                <div class="row between"><h3>Your review</h3><button class="button">Generate optional AI draft</button></div>
+                <div class="callout"><strong>Strong evidence</strong><br>You grounded the monitoring answer in a concrete production flow.</div>
+                <div class="callout" style="margin-top:8px"><strong>Improve next time</strong><br>Add a clearer threshold and escalation example.</div>
+              </div>
+            </div>
+            <aside>
+              <div class="section">
+                <h3>Processing</h3>
+                <p class="note">Transcript ✓<br>Summary ✓<br>AI review optional</p>
+                <div class="progress-line"><span></span></div>
+              </div>
+              <div class="section">
+                <h3>Next action</h3>
+                <p>Send follow-up and prepare a stronger monitoring example.</p>
+                <button class="button primary" style="width:100%">Save next action</button>
+              </div>
+            </aside>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

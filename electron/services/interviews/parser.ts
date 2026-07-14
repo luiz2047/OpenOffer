@@ -195,12 +195,23 @@ function normalizeRoleTitle(value: string | null): string | null {
   const trimmed = trimValue(value, 120);
   if (!trimmed) return null;
   return trimmed
+    .replace(/[.!?]+$/, '')
     .replace(/-а(?=\s|$)/i, '')
     .replace(/\s+в\s+компани[юи](?:\s|$).*$/i, '')
     .trim();
 }
 
+function normalizeCompany(value: string | null): string | null {
+  const trimmed = trimValue(value, 120);
+  if (!trimmed) return null;
+  return trimmed
+    .replace(/,\s*(?:remote|hybrid|onsite|удалённо|удаленно|гибрид|офис).*$/i, '')
+    .replace(/[.!?]+$/, '')
+    .trim();
+}
+
 function detectStage(text: string): string | null {
+  if (/\bintro\b|introductory|вводн(?:ый|ая)\s+(?:созвон|звонок|этап)/i.test(text)) return 'Intro call';
   if (/(?:созвон|созвониться|обсудить детали вакансии|выберем.+слот|слоты для первого собеседования|10\s*[-–—]\s*15\s*мин|рекрутер|hr|эйчар|скрининг|screen)/i.test(text)) return 'Recruiter screen';
   if (/онлайн[-\s]?собеседован|ссылка на видеовстречу|telemost|zoom\.us|meet\.google\.com/i.test(text)) return 'Interview stage';
   if (/system design|системн(ый|ое) дизайн/i.test(text)) return 'System design';
@@ -232,7 +243,20 @@ function weekdayMatches(date: Date, weekday?: string): boolean {
 function extractRussianDateTime(text: string): number | null {
   const pattern = /(?:(понедельник|вторник|среда|среду|четверг|пятница|пятницу|суббота|воскресенье)\s*,?\s*)?(\d{1,2})\s+(января|январь|февраля|февраль|марта|март|апреля|апрель|мая|май|июня|июнь|июля|июль|августа|август|сентября|сентябрь|октября|октябрь|ноября|ноябрь|декабря|декабрь)(?:\s+(\d{4}))?\s*,?\s*(\d{1,2})[:.](\d{2})/i;
   const match = text.match(pattern);
-  if (!match) return null;
+  if (!match) {
+    const weekdayTime = text.match(/(?:^|\s)(?:в|во)\s+(понедельник|вторник|среда|среду|четверг|пятница|пятницу|суббота|воскресенье)\s+(?:в\s+)?(\d{1,2})[:.](\d{2})/i);
+    if (!weekdayTime) return null;
+    const weekday = RU_WEEKDAYS[weekdayTime[1].toLowerCase()];
+    const hour = Number(weekdayTime[2]);
+    const minute = Number(weekdayTime[3]);
+    if (weekday === undefined || !Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+    const candidate = new Date();
+    candidate.setHours(hour, minute, 0, 0);
+    const daysUntil = (weekday - candidate.getDay() + 7) % 7;
+    if (daysUntil === 0 && candidate.getTime() <= Date.now()) candidate.setDate(candidate.getDate() + 7);
+    else candidate.setDate(candidate.getDate() + daysUntil);
+    return candidate.getTime();
+  }
 
   const weekday = match[1];
   const day = Number(match[2]);
@@ -293,13 +317,14 @@ export function parseInterviewSourceText(rawText: string): InterviewSourceParseR
   const startsAt = extractRussianDateTime(normalizedText);
   const durationMs = extractDurationMs(normalizedText);
   const endsAt = startsAt && durationMs ? startsAt + durationMs : null;
-  const company = lineValue(lines, [
+  const company = normalizeCompany(lineValue(lines, [
     /^(?:компания|company|работодатель|employer)\s*[:—-]\s*(.+)$/i,
     /(?:в компании|at company|at)\s+([A-ZА-ЯЁ][\wА-Яа-яЁё ."'&-]{2,80})/i,
     /(?:в компанию)\s+([A-ZА-ЯЁ][\wА-Яа-яЁё ."'&-]{2,80})/i,
-  ], 120);
+  ], 120));
   const roleTitle = normalizeRoleTitle(lineValue(lines, [
     /^(?:вакансия|позиция|должность|role|position|job)\s*[:—-]\s*(.+)$/i,
+    /(?:есть|открыта|открыт)\s+роль\s*[:—-]?\s*([A-ZА-ЯЁ][\wА-Яа-яЁё +#/.-]{2,120}?)(?:[.!?]|$)/i,
     /поисках\s+([A-ZА-ЯЁ][\wА-Яа-яЁё +#/.-]{2,120}?)(?:\s+в\s+компани[юи]\b|$)/i,
     /^([A-ZА-ЯЁ][\wА-Яа-яЁё +#/.-]{2,100}(?:developer|engineer|разработчик|инженер|frontend|backend|fullstack|data scientist|machine learning|ml engineer|аналитик|data analyst).*)$/i,
   ], 120));

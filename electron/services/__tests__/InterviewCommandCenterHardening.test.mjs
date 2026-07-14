@@ -34,18 +34,16 @@ test('pasted vacancy context is rendered as text and parser stays local-only', (
   assert.equal(parser.includes('console.'), false);
 });
 
-test('vacancy and stage recording actions pass durable application-stage metadata', () => {
+test('vacancy and stage actions resolve an exact workspace before recording', () => {
   const source = read('src/features/interviews/InterviewCommandCenter.tsx');
 
   assert.match(source, /const startSelectedInterview = \(\) => \{/);
   assert.match(source, /await stageApi\.create\(\{[\s\S]{0,300}applicationId: applicationDetail\.id/);
   assert.match(source, /defaultRecordingStageTitle/);
-  assert.match(source, /interviewStageId: targetStage\?\.id/);
-  assert.match(source, /applicationId: targetApplication\.id/);
-  assert.match(source, /const startStageRecording = \(stage: InterviewStage\) => \{/);
-  assert.match(source, /interviewStageId: stage\.id/);
-  assert.match(source, /applicationId: applicationDetail\.id/);
-  assert.match(source, /interviewEventId: stage\.legacyInterviewEventId \?\? applicationDetail\.legacyInterviewEventId/);
+  assert.match(source, /setWorkspaceStageId\(targetStage\.id\)/);
+  assert.match(source, /const openStageWorkspace = \(stage: InterviewStage\) => \{/);
+  assert.match(source, /onClick=\{\(\) => openStageWorkspace\(stage\)\}/);
+  assert.doesNotMatch(source, /onClick=\{\(\) => void startStageRecording\(stage\)\}/);
   assert.match(source, /useEffect\(\(\) => \{[\s\S]{0,120}if \(!applicationDetail\?\.id\) return;/);
 });
 

@@ -261,4 +261,217 @@ export function applyInterviewSchema(db: InterviewSchemaDb): void {
     CREATE INDEX IF NOT EXISTS idx_meetings_application_id ON meetings(application_id);
     CREATE INDEX IF NOT EXISTS idx_meetings_calendar_event_id ON meetings(calendar_event_id);
   `);
+
+  // Stage Workspace v20 is additive. The compatibility tables above remain the
+  // source of truth for legacy screens; these columns/tables make stage ownership
+  // explicit for the new service and give it durable lifecycle state.
+  addColumnIfMissing(db, 'interview_stages', 'next_action TEXT');
+  addColumnIfMissing(db, 'interview_stages', 'next_action_due_at INTEGER');
+  addColumnIfMissing(db, 'interview_stages', "next_action_state TEXT NOT NULL DEFAULT 'missing' CHECK(next_action_state IN ('missing', 'saved', 'completed', 'none_required'))");
+  addColumnIfMissing(db, 'interview_stages', 'next_action_completed_at INTEGER');
+  addColumnIfMissing(db, 'interview_stages', 'primary_session_meeting_id TEXT');
+  addColumnIfMissing(db, 'interview_stages', 'workspace_revision INTEGER NOT NULL DEFAULT 0');
+
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_legacy_event_map_stage
+      ON legacy_interview_event_map(stage_id)
+      WHERE stage_id IS NOT NULL;
+
+    CREATE TRIGGER IF NOT EXISTS trg_legacy_event_map_validate_insert
+    BEFORE INSERT ON legacy_interview_event_map
+    WHEN NEW.stage_id IS NOT NULL AND (
+      (SELECT application_id FROM interview_stages WHERE id = NEW.stage_id) IS NOT NEW.application_id
+      OR (SELECT legacy_interview_event_id FROM interview_stages WHERE id = NEW.stage_id) IS NOT NEW.legacy_interview_event_id
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'legacy stage map ownership mismatch');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_legacy_event_map_validate_update
+    BEFORE UPDATE OF application_id, stage_id, legacy_interview_event_id ON legacy_interview_event_map
+    WHEN NEW.stage_id IS NOT NULL AND (
+      (SELECT application_id FROM interview_stages WHERE id = NEW.stage_id) IS NOT NEW.application_id
+      OR (SELECT legacy_interview_event_id FROM interview_stages WHERE id = NEW.stage_id) IS NOT NEW.legacy_interview_event_id
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'legacy stage map ownership mismatch');
+    END;
+
+    CREATE TABLE IF NOT EXISTS stage_sessions (
+      meeting_id TEXT PRIMARY KEY,
+      operation_id TEXT,
+      interview_stage_id TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('initializing', 'recording', 'stopping', 'stopped', 'abandoned', 'failed')),
+      started_at INTEGER,
+      stopped_at INTEGER,
+      heartbeat_at INTEGER,
+      stop_requested_at INTEGER,
+      stop_operation_id TEXT,
+      failure_code TEXT,
+      revision INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(meeting_id) REFERENCES meetings(id) ON DELETE CASCADE,
+      FOREIGN KEY(interview_stage_id) REFERENCES interview_stages(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_stage_sessions_stage
+      ON stage_sessions(interview_stage_id, created_at);
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_stage_sessions_one_active
+      ON stage_sessions(interview_stage_id)
+      WHERE status IN ('initializing', 'recording', 'stopping');
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_stage_sessions_global_recorder
+      ON stage_sessions((1))
+      WHERE status IN ('initializing', 'recording', 'stopping');
+
+    CREATE TABLE IF NOT EXISTS stage_session_contexts (
+      meeting_id TEXT PRIMARY KEY,
+      schema_version INTEGER NOT NULL,
+      snapshot_json TEXT NOT NULL,
+      provider_routes_json TEXT NOT NULL,
+      redaction_version TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY(meeting_id) REFERENCES stage_sessions(meeting_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS stage_session_artifacts (
+      meeting_id TEXT NOT NULL,
+      artifact_type TEXT NOT NULL CHECK(artifact_type IN ('transcript', 'summary', 'ai_review')),
+      status TEXT NOT NULL CHECK(status IN ('not_requested', 'pending', 'ready', 'failed', 'skipped', 'cancelled')),
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      error_code TEXT,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY(meeting_id, artifact_type),
+      FOREIGN KEY(meeting_id) REFERENCES stage_sessions(meeting_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS stage_reviews (
+      interview_stage_id TEXT PRIMARY KEY,
+      meeting_id TEXT NOT NULL,
+      status TEXT NOT NULL CHECK(status IN ('draft', 'saved')),
+      review_json TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(interview_stage_id) REFERENCES interview_stages(id) ON DELETE CASCADE,
+      FOREIGN KEY(meeting_id) REFERENCES stage_sessions(meeting_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS stage_artifact_jobs (
+      meeting_id TEXT NOT NULL,
+      artifact_type TEXT NOT NULL CHECK(artifact_type IN ('transcript', 'summary', 'ai_review')),
+      status TEXT NOT NULL CHECK(status IN ('blocked', 'queued', 'running', 'succeeded', 'failed', 'cancelled')),
+      request_json TEXT NOT NULL,
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      lease_owner TEXT,
+      lease_expires_at INTEGER,
+      fencing_token INTEGER NOT NULL DEFAULT 0,
+      last_error_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY(meeting_id, artifact_type),
+      FOREIGN KEY(meeting_id) REFERENCES stage_sessions(meeting_id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS stage_workspace_operations (
+      operation_id TEXT PRIMARY KEY,
+      action TEXT NOT NULL,
+      request_hash TEXT NOT NULL,
+      request_json TEXT,
+      stage_id TEXT,
+      status TEXT NOT NULL CHECK(status IN ('pending', 'intent_committed', 'committed', 'failed', 'cancelled')),
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      lease_owner TEXT,
+      lease_expires_at INTEGER,
+      fencing_token INTEGER NOT NULL DEFAULT 0,
+      result_json TEXT,
+      error_json TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY(stage_id) REFERENCES interview_stages(id) ON DELETE SET NULL
+    );
+
+    CREATE TRIGGER IF NOT EXISTS trg_stage_sessions_validate_insert
+    BEFORE INSERT ON stage_sessions
+    BEGIN
+      SELECT CASE WHEN (SELECT id FROM interview_stages WHERE id = NEW.interview_stage_id) IS NULL
+        THEN RAISE(ABORT, 'stage session stage not found') END;
+      SELECT CASE WHEN (SELECT interview_stage_id FROM meetings WHERE id = NEW.meeting_id) IS NOT NEW.interview_stage_id
+        THEN RAISE(ABORT, 'stage session meeting stage mismatch') END;
+      SELECT CASE WHEN (SELECT application_id FROM meetings WHERE id = NEW.meeting_id) IS NOT
+                         (SELECT application_id FROM interview_stages WHERE id = NEW.interview_stage_id)
+        THEN RAISE(ABORT, 'stage session meeting application mismatch') END;
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_stage_sessions_immutable_owner
+    BEFORE UPDATE OF interview_stage_id, meeting_id ON stage_sessions
+    WHEN OLD.interview_stage_id IS NOT NEW.interview_stage_id OR OLD.meeting_id IS NOT NEW.meeting_id
+    BEGIN
+      SELECT RAISE(ABORT, 'stage session ownership is immutable');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_stage_reject_application_drift
+    BEFORE UPDATE OF application_id ON interview_stages
+    WHEN EXISTS (SELECT 1 FROM stage_sessions WHERE interview_stage_id = OLD.id)
+      AND OLD.application_id IS NOT NEW.application_id
+    BEGIN
+      SELECT RAISE(ABORT, 'stage application ownership is immutable after session creation');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_meetings_reject_stage_session_drift
+    BEFORE UPDATE OF interview_stage_id, application_id ON meetings
+    WHEN EXISTS (SELECT 1 FROM stage_sessions WHERE meeting_id = OLD.id)
+      AND (NEW.interview_stage_id IS NOT OLD.interview_stage_id OR NEW.application_id IS NOT OLD.application_id)
+    BEGIN
+      SELECT RAISE(ABORT, 'meeting ownership is immutable after stage session creation');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_meetings_restrict_primary_session_delete
+    BEFORE DELETE ON meetings
+    WHEN EXISTS (
+      SELECT 1 FROM interview_stages
+      WHERE primary_session_meeting_id = OLD.id
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'primary stage session must be cleared or replaced before deletion');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_stage_primary_session_matches_stage
+    BEFORE UPDATE OF primary_session_meeting_id ON interview_stages
+    WHEN NEW.primary_session_meeting_id IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM stage_sessions
+        WHERE meeting_id = NEW.primary_session_meeting_id
+          AND interview_stage_id = NEW.id
+      )
+    BEGIN
+      SELECT RAISE(ABORT, 'primary session does not belong to stage');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_stage_review_matches_stage
+    BEFORE INSERT ON stage_reviews
+    WHEN NOT EXISTS (
+      SELECT 1 FROM stage_sessions
+      WHERE meeting_id = NEW.meeting_id
+        AND interview_stage_id = NEW.interview_stage_id
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'stage review session does not belong to stage');
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS trg_stage_review_matches_stage_update
+    BEFORE UPDATE OF interview_stage_id, meeting_id ON stage_reviews
+    WHEN NOT EXISTS (
+      SELECT 1 FROM stage_sessions
+      WHERE meeting_id = NEW.meeting_id
+        AND interview_stage_id = NEW.interview_stage_id
+    )
+    BEGIN
+      SELECT RAISE(ABORT, 'stage review session does not belong to stage');
+    END;
+  `);
+
+  // Added after the first v20 preview so existing stage sessions can finish
+  // the durable initializing -> recording handshake without a destructive
+  // table rewrite.
+  addColumnIfMissing(db, 'stage_sessions', 'operation_id TEXT');
 }

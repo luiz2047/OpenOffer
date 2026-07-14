@@ -875,10 +875,10 @@ test.describe('Interview Command Center', () => {
     await updatedTechStage.getByRole('button', { name: 'Link' }).click();
     await expect(page.getByText('Backend interview recording').last()).toBeVisible();
 
-    await updatedTechStage.getByRole('button', { name: 'Start recording' }).click();
+    await updatedTechStage.getByRole('button', { name: 'Open stage workspace' }).click();
     const startPayload = await page.evaluate(() => (window as any).__openOfferTestState.lastStartMeetingPayload);
-    expect(startPayload.applicationId).toBe('app_1');
-    expect(startPayload.interviewStageId).toBe('stage_2');
+    expect(startPayload).toBeNull();
+    await expect(page.getByTestId('stage-workspace-panel')).toBeVisible();
 
     await page.keyboard.press('Control+K');
     await page.getByTestId('top-search-input').fill('Synthetic second stage update for existing saved vacancy.');
@@ -909,7 +909,9 @@ test.describe('Interview Command Center', () => {
     await expect(technicalStage).toContainText('Technical sync');
     await expect(finalStage).toContainText('Final interview');
     await expect(russianStage).toContainText('Техническое интервью');
-    await expect(technicalStage.getByTestId('stage-recording-count')).toHaveText('2');
+    // The stage card no longer starts recording directly; it only opens the
+    // Stage Workspace where context/readiness confirmation is required.
+    await expect(technicalStage.getByTestId('stage-recording-count')).toHaveText('1');
     await expect(finalStage.getByTestId('stage-recording-count')).toHaveText('0');
     await finalStage.getByLabel('Attach recording').selectOption({ label: 'Final stage recording' });
     await finalStage.getByRole('button', { name: 'Link' }).click();
@@ -921,9 +923,9 @@ test.describe('Interview Command Center', () => {
 
     await finalStage.getByTitle('Archive stage').click();
     await expect(page.getByText('Archived stages')).toBeVisible();
-    await expect(page.getByTestId('interview-stage-card').filter({ hasText: 'Final interview' }).getByRole('button', { name: 'Start recording' })).toHaveCount(0);
+    await expect(page.getByTestId('interview-stage-card').filter({ hasText: 'Final interview' }).getByRole('button', { name: 'Open stage workspace' })).toHaveCount(0);
     await page.getByTestId('interview-stage-card').filter({ hasText: 'Final interview' }).getByTitle('Restore stage').click();
-    await expect(page.getByTestId('interview-stage-card').filter({ hasText: 'Final interview' }).getByRole('button', { name: 'Start recording' })).toBeVisible();
+    await expect(page.getByTestId('interview-stage-card').filter({ hasText: 'Final interview' }).getByRole('button', { name: 'Open stage workspace' })).toBeVisible();
 
     await page.evaluate(() => {
       const state = (window as any).__openOfferTestState;

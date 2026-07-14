@@ -21,6 +21,8 @@ The story continues in [Real Interview Loop](real-interview-loop.md), where the 
 
 ## Expected OpenOffer Output
 
+The canonical automated fixture is [`tests/fixtures/interviews/canonical-recruiter-chat.txt`](../../tests/fixtures/interviews/canonical-recruiter-chat.txt), SHA-256 `e740f107ebd6bc0d141ecf1a0c30cce38f62d7f7ff15937c7be7341f772f8398`. The deterministic parser must produce the same company, role, intro stage, and scheduled Tuesday proposal from that input without an AI request.
+
 OpenOffer should propose:
 
 - New vacancy: `ExampleAI - Senior/Lead ML Engineer`.

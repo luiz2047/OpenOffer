@@ -2,6 +2,8 @@
 // Works in Electron by dynamically loading the gtag script into the renderer DOM
 // Only requires the public Measurement ID — no API secrets needed
 
+import packageJson from '../../../package.json';
+
 // --- Types ---
 
 export type ModelProviderType = 'cloud' | 'local';
@@ -47,7 +49,7 @@ interface SessionDurationPayload {
 // --- Configuration ---
 
 const GA4_MEASUREMENT_ID = "G-494RMJ2G6E";
-const APP_VERSION = "1.1.3";
+const APP_VERSION = packageJson.version;
 
 // Extend window to include gtag/dataLayer
 declare global {
@@ -85,6 +87,7 @@ export function detectProviderType(modelName: string): ModelProviderType {
 class AnalyticsService {
     private static instance: AnalyticsService;
     private initialized = false;
+    private consentResolutionRequested = false;
     private sessionStartTime: number = Date.now();
     private assistantStartTime: number | null = null;
     private totalAssistantDuration: number = 0;
@@ -100,7 +103,30 @@ class AnalyticsService {
 
     public initAnalytics(): void {
         if (this.initialized) return;
+        // Analytics is opt-in. A clean install must not contact GA4 before the
+        // user explicitly enables this separate consent setting.
+        const bridge = window.electronAPI;
+        if (bridge?.getTelemetryConsent && !this.consentResolutionRequested) {
+            this.consentResolutionRequested = true;
+            void Promise.resolve(bridge.getTelemetryConsent()).then((consent) => {
+                if (!consent || typeof consent.enabled !== 'boolean') { this.initAnalytics(); return; }
+                if (consent.enabled) localStorage.setItem('openoffer_analytics_consent', 'granted');
+                else localStorage.removeItem('openoffer_analytics_consent');
+                this.initAnalytics();
+            }).catch(() => {
+                // A renderer-only/older bridge falls back to the local consent
+                // marker without making a network request.
+                this.initAnalytics();
+            });
+            return;
+        }
+        if (localStorage.getItem('openoffer_analytics_consent') !== 'granted') return;
 
+        this.initializeGrantedAnalytics();
+    }
+
+    private initializeGrantedAnalytics(): void {
+        if (this.initialized) return;
         try {
             // 1. Initialize dataLayer
             window.dataLayer = window.dataLayer || [];
@@ -131,6 +157,23 @@ class AnalyticsService {
         } catch (error) {
             console.warn("[Analytics] Initialization failed:", error);
         }
+    }
+
+    public getConsent(): boolean {
+        return localStorage.getItem('openoffer_analytics_consent') === 'granted';
+    }
+
+    public setConsent(granted: boolean): void {
+        if (!granted) {
+            localStorage.removeItem('openoffer_analytics_consent');
+            this.initialized = false;
+            void window.electronAPI?.setTelemetryConsent?.(false);
+            return;
+        }
+        localStorage.setItem('openoffer_analytics_consent', 'granted');
+        void window.electronAPI?.setTelemetryConsent?.(true);
+        this.consentResolutionRequested = true;
+        this.initAnalytics();
     }
 
     // --- Tracking Methods ---

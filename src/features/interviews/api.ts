@@ -24,6 +24,7 @@ import type {
   PrepBrief,
   PrepBriefPayload,
   ReadinessResult,
+  StageWorkspaceSnapshot,
   RetroPromptActionPayload,
   RetroPromptDecision,
   VacancyDossier,
@@ -176,7 +177,81 @@ export const stageApi = {
     return unwrap(await requireBridge().interviewStagesAttachMeeting(id, meetingId));
   },
 
-  async createCalendarEvent(id: string, provider: InterviewStageCalendarEventPayload['provider']): Promise<ApplicationDetail> {
-    return unwrap(await requireBridge().interviewStagesCreateCalendarEvent(id, provider));
+  async createCalendarEvent(id: string, provider: InterviewStageCalendarEventPayload['provider'], expectedRevision?: number): Promise<ApplicationDetail> {
+    return unwrap(await requireBridge().interviewStagesCreateCalendarEvent(id, provider, newOperationId('stage-workspace:calendar-event'), expectedRevision));
+  },
+};
+
+export const stageWorkspaceApi = {
+  async get(stageId: string): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceGet(stageId));
+  },
+
+  async preflight(stageId: string, includeAi = false): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspacePreflight(stageId, { includeAi }));
+  },
+
+  async retryArtifact(meetingId: string, artifactType: 'transcript' | 'summary' | 'ai_review'): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceRetryArtifact(meetingId, artifactType));
+  },
+
+  async ensureBacking(stageId: string, expectedRevision?: number): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceEnsureBacking(stageId, expectedRevision));
+  },
+
+  async updateStage(stageId: string, patch: InterviewStageUpdatePatch, expectedRevision?: number): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceUpdateStage(stageId, newOperationId('stage-workspace:update-stage'), expectedRevision, patch));
+  },
+
+  async attachMeeting(stageId: string, meetingId: string, expectedRevision?: number): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceAttachMeeting(stageId, meetingId, newOperationId('stage-workspace:attach-meeting'), expectedRevision));
+  },
+
+  async prepare(stageId: string, payload: PrepBriefPayload, expectedRevision?: number): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspacePrepare(stageId, newOperationId('stage-workspace:prepare'), expectedRevision, payload));
+  },
+
+  async start(stageId: string, expectedRevision?: number, context?: Record<string, unknown>): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceStart(stageId, newOperationId('stage-workspace:start'), expectedRevision, context));
+  },
+
+  async stop(meetingId: string, expectedSessionRevision?: number): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceStop(meetingId, newOperationId('stage-workspace:stop'), expectedSessionRevision));
+  },
+
+  async fail(meetingId: string, failureCode = 'capture_start_failed'): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceFail(meetingId, newOperationId('stage-workspace:fail'), failureCode));
+  },
+
+  async saveReview(stageId: string, meetingId: string, review: Record<string, unknown>, expectedRevision?: number): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceSaveReview(stageId, meetingId, review, expectedRevision));
+  },
+
+  async selectPrimary(stageId: string, meetingId: string | null, expectedRevision?: number): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceSelectPrimary(stageId, meetingId, expectedRevision));
+  },
+
+  async clearReview(stageId: string, expectedRevision?: number): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceClearReview(stageId, 'clear-stage-review', expectedRevision));
+  },
+
+  async deleteSession(meetingId: string, expectedRevision?: number): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceDeleteSession(meetingId, 'delete-stage-session', expectedRevision));
+  },
+
+  async setNextAction(stageId: string, nextAction: { text?: string | null; dueAt?: number | null; state?: 'missing' | 'saved' | 'completed' | 'none_required' }, expectedRevision?: number): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceSetNextAction(stageId, nextAction, expectedRevision));
+  },
+
+  async completeNextAction(stageId: string, expectedRevision?: number): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceCompleteNextAction(stageId, expectedRevision));
+  },
+
+  async noNextAction(stageId: string, expectedRevision?: number): Promise<StageWorkspaceSnapshot> {
+    return unwrap(await requireBridge().stageWorkspaceNoNextAction(stageId, expectedRevision));
+  },
+
+  async export(stageId: string, format: 'json' | 'markdown', includeTranscript = false) {
+    return unwrap(await requireBridge().stageWorkspaceExport(stageId, format, includeTranscript));
   },
 };

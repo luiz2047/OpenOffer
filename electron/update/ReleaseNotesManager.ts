@@ -48,7 +48,13 @@ export class ReleaseNotesManager {
                 return null;
             }
 
-            const data = JSON.parse(response);
+            const parsedResponse = JSON.parse(response);
+            // Preview channel uses the newest GitHub prerelease explicitly;
+            // `/releases/latest` intentionally excludes prereleases.
+            const data = version === 'preview'
+                ? (Array.isArray(parsedResponse) ? parsedResponse.find((release: any) => release?.prerelease) : null)
+                : parsedResponse;
+            if (!data) return null;
             const body = data.body || "";
             const htmlUrl = data.html_url || "";
             const tagName = data.tag_name || version; // Use tag_name from API if available
@@ -66,6 +72,9 @@ export class ReleaseNotesManager {
     private buildReleaseUrl(version: string): string {
         if (version === 'latest') {
             return `https://api.github.com/repos/${this.repoOwner}/${this.repoName}/releases/latest`;
+        }
+        if (version === 'preview') {
+            return `https://api.github.com/repos/${this.repoOwner}/${this.repoName}/releases?per_page=20`;
         }
 
         const tag = version.startsWith('v') ? version : `v${version}`;

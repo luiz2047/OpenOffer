@@ -29,7 +29,11 @@ interface StartMeetingMetadata {
   title?: string;
   calendarEventId?: string;
   interviewEventId?: string;
+  interviewStageId?: string;
+  applicationId?: string;
   source?: 'manual' | 'calendar';
+  stageWorkspaceMeetingId?: string;
+  stageWorkspaceSessionRevision?: number;
 }
 
 const queryClient = new QueryClient()
@@ -221,8 +225,12 @@ const App: React.FC = () => {
     if (isLauncherWindow || isDefault) {
       const permsShown = localStorage.getItem('natively_perms_shown_v1');
       if (!permsShown) {
-        // First ever launch — show permissions toaster
-        setShowPermissionsToaster(true);
+        // First ever launch stays useful without foregrounding permissions.
+        // Ask for them only when the user invokes capture/recording. Persist
+        // the acknowledgement so a later launch can still surface a revoked
+        // permission as a recovery action.
+        try { localStorage.setItem('natively_perms_shown_v1', '1'); } catch {}
+        window.electronAPI?.onboardingSetFlag?.('permsShown', true).catch(() => {});
       } else {
         // Returning launch: re-check live TCC status. A macOS permission grant
         // can be DROPPED out from under a returning user — most commonly after
@@ -374,6 +382,18 @@ const App: React.FC = () => {
   };
 
   const handleStartMeeting = async (metadata: StartMeetingMetadata = {}) => {
+    const failStageWorkspaceStart = async (failureCode: string) => {
+      if (!metadata.stageWorkspaceMeetingId || typeof window.electronAPI?.stageWorkspaceFail !== 'function') return;
+      try {
+        await window.electronAPI.stageWorkspaceFail(
+          metadata.stageWorkspaceMeetingId,
+          `fail:${metadata.stageWorkspaceMeetingId}:${Date.now()}`,
+          failureCode,
+        );
+      } catch (failureError) {
+        console.warn('[App] Failed to finalize unusable stage session:', failureError);
+      }
+    };
     try {
       localStorage.setItem('natively_last_meeting_start', Date.now().toString());
       const inputDeviceId = localStorage.getItem('preferredInputDeviceId');
@@ -403,12 +423,23 @@ const App: React.FC = () => {
         doNotPersist: meetingRetention === 'never'
       });
       if (result.success) {
+        if (metadata.stageWorkspaceMeetingId && typeof window.electronAPI?.stageWorkspaceConfirmCapture === 'function') {
+          const confirmed = await window.electronAPI.stageWorkspaceConfirmCapture(
+            metadata.stageWorkspaceMeetingId,
+            metadata.stageWorkspaceSessionRevision,
+          );
+          if (!confirmed.ok) {
+            await failStageWorkspaceStart(confirmed.code || 'session_capture_failed');
+            throw new Error(confirmed.message || 'Stage capture could not be confirmed.');
+          }
+        }
         analytics.trackMeetingStarted();
         // Window swap happens inside main's startMeeting() now (before the
         // meeting-state broadcast) to avoid a blue→green CTA flash on the
         // launcher. No follow-up setWindowMode IPC needed here.
       } else {
         console.error("Failed to start meeting:", result.error);
+        await failStageWorkspaceStart(result.code || 'capture_start_failed');
         // A mic-permission denial aborts the meeting before the overlay (which
         // hosts the in-meeting audio banner) is ever shown — so the user is
         // left on the launcher with nothing actionable. Re-open the permissions
@@ -421,6 +452,7 @@ const App: React.FC = () => {
       }
     } catch (err) {
       console.error("Failed to start meeting:", err);
+      await failStageWorkspaceStart((err as { code?: string })?.code || 'capture_start_failed');
       // Defense-in-depth: today the start-meeting IPC handler catches and
       // resolves {success:false, code}, so a mic denial lands in the else
       // branch above. If the call ever rejects instead, Electron preserves the

@@ -399,7 +399,7 @@ function normalizeStageCreatePayload(payload: any): InterviewStageCreatePayload 
   };
 }
 
-function normalizeStageUpdatePatch(patch: any): InterviewStageUpdatePatch {
+export function normalizeStageUpdatePatch(patch: any): InterviewStageUpdatePatch {
   if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
     throw new InterviewDomainError('invalid_payload', 'stage patch is invalid.', false, 'fix_input');
   }
@@ -1251,14 +1251,14 @@ export class InterviewService {
 
   getRetroEvaluation(interviewId: string): InterviewRetroEvaluation | null {
     const id = assertId(interviewId, 'interviewId');
-    this.requireActiveInterview(id);
-    return this.repo.getLatestRetroEvaluation(id);
+    const detail = this.requireActiveInterview(id);
+    return this.repo.getLatestRetroEvaluation(id, detail.selectedStageId ?? undefined);
   }
 
   async generateRetroEvaluation(interviewId: string): Promise<InterviewRetroEvaluation> {
     const id = assertId(interviewId, 'interviewId');
     const detail = this.requireActiveInterview(id);
-    const linked = this.repo.getLatestLinkedMeetingTranscript(id);
+    const linked = this.repo.getLatestLinkedMeetingTranscript(id, detail.selectedStageId ?? undefined);
     if (!linked) {
       throw new InterviewDomainError(
         'invalid_payload',

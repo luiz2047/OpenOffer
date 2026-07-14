@@ -595,6 +595,7 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [interfaceLanguageError, setInterfaceLanguageError] = useState<string | null>(null);
     const [isAiLangDropdownOpen, setIsAiLangDropdownOpen] = useState(false);
     const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'uptodate' | 'error'>('idle');
+    const [updateCheckConsent, setUpdateCheckConsent] = useState(false);
     const themeDropdownRef = React.useRef<HTMLDivElement>(null);
     const interfaceLanguageDropdownRef = React.useRef<HTMLDivElement>(null);
     const aiLangDropdownRef = React.useRef<HTMLDivElement>(null);
@@ -606,6 +607,9 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
     const [verboseLogging, setVerboseLogging] = useState(false);
     const [meetingRetention, setMeetingRetention] = useState<'forever' | '7d' | '30d' | 'never'>('forever');
     const [showVerboseToast, setShowVerboseToast] = useState(false);
+    const [databaseBackupState, setDatabaseBackupState] = useState<string | null>(null);
+    const [databaseInfo, setDatabaseInfo] = useState<{ databasePath: string; recordingsPath: string | null; encryptedAtRest: boolean } | null>(null);
+    const [analyticsConsent, setAnalyticsConsent] = useState(() => analytics.getConsent());
     const verboseToastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const applyInterfaceTranslationsSnapshot = (snapshot?: InterfaceTranslationsSnapshot | null) => {
@@ -625,6 +629,13 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
             window.electronAPI?.getDisguise?.().then(setDisguiseMode).catch(() => { });
             window.electronAPI?.getVerboseLogging?.().then(setVerboseLogging).catch(() => { });
             window.electronAPI?.getMeetingRetention?.().then(setMeetingRetention).catch(() => { });
+            window.electronAPI?.getUpdateCheckConsent?.().then(setUpdateCheckConsent).catch(() => { });
+            void Promise.resolve(window.electronAPI?.getTelemetryConsent?.()).then((state) => {
+                if (state && typeof state.enabled === 'boolean') setAnalyticsConsent(state.enabled);
+            }).catch(() => { });
+            window.electronAPI?.databaseInfo?.().then(result => {
+                if (result?.ok && result.data) setDatabaseInfo(result.data);
+            }).catch(() => { });
             window.electronAPI?.getInterfaceTranslations?.()
                 .then((snapshot) => {
                     if (snapshot) {
@@ -2007,6 +2018,49 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                             <h3 className="text-lg font-bold text-text-primary mb-1">{t('settings.general.title')}</h3>
                                             <p className="text-xs text-text-secondary mb-2">{t('settings.general.subtitle')}</p>
 
+                                            <div className={`${isLight ? 'bg-bg-card' : 'bg-bg-item-surface'} mb-3 rounded-xl border border-border-subtle p-4 flex items-center justify-between gap-4`}>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-text-primary">Local data backup</h4>
+                                                    <p className="mt-1 text-xs text-text-secondary">Save a restorable copy of the SQLite database. Audio files are not copied.</p>
+                                                    {databaseInfo && <p className="mt-1 break-all text-[11px] text-text-tertiary">SQLite: {databaseInfo.databasePath} · encrypted at rest: {databaseInfo.encryptedAtRest ? 'yes' : 'not yet'}</p>}
+                                                    {databaseBackupState && <p className="mt-1 text-[11px] text-text-tertiary">{databaseBackupState}</p>}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex min-h-9 items-center gap-2 rounded-md border border-border-subtle px-3 py-2 text-xs font-semibold text-text-primary hover:bg-bg-item-active"
+                                                    onClick={async () => {
+                                                        setDatabaseBackupState('Choose a backup location…');
+                                                        try {
+                                                            const result = await window.electronAPI?.databaseBackup?.();
+                                                            setDatabaseBackupState(result?.ok ? `Backup saved: ${result.data?.path ?? 'selected location'}` : (result?.message ?? 'Backup cancelled.'));
+                                                        } catch (error) {
+                                                            setDatabaseBackupState(error instanceof Error ? error.message : 'Backup failed.');
+                                                        }
+                                                    }}
+                                                >
+                                                    <Shield size={14} /> Back up database
+                                                </button>
+                                            </div>
+
+                                            <div className={`${isLight ? 'bg-bg-card' : 'bg-bg-item-surface'} mb-3 rounded-xl border border-border-subtle p-4 flex items-center justify-between gap-4`}>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-text-primary">Optional analytics</h4>
+                                                    <p className="mt-1 text-xs text-text-secondary">Disabled by default. No analytics request is made until you enable this setting.</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    aria-pressed={analyticsConsent}
+                                                    className={`min-h-9 rounded-md border px-3 py-2 text-xs font-semibold ${analyticsConsent ? 'border-emerald-400/30 text-emerald-300' : 'border-border-subtle text-text-secondary'}`}
+                                                    onClick={() => {
+                                                        const next = !analyticsConsent;
+                                                        setAnalyticsConsent(next);
+                                                        analytics.setConsent(next);
+                                                    }}
+                                                >
+                                                    {analyticsConsent ? 'Enabled' : 'Disabled'}
+                                                </button>
+                                            </div>
+
                                             <div className={`rounded-xl border ${isLight ? 'bg-bg-card border-border-subtle divide-y divide-border-subtle' : 'bg-transparent border-transparent divide-y divide-border-subtle/20'}`}>
                                             <div className="space-y-0">
                                                 {/* Open at Login */}
@@ -2055,19 +2109,21 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                             <p className="text-xs text-text-secondary mt-0.5 leading-normal">{t('settings.general.doNotSaveMeetingsDescription')}</p>
                                                         </div>
                                                     </div>
-                                                    <div
-                                                        onClick={() => {
-                                                            const nextRetention = meetingRetention === 'never' ? 'forever' : 'never';
+                                                    <select
+                                                        value={meetingRetention}
+                                                        aria-label={t('settings.general.doNotSaveMeetingsTitle')}
+                                                        onChange={(event) => {
+                                                            const nextRetention = event.target.value as 'forever' | '7d' | '30d' | 'never';
                                                             setMeetingRetention(nextRetention);
                                                             window.electronAPI?.setMeetingRetention?.(nextRetention);
                                                         }}
-                                                        className={`w-11 h-6 rounded-full relative transition-colors cursor-pointer shrink-0 mt-2 ${meetingRetention === 'never' ? 'bg-emerald-500' : 'bg-bg-toggle-switch border border-border-muted'}`}
-                                                        role="switch"
-                                                        aria-checked={meetingRetention === 'never'}
-                                                        aria-label={t('settings.general.doNotSaveMeetingsTitle')}
+                                                        className="min-h-9 rounded-md border border-border-subtle bg-bg-input px-3 py-2 text-xs text-text-primary"
                                                     >
-                                                        <div className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${meetingRetention === 'never' ? 'translate-x-5' : 'translate-x-0'}`} />
-                                                    </div>
+                                                        <option value="forever">Keep forever</option>
+                                                        <option value="30d">Delete after 30 days</option>
+                                                        <option value="7d">Delete after 7 days</option>
+                                                        <option value="never">Do not save new meetings</option>
+                                                    </select>
                                                 </div>
 
                                                 {/* Debug Logging */}
@@ -2564,6 +2620,25 @@ const SettingsOverlay: React.FC<SettingsOverlayProps> = ({ isOpen, onClose, init
                                                     </button>
                                                 </div>
                                             </div>
+                                            </div>
+
+                                            <div className={`${isLight ? 'bg-bg-card' : 'bg-bg-item-surface'} mt-3 rounded-xl border border-border-subtle p-4 flex items-center justify-between gap-4`}>
+                                                <div>
+                                                    <h4 className="text-sm font-bold text-text-primary">Background update checks</h4>
+                                                    <p className="mt-1 text-xs text-text-secondary">Disabled by default. Manual “Check” is always explicit.</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    aria-pressed={updateCheckConsent}
+                                                    className={`min-h-9 rounded-md border px-3 py-2 text-xs font-semibold ${updateCheckConsent ? 'border-emerald-400/30 text-emerald-300' : 'border-border-subtle text-text-secondary'}`}
+                                                    onClick={async () => {
+                                                        const next = !updateCheckConsent;
+                                                        setUpdateCheckConsent(next);
+                                                        await window.electronAPI?.setUpdateCheckConsent?.(next);
+                                                    }}
+                                                >
+                                                    {updateCheckConsent ? 'Enabled' : 'Disabled'}
+                                                </button>
                                             </div>
 
                                                 {/* ------------------------------------------------------------------ */}

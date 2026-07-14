@@ -149,6 +149,9 @@ export class DatabaseManager {
 
             this.db = new Database(this.dbPath);
             this.db.pragma('journal_mode = WAL');
+            // Enforce ownership and cascade constraints on every application
+            // connection, not only inside the v20 migration transaction.
+            this.db.pragma('foreign_keys = ON');
 
             // Load sqlite-vec extension for native vector search
             try {
@@ -169,10 +172,104 @@ export class DatabaseManager {
                 console.warn('[DatabaseManager] Vector search will fall back to JS cosine similarity');
             }
 
-            this.runMigrations();
+            this.withMigrationLock(() => this.runMigrations());
+            try {
+                const { SettingsManager } = require('../services/SettingsManager');
+                const retention = SettingsManager.getInstance().get('meetingRetention') ?? 'forever';
+                this.purgeExpiredMeetings(retention);
+            } catch (retentionError) {
+                console.warn('[DatabaseManager] Retention cleanup skipped during startup:', retentionError);
+            }
+            this.recoverStageSessionsOnStartup();
         } catch (error) {
             console.error('[DatabaseManager] Failed to initialize database:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Native capture cannot survive an app crash. Release any recorder lease
+     * left in an active state before the next workspace start. A stale stop is
+     * finalized as a recovered session; an initializing/recording row is
+     * preserved as failed/abandoned so the user can inspect or retake it.
+     */
+    private recoverStageSessionsOnStartup(): void {
+        if (!this.db) return;
+        try {
+            const now = Date.now();
+            const staleBefore = now - 30_000;
+            const recover = this.db.transaction(() => {
+                const stale = this.db!.prepare(`
+                    SELECT meeting_id, interview_stage_id, status
+                    FROM stage_sessions
+                    WHERE status IN ('initializing', 'recording', 'stopping')
+                      AND COALESCE(heartbeat_at, stop_requested_at, started_at, 0) < ?
+                `).all(staleBefore) as Array<{ meeting_id: string; interview_stage_id: string; status: string }>;
+                const updateStopping = this.db!.prepare(`
+                    UPDATE stage_sessions
+                    SET status = 'stopped',
+                        stopped_at = COALESCE(heartbeat_at, stop_requested_at, ?),
+                        failure_code = 'stop_interrupted',
+                        revision = revision + 1,
+                        updated_at = ?
+                    WHERE meeting_id = ? AND status = 'stopping'
+                `);
+                const updateRecording = this.db!.prepare(`
+                    UPDATE stage_sessions
+                    SET status = CASE WHEN status = 'initializing' THEN 'failed' ELSE 'abandoned' END,
+                        failure_code = CASE WHEN status = 'initializing' THEN 'capture_start_interrupted' ELSE 'session_abandoned' END,
+                        revision = revision + 1,
+                        updated_at = ?
+                    WHERE meeting_id = ? AND status IN ('initializing', 'recording')
+                `);
+                const bumpStage = this.db!.prepare(`
+                    UPDATE interview_stages
+                    SET workspace_revision = workspace_revision + 1, updated_at = ?
+                    WHERE id = ?
+                `);
+                const timestamp = new Date().toISOString();
+                for (const row of stale) {
+                    if (row.status === 'stopping') updateStopping.run(now, timestamp, row.meeting_id);
+                    else updateRecording.run(timestamp, row.meeting_id);
+                    bumpStage.run(timestamp, row.interview_stage_id);
+                }
+                // Requeue durable post-call work whose worker died with the
+                // process. A fencing token prevents the old worker from
+                // committing a late result after restart.
+                this.db!.prepare(`
+                    UPDATE stage_artifact_jobs
+                    SET status = CASE WHEN attempt_count >= 3 THEN 'failed' ELSE 'queued' END,
+                        lease_owner = NULL,
+                        lease_expires_at = NULL,
+                        last_error_json = CASE WHEN attempt_count >= 3 THEN '{"code":"startup_retry_exhausted"}' ELSE last_error_json END,
+                        updated_at = ?
+                    WHERE status = 'running' AND lease_expires_at IS NOT NULL AND lease_expires_at < ?
+                `).run(timestamp, now);
+                this.db!.prepare(`
+                    UPDATE stage_artifact_jobs
+                    SET status = 'queued', updated_at = ?
+                    WHERE status = 'blocked' AND artifact_type IN ('transcript', 'summary')
+                      AND meeting_id IN (SELECT meeting_id FROM stage_sessions WHERE status = 'stopped')
+                `).run(timestamp);
+                this.db!.prepare(`
+                    UPDATE stage_session_artifacts
+                    SET status = 'pending', updated_at = ?
+                    WHERE status = 'not_requested' AND artifact_type IN ('transcript', 'summary')
+                      AND meeting_id IN (SELECT meeting_id FROM stage_artifact_jobs WHERE status = 'queued')
+                `).run(timestamp);
+                this.db!.prepare(`
+                    DELETE FROM stage_workspace_operations
+                    WHERE status IN ('committed', 'failed', 'cancelled')
+                      AND updated_at < datetime('now', '-30 days')
+                `).run();
+                return stale.length;
+            });
+            const recovered = recover();
+            if (recovered > 0) console.warn(`[DatabaseManager] Recovered ${recovered} stale Stage Workspace session(s) at startup.`);
+        } catch (error) {
+            // Older/read-only databases may not have v20 tables. Migration will
+            // provision them later; startup must remain non-fatal here.
+            console.warn('[DatabaseManager] Stage session recovery skipped:', error);
         }
     }
 
@@ -182,6 +279,54 @@ export class DatabaseManager {
     // Each version is applied exactly once, in order.
     // New migrations append a new `if (version < N)` block.
     // ============================================
+
+    /**
+     * Keep every startup writer quiescent while a schema upgrade is in flight.
+     * The lock is process-local in addition to the filesystem O_EXCL lock so a
+     * second Electron instance cannot race the backup/preflight transaction.
+     */
+    private withMigrationLock<T>(fn: () => T): T {
+        if (!this.db) return fn();
+        const lockPath = `${this.dbPath}.migration.lock`;
+        let fd: number | null = null;
+        try {
+            try {
+                fd = fs.openSync(lockPath, 'wx');
+            } catch (error: any) {
+                if (error?.code !== 'EEXIST') throw error;
+                // A crashed process can leave the marker behind. Reclaim only
+                // when its recorded PID is definitely no longer alive; an
+                // active owner remains a hard stop rather than a race.
+                let ownerAlive = true;
+                try {
+                    const owner = Number(fs.readFileSync(lockPath, 'utf8').trim());
+                    if (!Number.isInteger(owner) || owner <= 0) ownerAlive = false;
+                    else process.kill(owner, 0);
+                } catch (probeError: any) {
+                    ownerAlive = probeError?.code !== 'ESRCH';
+                }
+                if (ownerAlive) throw new Error('Another OpenOffer process is running a database migration. Close it and retry.');
+                try { fs.unlinkSync(lockPath); } catch { /* another owner may have won the race */ }
+                fd = fs.openSync(lockPath, 'wx');
+            }
+            fs.writeFileSync(fd, String(process.pid), 'utf8');
+            this.db.pragma('wal_checkpoint(FULL)');
+            const result = fn();
+            try {
+                this.db.pragma('wal_checkpoint(FULL)');
+                const dbFd = fs.openSync(this.dbPath, 'r');
+                try { fs.fsyncSync(dbFd); } finally { fs.closeSync(dbFd); }
+            } catch { /* best effort; the transaction itself remains durable */ }
+            return result;
+        } catch (error: any) {
+            throw error;
+        } finally {
+            if (fd !== null) {
+                try { fs.closeSync(fd); } catch { /* best effort */ }
+                try { fs.unlinkSync(lockPath); } catch { /* best effort */ }
+            }
+        }
+    }
 
     private runMigrations() {
         if (!this.db) return;
@@ -878,6 +1023,67 @@ export class DatabaseManager {
             tx();
         }
 
+        // Version 19 -> 20: Stage Workspace integrity tables and strict ownership.
+        // This migration is additive. Existing meetings are backfilled only when
+        // their stage/application linkage is already unambiguous; application-only
+        // meetings remain available to explicit repair tooling and are never guessed.
+        if (version < 20) {
+            console.log('[DatabaseManager] Applying migration v19 -> v20: Stage Workspace integrity');
+            this.runStageWorkspaceMigrationPreflight();
+            this.createMigrationBackup(version);
+            const tx = this.db.transaction(() => {
+                applyInterviewSchema(this.db!);
+                this.db!.exec(`
+                    INSERT OR IGNORE INTO stage_sessions (
+                      meeting_id, interview_stage_id, status, started_at, stopped_at,
+                      revision, created_at, updated_at
+                    )
+                    SELECT
+                      m.id,
+                      m.interview_stage_id,
+                      'stopped',
+                      m.start_time,
+                      CASE WHEN m.duration_ms IS NOT NULL AND m.start_time IS NOT NULL
+                        THEN m.start_time + m.duration_ms ELSE NULL END,
+                      1,
+                      COALESCE(m.created_at, CURRENT_TIMESTAMP),
+                      COALESCE(m.created_at, CURRENT_TIMESTAMP)
+                    FROM meetings m
+                    JOIN interview_stages s ON s.id = m.interview_stage_id
+                    WHERE m.interview_stage_id IS NOT NULL
+                      AND m.application_id = s.application_id
+                      AND NOT EXISTS (
+                        SELECT 1 FROM stage_sessions existing WHERE existing.meeting_id = m.id
+                      );
+
+                    UPDATE interview_stages
+                    SET primary_session_meeting_id = (
+                      SELECT ss.meeting_id
+                      FROM stage_sessions ss
+                      WHERE ss.interview_stage_id = interview_stages.id
+                        AND ss.status = 'stopped'
+                      ORDER BY ss.stopped_at ASC, ss.created_at ASC
+                      LIMIT 1
+                    )
+                    WHERE primary_session_meeting_id IS NULL;
+
+                    SELECT 1;
+                `);
+                const foreignKeyErrors = this.db!.prepare('PRAGMA foreign_key_check').all();
+                const driftErrors = this.db!.prepare(`
+                  SELECT m.id
+                  FROM meetings m
+                  JOIN interview_stages s ON s.id = m.interview_stage_id
+                  WHERE m.application_id IS NOT s.application_id
+                `).all();
+                if (foreignKeyErrors.length || driftErrors.length) {
+                    throw new Error(`v20 integrity verification failed: foreign_keys=${foreignKeyErrors.length}, drift=${driftErrors.length}`);
+                }
+                this.db!.pragma('user_version = 20');
+            });
+            tx();
+        }
+
         console.log('[DatabaseManager] Migrations completed.');
     }
 
@@ -1306,6 +1512,85 @@ export class DatabaseManager {
         return this.dbPath;
     }
 
+    /** Create a consistent, user-restorable SQLite backup using SQLite's backup API. */
+    public async createBackup(destinationPath?: string): Promise<{ path: string }> {
+        if (!this.db) throw new Error('Local database is unavailable.');
+        const backupDir = path.join(path.dirname(this.dbPath), 'backups');
+        fs.mkdirSync(backupDir, { recursive: true });
+        const target = destinationPath || path.join(backupDir, `openoffer-${new Date().toISOString().replace(/[:.]/g, '-')}.db`);
+        await this.db.backup(target);
+        const fd = fs.openSync(target, 'r');
+        try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+        try {
+            const dirFd = fs.openSync(path.dirname(target), 'r');
+            try { fs.fsyncSync(dirFd); } finally { fs.closeSync(dirFd); }
+        } catch { /* best effort on platforms that do not fsync directories */ }
+        return { path: target };
+    }
+
+    private createMigrationBackup(version: number): void {
+        if (!this.db || !fs.existsSync(this.dbPath)) return;
+        const backupDir = path.join(path.dirname(this.dbPath), 'backups');
+        fs.mkdirSync(backupDir, { recursive: true });
+        const target = path.join(backupDir, `pre-v20-${version}-${new Date().toISOString().replace(/[:.]/g, '-')}.db`);
+        try {
+            // VACUUM INTO creates a consistent snapshot while WAL writers are
+            // quiesced during startup migration. User-triggered backups use
+            // better-sqlite3's online backup API above.
+            this.db.prepare('VACUUM INTO ?').run(target);
+            const fd = fs.openSync(target, 'r');
+            try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+            console.log(`[DatabaseManager] Created migration backup at ${target}`);
+        } catch (error) {
+            throw new Error(`Migration backup failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    }
+
+    private runStageWorkspaceMigrationPreflight(): void {
+        if (!this.db) return;
+        const checks: Array<{ name: string; sql: string }> = [
+            {
+                name: 'duplicate_stage_maps',
+                sql: `SELECT stage_id, COUNT(*) AS count FROM legacy_interview_event_map GROUP BY stage_id HAVING COUNT(*) > 1`,
+            },
+            {
+                name: 'duplicate_event_maps',
+                sql: `SELECT legacy_interview_event_id, COUNT(*) AS count FROM legacy_interview_event_map GROUP BY legacy_interview_event_id HAVING COUNT(*) > 1`,
+            },
+            {
+                name: 'map_application_mismatch',
+                sql: `
+                  SELECT map.stage_id, map.application_id, stage.application_id AS stage_application_id
+                  FROM legacy_interview_event_map map
+                  JOIN interview_stages stage ON stage.id = map.stage_id
+                  WHERE map.application_id IS NOT stage.application_id
+                `,
+            },
+            {
+                name: 'orphan_stages',
+                sql: `SELECT stage.id FROM interview_stages stage LEFT JOIN applications app ON app.id = stage.application_id WHERE app.id IS NULL`,
+            },
+            {
+                name: 'meeting_stage_application_disagreement',
+                sql: `
+                  SELECT meeting.id, meeting.interview_stage_id, meeting.application_id, stage.application_id AS stage_application_id
+                  FROM meetings meeting
+                  JOIN interview_stages stage ON stage.id = meeting.interview_stage_id
+                  WHERE meeting.application_id IS NOT stage.application_id
+                `,
+            },
+        ];
+        const failures: Record<string, unknown[]> = {};
+        for (const check of checks) {
+            const rows = this.db.prepare(check.sql).all();
+            if (rows.length > 0) failures[check.name] = rows;
+        }
+        if (Object.keys(failures).length === 0) return;
+        const reportPath = path.join(path.dirname(this.dbPath), `stage-workspace-repair-${new Date().toISOString().replace(/[:.]/g, '-')}.json`);
+        fs.writeFileSync(reportPath, JSON.stringify({ schemaVersion: 1, createdAt: new Date().toISOString(), failures }, null, 2), 'utf8');
+        throw new Error(`Stage Workspace migration preflight found ambiguous ownership. Repair report: ${reportPath}`);
+    }
+
     /**
      * Resolved sqlite-vec extension path (without platform file suffix).
      * Used by worker threads that open their own DB connection.
@@ -1380,12 +1665,24 @@ export class DatabaseManager {
         }
 
         const insertMeeting = this.db.prepare(`
-            INSERT OR REPLACE INTO meetings (
+            INSERT INTO meetings (
                 id, title, start_time, duration_ms, summary_json, created_at,
                 calendar_event_id, source, is_processed, interview_event_id,
                 interview_stage_id, application_id
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                start_time = excluded.start_time,
+                duration_ms = excluded.duration_ms,
+                summary_json = excluded.summary_json,
+                created_at = excluded.created_at,
+                calendar_event_id = excluded.calendar_event_id,
+                source = excluded.source,
+                is_processed = excluded.is_processed,
+                interview_event_id = excluded.interview_event_id,
+                interview_stage_id = excluded.interview_stage_id,
+                application_id = excluded.application_id
         `);
 
         const insertTranscript = this.db.prepare(`
@@ -1645,6 +1942,34 @@ export class DatabaseManager {
         } catch (error) {
             console.error(`[DatabaseManager] Failed to delete meeting ${id}:`, error);
             return false;
+        }
+    }
+
+    /** Delete persisted meeting data older than the selected retention window. */
+    public purgeExpiredMeetings(retention: 'forever' | '7d' | '30d' | 'never'): number {
+        if (!this.db || retention === 'forever' || retention === 'never') return 0;
+        const days = retention === '7d' ? 7 : 30;
+        const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+        try {
+            const ids = this.db.prepare(`
+              SELECT id FROM meetings
+              WHERE COALESCE(start_time, strftime('%s', created_at) * 1000) < ?
+            `).all(cutoff) as Array<{ id: string }>;
+            const purge = this.db.transaction(() => {
+                for (const row of ids) {
+                    // Foreign-key cascades remove stage sessions, contexts,
+                    // artifacts, reviews, and transcripts for this meeting.
+                    this.db!.prepare('DELETE FROM meetings WHERE id = ?').run(row.id);
+                    for (const table of ['embedding_queue', 'chunks', 'chunk_summaries']) {
+                        try { this.db!.prepare(`DELETE FROM ${table} WHERE meeting_id = ?`).run(row.id); } catch { /* legacy table/column */ }
+                    }
+                }
+            });
+            purge();
+            return ids.length;
+        } catch (error) {
+            console.error('[DatabaseManager] Failed to purge expired meetings:', error);
+            return 0;
         }
     }
 

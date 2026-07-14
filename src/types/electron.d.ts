@@ -29,6 +29,9 @@ import type {
   PrepBrief,
   PrepBriefPayload,
   ReadinessResult,
+  StageWorkspaceSnapshot,
+  StageWorkspaceInvalidation,
+  StageWorkspaceExportResult,
   RetroPromptActionPayload,
   RetroPromptDecision,
   VacancyDossier,
@@ -367,7 +370,7 @@ export interface ElectronAPI {
   interviewStagesArchive: (id: string) => Promise<InterviewIpcResult<ApplicationDetail>>
   interviewStagesRestore: (id: string, status?: InterviewStageUpdatePatch['status']) => Promise<InterviewIpcResult<ApplicationDetail>>
   interviewStagesAttachMeeting: (id: string, meetingId: string) => Promise<InterviewIpcResult<{ attached: boolean }>>
-  interviewStagesCreateCalendarEvent: (id: string, provider: InterviewStageCalendarEventPayload['provider']) => Promise<InterviewIpcResult<ApplicationDetail>>
+  interviewStagesCreateCalendarEvent: (id: string, provider: InterviewStageCalendarEventPayload['provider'], operationId: string, expectedRevision?: number) => Promise<InterviewIpcResult<ApplicationDetail>>
   interviewsUpdate: (id: string, patch: InterviewUpdatePatch) => Promise<InterviewIpcResult<InterviewDetail>>
   interviewsArchive: (id: string) => Promise<InterviewIpcResult<{ archived: boolean }>>
   interviewsDelete: (id: string, includeLinkedMeetings?: boolean) => Promise<InterviewIpcResult<{ deleted: boolean }>>
@@ -383,6 +386,28 @@ export interface ElectronAPI {
   interviewRetroSave: (interviewId: string, operationId: string, payload: InterviewRetroPayload) => Promise<InterviewIpcResult<InterviewRetro>>
   interviewQuestionsList: (interviewId?: string) => Promise<InterviewIpcResult<InterviewQuestion[]>>
   interviewQuestionsSave: (interviewId: string, operationId: string, questions: InterviewQuestionPayload[]) => Promise<InterviewIpcResult<InterviewQuestion[]>>
+  stageWorkspaceGet: (stageId: string) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspacePreflight: (stageId: string, options?: { includeAi?: boolean }) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceCancelPreflight: (stageId: string) => Promise<InterviewIpcResult<{ cancelled: boolean }>>
+  onStageWorkspaceInvalidated: (callback: (event: StageWorkspaceInvalidation) => void) => () => void
+  stageWorkspaceEnsureBacking: (stageId: string, expectedRevision?: number) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceUpdateStage: (stageId: string, operationId: string, expectedRevision: number | undefined, patch: InterviewStageUpdatePatch) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceAttachMeeting: (stageId: string, meetingId: string, operationId: string, expectedRevision?: number) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspacePrepare: (stageId: string, operationId: string, expectedRevision: number | undefined, payload: PrepBriefPayload) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceStart: (stageId: string, operationId: string, expectedRevision?: number, context?: Record<string, unknown>) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceStop: (meetingId: string, operationId: string, expectedSessionRevision?: number) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceConfirmCapture: (meetingId: string, expectedSessionRevision?: number) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceRetryArtifact: (meetingId: string, artifactType: 'transcript' | 'summary' | 'ai_review') => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceFail: (meetingId: string, operationId: string, failureCode?: string) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceSaveReview: (stageId: string, meetingId: string, review: Record<string, unknown>, expectedRevision?: number) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceSelectPrimary: (stageId: string, meetingId: string | null, expectedRevision?: number) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceClearReview: (stageId: string, confirmationToken: string, expectedRevision?: number) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceDeleteSession: (meetingId: string, confirmationToken: string, expectedRevision?: number) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceSetNextAction: (stageId: string, nextAction: { text?: string | null; dueAt?: number | null; state?: 'missing' | 'saved' | 'completed' | 'none_required' }, expectedRevision?: number) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceCompleteNextAction: (stageId: string, expectedRevision?: number) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceNoNextAction: (stageId: string, expectedRevision?: number) => Promise<InterviewIpcResult<StageWorkspaceSnapshot>>
+  stageWorkspaceCancelOperation: (operationId: string) => Promise<InterviewIpcResult<{ cancelled: boolean }>>
+  stageWorkspaceExport: (stageId: string, format: 'json' | 'markdown', includeTranscript?: boolean) => Promise<InterviewIpcResult<StageWorkspaceExportResult & { path?: string }>>
 
   // Meeting Lifecycle
   startMeeting: (metadata?: any) => Promise<{ success: boolean; error?: string; code?: string }>
@@ -492,6 +517,12 @@ export interface ElectronAPI {
 
   // Database
   flushDatabase: () => Promise<{ success: boolean }>;
+  databaseBackup: () => Promise<{ ok: boolean; data?: { path: string }; message?: string }>;
+  databaseInfo: () => Promise<{ ok: boolean; data?: { databasePath: string; recordingsPath: string | null; audioPersisted: boolean; encryptedAtRest: boolean; deletion: string } }>;
+  getUpdateCheckConsent: () => Promise<boolean>;
+  setUpdateCheckConsent: (enabled: boolean) => Promise<{ success: boolean; enabled?: boolean; error?: string }>;
+  getTelemetryConsent: () => Promise<{ enabled: boolean; grantedAt: string | null; policyVersion: string }>;
+  setTelemetryConsent: (enabled: boolean) => Promise<{ success: boolean; state?: { enabled: boolean; grantedAt: string | null; policyVersion: string }; error?: string }>;
 
   onUndetectableChanged: (callback: (state: boolean) => void) => () => void;
   onGroqFastTextChanged: (callback: (enabled: boolean) => void) => () => void;

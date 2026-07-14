@@ -12,7 +12,13 @@ import { LongTermMemoryService } from './intelligence/memory/LongTermMemoryServi
 import { isIntelligenceFlagEnabled } from './intelligence/intelligenceFlags';
 import { telemetryService } from './services/telemetry/TelemetryService';
 import type { ProviderDataScopePolicy } from './llm/ProviderRouter';
+import { broadcastStageWorkspaceInvalidated } from './services/interviews/StageWorkspaceEvents';
 const crypto = require('crypto');
+
+function parseDurationMs(duration: string): number {
+    const [minutes, seconds] = String(duration || '0:00').split(':').map(Number);
+    return Math.max(0, ((minutes || 0) * 60 + (seconds || 0)) * 1000);
+}
 
 export class MeetingPersistence {
     private session: SessionTracker;
@@ -100,7 +106,7 @@ export class MeetingPersistence {
         // 2. Reset state immediately so new meeting can start or UI is clean
         this.session.reset();
 
-        const meetingId = crypto.randomUUID();
+        const meetingId = metadataSnapshot?.stageWorkspaceMeetingId || crypto.randomUUID();
 
         // 4. Initial Save (Placeholder)
         const minutes = Math.floor(durationMs / 60000);
@@ -126,6 +132,24 @@ export class MeetingPersistence {
 
         try {
             DatabaseManager.getInstance().saveMeeting(placeholder, snapshot.startTime, durationMs);
+            if (metadataSnapshot?.stageWorkspaceMeetingId) {
+                try {
+                    const { createBetterSqliteExecutor, InterviewRepository } = require('./services/interviews/InterviewRepository');
+                    const { StageWorkspaceService } = require('./services/interviews/StageWorkspaceService');
+                    const db = DatabaseManager.getInstance().getDb();
+                    if (db) {
+                        const executor = createBetterSqliteExecutor(db);
+                        new StageWorkspaceService(new InterviewRepository(executor), executor)
+                            .completeStageSession(
+                                metadataSnapshot.stageWorkspaceMeetingId,
+                                `stop:${metadataSnapshot.stageWorkspaceMeetingId}`,
+                                metadataSnapshot.stageWorkspaceSessionRevision,
+                            );
+                    }
+                } catch (workspaceError) {
+                    console.warn('[MeetingPersistence] Stage Workspace stop finalization failed:', workspaceError);
+                }
+            }
             // Notify Frontend
             const wins = require('electron').BrowserWindow.getAllWindows();
             wins.forEach((w: any) => w.webContents.send('meetings-updated'));
@@ -138,6 +162,83 @@ export class MeetingPersistence {
         });
 
         return meetingId;
+    }
+
+    /** Re-run durable Stage Workspace post-call work from the saved meeting. */
+    public async retryStageArtifacts(meetingId: string): Promise<void> {
+        const meeting = DatabaseManager.getInstance().getMeetingDetails(meetingId);
+        if (!meeting) throw new Error('Stage meeting was not found for retry.');
+        const transcript = meeting.transcript ?? [];
+        const context = transcript.map(segment => `${segment.speaker || 'speaker'}: ${segment.text}`).join('\n');
+        await this.processAndSaveMeeting(
+            {
+                transcript: transcript.map(segment => ({ speaker: segment.speaker, text: segment.text, timestamp: segment.timestamp })) as TranscriptSegment[],
+                usage: meeting.usage ?? [],
+                startTime: Date.parse(meeting.date) || Date.now(),
+                durationMs: parseDurationMs(meeting.duration),
+                context,
+            },
+            meetingId,
+            {
+                title: meeting.title,
+                calendarEventId: meeting.calendarEventId ?? undefined,
+                interviewEventId: meeting.interviewEventId ?? undefined,
+                interviewStageId: meeting.interviewStageId ?? undefined,
+                applicationId: meeting.applicationId ?? undefined,
+                source: meeting.source,
+                stageWorkspaceMeetingId: meetingId,
+            },
+            null,
+        );
+    }
+
+    /** Generate an explicitly requested, editable AI review draft for a stage session. */
+    public async generateStageReview(meetingId: string): Promise<void> {
+        const meeting = DatabaseManager.getInstance().getMeetingDetails(meetingId);
+        if (!meeting) throw new Error('Stage meeting was not found for AI review.');
+        const transcript = meeting.transcript ?? [];
+        if (transcript.length === 0) throw new Error('A transcript is required before generating an AI review.');
+
+        const { createBetterSqliteExecutor, InterviewRepository } = require('./services/interviews/InterviewRepository');
+        const { StageWorkspaceService } = require('./services/interviews/StageWorkspaceService');
+        const db = DatabaseManager.getInstance().getDb();
+        if (!db) throw new Error('Local database is unavailable.');
+        const executor = createBetterSqliteExecutor(db);
+        const workspace = new StageWorkspaceService(new InterviewRepository(executor), executor);
+        const leaseOwner = `ai-review:${process.pid}:${meetingId}`;
+        const claims = workspace.claimArtifactJobs(meetingId, leaseOwner, 60_000, 'ai_review');
+        const claim = claims.find((item: { artifactType: string }) => item.artifactType === 'ai_review');
+        if (!claim) return;
+
+        try {
+            const transcriptText = transcript
+                .map(segment => `${segment.speaker || 'speaker'}: ${segment.text || ''}`)
+                .join('\n')
+                .slice(0, 14000);
+            const prompt = `You are preparing an editable interview retrospective for the candidate.\n\n` +
+                `Use only evidence present in the transcript. Do not invent metrics, outcomes, or claims.\n` +
+                `Return only valid JSON with this shape:\n` +
+                `{"mainSignal":"...","strengths":["..."],"risks":["..."],"followUps":["..."],"evidence":["..."]}\n\n` +
+                `Transcript:\n${transcriptText}`;
+            const raw = await this.llmHelper.generateContentStructured(prompt, { preferFast: true });
+            const match = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/) || [null, raw];
+            const parsed = JSON.parse(String(match[1] || raw).trim()) as Record<string, unknown>;
+            const draft = {
+                mainSignal: typeof parsed.mainSignal === 'string' ? parsed.mainSignal : '',
+                strengths: Array.isArray(parsed.strengths) ? parsed.strengths.filter(item => typeof item === 'string') : [],
+                risks: Array.isArray(parsed.risks) ? parsed.risks.filter(item => typeof item === 'string') : [],
+                followUps: Array.isArray(parsed.followUps) ? parsed.followUps.filter(item => typeof item === 'string') : [],
+                evidence: Array.isArray(parsed.evidence) ? parsed.evidence.filter(item => typeof item === 'string') : [],
+                generatedBy: 'ai',
+            };
+            const snapshot = workspace.saveAiReviewDraft(meetingId, draft);
+            workspace.completeArtifactJob(meetingId, 'ai_review', leaseOwner, claim.fencingToken, 'succeeded');
+            try { broadcastStageWorkspaceInvalidated(workspace.getStageWorkspace(snapshot.stageId)); } catch { /* durable state remains */ }
+        } catch (error) {
+            workspace.completeArtifactJob(meetingId, 'ai_review', leaseOwner, claim.fencingToken, 'failed', 'review_generation_failed');
+            try { broadcastStageWorkspaceInvalidated(workspace.getStageWorkspace((meeting as any).interviewStageId)); } catch { /* durable state remains */ }
+            throw error;
+        }
     }
 
     /**
@@ -154,6 +255,7 @@ export class MeetingPersistence {
             interviewStageId?: string;
             applicationId?: string;
             source?: 'manual' | 'calendar';
+            stageWorkspaceMeetingId?: string;
         } | null,
         // BUG-MODE-BLEEDING fix: accept mode snapshot so async summary uses the mode that was
         // active when meeting stopped, not whatever mode is active when async processing runs.
@@ -164,6 +266,23 @@ export class MeetingPersistence {
         // Phase 6 — post_call_summary lifecycle telemetry. Wrapped in try/catch
         // around track calls so a telemetry sink fault never breaks persistence.
         const _postCallStart = Date.now();
+        let stageWorker: any = null;
+        let stageClaims: Array<{ artifactType: string; fencingToken: number }> = [];
+        const stageLeaseOwner = `post-call:${process.pid}:${meetingId}`;
+        try {
+            if (metadata?.stageWorkspaceMeetingId) {
+                const { createBetterSqliteExecutor, InterviewRepository } = require('./services/interviews/InterviewRepository');
+                const { StageWorkspaceService } = require('./services/interviews/StageWorkspaceService');
+                const db = DatabaseManager.getInstance().getDb();
+                if (db) {
+                    const executor = createBetterSqliteExecutor(db);
+                    stageWorker = new StageWorkspaceService(new InterviewRepository(executor), executor);
+                    stageClaims = stageWorker.claimArtifactJobs(metadata.stageWorkspaceMeetingId, stageLeaseOwner);
+                }
+            }
+        } catch (claimError) {
+            console.warn('[MeetingPersistence] Stage artifact claim skipped:', claimError);
+        }
         try {
             telemetryService.track({
                 name: 'post_call_summary_started',
@@ -428,6 +547,23 @@ Return ONLY valid JSON (no markdown code blocks):
 
             DatabaseManager.getInstance().saveMeeting(meetingData, data.startTime, data.durationMs);
 
+            if (stageWorker && metadata?.stageWorkspaceMeetingId) {
+                for (const claim of stageClaims) {
+                    if (claim.artifactType === 'transcript' || claim.artifactType === 'summary') {
+                        stageWorker.completeArtifactJob(
+                            metadata.stageWorkspaceMeetingId,
+                            claim.artifactType,
+                            stageLeaseOwner,
+                            claim.fencingToken,
+                            'succeeded',
+                        );
+                    }
+                }
+                try {
+                    broadcastStageWorkspaceInvalidated(stageWorker.getStageWorkspace(metadata.stageWorkspaceMeetingId));
+                } catch { /* durable DB state remains authoritative */ }
+            }
+
             // HINDSIGHT POST-MEETING RETAIN (Phase 13 wiring, behind
             // hindsight_post_meeting_retain_enabled). After the meeting is persisted
             // locally, ASYNC-retain its summary into long-term memory IF Hindsight is
@@ -486,6 +622,21 @@ Return ONLY valid JSON (no markdown code blocks):
 
         } catch (error) {
             console.error('[MeetingPersistence] Failed to save meeting:', error);
+            if (stageWorker && metadata?.stageWorkspaceMeetingId) {
+                for (const claim of stageClaims) {
+                    stageWorker.completeArtifactJob(
+                        metadata.stageWorkspaceMeetingId,
+                        claim.artifactType as 'transcript' | 'summary' | 'ai_review',
+                        stageLeaseOwner,
+                        claim.fencingToken,
+                        'failed',
+                        'post_call_persistence_failed',
+                    );
+                }
+                try {
+                    broadcastStageWorkspaceInvalidated(stageWorker.getStageWorkspace(metadata.stageWorkspaceMeetingId));
+                } catch { /* durable DB state remains authoritative */ }
+            }
             try {
                 telemetryService.track({
                     name: 'post_call_summary_failed',

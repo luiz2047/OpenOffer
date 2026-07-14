@@ -53,6 +53,8 @@ export class SessionTracker {
         interviewStageId?: string;
         applicationId?: string;
         source?: 'manual' | 'calendar';
+        stageWorkspaceMeetingId?: string;
+        stageWorkspaceSessionRevision?: number;
     } | null = null;
 
     // Full Session Tracking (Persisted)

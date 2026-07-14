@@ -27,6 +27,9 @@ import {
 import { SkillsManager } from './services/SkillsManager';
 import { createBetterSqliteExecutor, InterviewRepository } from './services/interviews/InterviewRepository';
 import { InterviewDomainError, InterviewService, safeInterviewHandle } from './services/interviews/InterviewService';
+import { StageWorkspaceService, type StageWorkspaceReadinessProvider } from './services/interviews/StageWorkspaceService';
+import { broadcastStageWorkspaceInvalidated } from './services/interviews/StageWorkspaceEvents';
+import { getStageProviderProbeEndpoint, runStageProviderPreflight, type StageProviderProbeResult } from './services/interviews/StageProviderPreflight';
 import { normalizeTaskModelPolicy, resolveTaskModel, type AiTask } from './services/TaskModelPolicy';
 
 import { TRIAL_SENTINEL_KEY, DOM_CONTEXT_MAX_CHARS } from './config/constants';
@@ -81,6 +84,9 @@ type InterfaceLanguageState = {
   systemLanguage: string;
 };
 
+const stagePreflightCache = new Map<string, { checkedAt: number; results: StageProviderProbeResult[] }>();
+const activeStagePreflights = new Map<string, AbortController>();
+
 function getInterfaceTranslationsSnapshot(): InterfaceTranslationsSnapshot {
   return InterfaceTranslationManager.getInstance().getSnapshot();
 }
@@ -112,6 +118,7 @@ function broadcastInterfaceTranslationsChanged(snapshot: InterfaceTranslationsSn
     }
   });
 }
+
 
 const GIGASTT_HTTP_BASE_URL = 'http://127.0.0.1:9876';
 const GIGASTT_LOG_PATH = path.join(os.homedir(), '.gigastt', 'openoffer-gigastt.log');
@@ -409,6 +416,110 @@ export function initializeIpcHandlers(appState: AppState): void {
         return llmHelper.generateContentStructured(prompt, { preferFast: true });
       },
     );
+  };
+
+  const getStageWorkspaceService = (): StageWorkspaceService => {
+    const db = DatabaseManager.getInstance().getDb();
+    if (!db) {
+      throw new InterviewDomainError(
+        'local_database_unavailable',
+        'The local interview database is not ready yet.',
+        true,
+        'retry',
+      );
+    }
+    const executor = createBetterSqliteExecutor(db);
+    const readinessProvider: StageWorkspaceReadinessProvider = (stage, contextReady) => {
+      const blockers: string[] = [];
+      const warnings: string[] = [];
+      const completed: string[] = [];
+      let score = 0;
+      const checks: Array<any> = [];
+
+      if (contextReady) {
+        completed.push('stage_context');
+        score += 25;
+        checks.push({ id: 'context', required: true, status: 'ready', messageKey: 'stage_context_ready', checkedAt: Date.now() });
+      } else {
+        blockers.push('stage_context_missing');
+        checks.push({ id: 'context', required: true, status: 'missing', messageKey: 'stage_context_missing', recoveryAction: 'add_context' });
+      }
+
+      let sttConfigured = false;
+      let sttProvider = 'none';
+      let sttEndpoint: string | undefined;
+      try {
+        const { CredentialsManager } = require('./services/CredentialsManager');
+        const credentials = CredentialsManager.getInstance();
+        sttProvider = credentials.getSttProvider();
+        sttEndpoint = sttProvider === 'openai' ? credentials.getOpenAiSttBaseUrl() : undefined;
+        sttConfigured = sttProvider !== 'none';
+        if (sttConfigured) completed.push(`stt_configured:${sttProvider}`);
+      } catch {
+        warnings.push('stt_configuration_unknown');
+      }
+      const localStt = sttProvider === 'local-whisper' || sttProvider === 'gigastt';
+      const preflight = stagePreflightCache.get(stage.id)?.results.find(result => result.id === 'stt');
+      if (!sttConfigured) {
+        blockers.push('stt_not_configured');
+        checks.push({ id: 'stt', required: true, status: 'missing', messageKey: 'stt_not_configured', recoveryAction: 'configure_provider' });
+      } else if (localStt) {
+        score += 35;
+        checks.push({ id: 'stt', required: true, status: 'ready', messageKey: 'stt_local_ready', checkedAt: Date.now(), provider: sttProvider, endpoint: 'localhost / local runtime' });
+      } else if (!preflight) {
+        blockers.push('stt_probe_required');
+        checks.push({ id: 'stt', required: true, status: 'unknown', messageKey: 'stt_probe_required', recoveryAction: 'run_preflight', provider: sttProvider, endpoint: getStageProviderProbeEndpoint(sttProvider, sttEndpoint) ?? 'credentials present; endpoint not live-tested' });
+      } else if (preflight.status === 'ready') {
+        score += 35;
+        checks.push(preflight);
+      } else {
+        blockers.push(preflight.errorCode === 'provider_probe_timeout' ? 'provider_probe_timeout' : 'stt_probe_failed');
+        checks.push(preflight);
+      }
+
+      let microphoneReady = true;
+      let systemAudioReady = true;
+      if (process.platform === 'darwin') {
+        const microphone = systemPreferences.getMediaAccessStatus('microphone');
+        const screen = systemPreferences.getMediaAccessStatus('screen');
+        microphoneReady = microphone === 'granted';
+        systemAudioReady = screen === 'granted';
+        if (microphoneReady) completed.push('microphone_permission');
+        else blockers.push(microphone === 'denied' ? 'microphone_permission_denied' : 'microphone_permission_unknown');
+        checks.push({ id: 'microphone', required: true, status: microphoneReady ? 'ready' : microphone === 'denied' ? 'denied' : 'unknown', messageKey: microphoneReady ? 'microphone_ready' : 'microphone_permission_denied', recoveryAction: microphoneReady ? undefined : 'open_permissions' });
+        if (systemAudioReady) completed.push('system_audio_permission');
+        else blockers.push(screen === 'denied' ? 'system_audio_permission_denied' : 'system_audio_permission_unknown');
+        checks.push({ id: 'system_audio', required: true, status: systemAudioReady ? 'ready' : screen === 'denied' ? 'denied' : 'unknown', messageKey: systemAudioReady ? 'system_audio_ready' : 'system_audio_permission_denied', recoveryAction: systemAudioReady ? undefined : 'open_permissions' });
+      } else {
+        completed.push('microphone_permission', 'system_audio_permission');
+        checks.push({ id: 'microphone', required: true, status: 'ready', messageKey: 'microphone_ready', checkedAt: Date.now() });
+        checks.push({ id: 'system_audio', required: true, status: 'ready', messageKey: 'system_audio_ready', checkedAt: Date.now() });
+      }
+      if (microphoneReady) score += 20;
+      if (systemAudioReady) score += 20;
+
+      const nextAction = blockers.includes('stage_context_missing')
+        ? 'Add the recruiter or stage context.'
+        : blockers.includes('stt_not_configured')
+          ? 'Choose and configure a speech-to-text provider in Settings.'
+          : blockers.includes('stt_probe_required')
+            ? 'Run preflight to verify the configured speech-to-text provider.'
+            : blockers.some(code => code.includes('probe'))
+              ? 'Provider preflight did not complete. Retry before recording.'
+          : blockers.some(code => code.includes('permission'))
+            ? 'Grant microphone and system-audio permissions, then run preflight again.'
+            : null;
+      return {
+        score,
+        level: blockers.length === 0 ? 'ready' : score > 0 ? 'needs_work' : 'not_started',
+        blockers,
+        warnings,
+        completed,
+        checks,
+        nextAction,
+      };
+    };
+    return new StageWorkspaceService(new InterviewRepository(executor), executor, readinessProvider);
   };
 
   // Clears premium-only context when the pro license is lost.
@@ -2102,12 +2213,46 @@ export function initializeIpcHandlers(appState: AppState): void {
       return { success: false, error: 'invalid_retention' };
     }
     SettingsManager.getInstance().set('meetingRetention', retention);
+    const purgedMeetings = DatabaseManager.getInstance().purgeExpiredMeetings(retention);
     BrowserWindow.getAllWindows().forEach((win) => {
       if (!win.isDestroyed()) {
         win.webContents.send('meeting-retention-changed', retention);
       }
     });
-    return { success: true };
+    return { success: true, purgedMeetings };
+  });
+
+  const UPDATE_CHECK_POLICY_VERSION = '2026-07-14-stage-workspace';
+  safeHandle('get-update-check-consent', async () => SettingsManager.getInstance().get('updateChecksConsent') ?? false);
+  safeHandle('set-update-check-consent', async (_, enabled: boolean) => {
+    if (typeof enabled !== 'boolean') return { success: false, error: 'invalid_value' };
+    const settings = SettingsManager.getInstance();
+    settings.set('updateChecksConsent', enabled);
+    settings.set('updateChecksConsentGrantedAt', enabled ? new Date().toISOString() : undefined);
+    settings.set('updateChecksConsentPolicyVersion', UPDATE_CHECK_POLICY_VERSION);
+    return { success: true, enabled, policyVersion: UPDATE_CHECK_POLICY_VERSION };
+  });
+
+  const TELEMETRY_POLICY_VERSION = 'telemetry-v1';
+  safeHandle('get-telemetry-consent', async () => {
+    const settings = SettingsManager.getInstance();
+    return settings.get('telemetryConsent') ?? {
+      enabled: settings.get('telemetryEnabled') === true,
+      grantedAt: null,
+      policyVersion: TELEMETRY_POLICY_VERSION,
+    };
+  });
+  safeHandle('set-telemetry-consent', async (_, enabled: boolean) => {
+    if (typeof enabled !== 'boolean') return { success: false, error: 'invalid_consent' };
+    const state = {
+      enabled,
+      grantedAt: enabled ? new Date().toISOString() : null,
+      policyVersion: TELEMETRY_POLICY_VERSION,
+    } as const;
+    const settings = SettingsManager.getInstance();
+    settings.set('telemetryConsent', state);
+    settings.set('telemetryEnabled', enabled);
+    return { success: true, state };
   });
 
   safeHandle('get-provider-data-scopes', async () => {
@@ -4281,6 +4426,37 @@ export function initializeIpcHandlers(appState: AppState): void {
 
   safeHandle('start-meeting', async (event, metadata?: any) => {
     try {
+      // Stage-linked capture is owned by StageWorkspaceService. A renderer
+      // must not smuggle an interviewStageId into the generic meeting path;
+      // the durable initializing session is the proof that context/readiness
+      // and the operation journal already ran.
+      if (metadata?.interviewStageId && !metadata?.stageWorkspaceMeetingId) {
+        return {
+          success: false,
+          error: 'Select the stage workspace and complete readiness before recording.',
+          code: 'stage_workspace_required',
+        };
+      }
+      if (metadata?.stageWorkspaceMeetingId) {
+        const db = DatabaseManager.getInstance().getDb();
+        const linked = db?.prepare(`
+          SELECT 1
+          FROM stage_sessions AS ss
+          JOIN interview_stages AS s ON s.id = ss.interview_stage_id
+          WHERE ss.meeting_id = ?
+            AND ss.interview_stage_id = ?
+            AND s.application_id = ?
+            AND ss.status = 'initializing'
+          LIMIT 1
+        `).get(metadata.stageWorkspaceMeetingId, metadata.interviewStageId, metadata.applicationId);
+        if (!linked) {
+          return {
+            success: false,
+            error: 'The selected stage session is not ready for capture. Refresh the Stage Workspace and try again.',
+            code: 'stage_session_not_ready',
+          };
+        }
+      }
       await appState.startMeeting(metadata);
       return { success: true };
     } catch (error: any) {
@@ -4520,6 +4696,34 @@ export function initializeIpcHandlers(appState: AppState): void {
     const result = DatabaseManager.getInstance().clearAllData();
     return { success: result };
   });
+
+  safeHandle('database:backup', async () => {
+    const result: any = await dialog.showSaveDialog({
+      title: 'Back up OpenOffer database',
+      defaultPath: path.join(app.getPath('documents'), `openoffer-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.db`),
+      filters: [{ name: 'SQLite database', extensions: ['db'] }],
+    });
+    if (result.canceled || !result.filePath) {
+      return { ok: false, code: 'invalid_payload', message: 'Backup cancelled.', retryable: false, action: 'none' };
+    }
+    try {
+      const backup = await DatabaseManager.getInstance().createBackup(result.filePath);
+      return { ok: true, data: backup };
+    } catch (error) {
+      return { ok: false, code: 'unexpected_error', message: error instanceof Error ? error.message : String(error), retryable: true, action: 'retry' };
+    }
+  });
+
+  safeHandle('database:info', async () => ({
+    ok: true,
+    data: {
+      databasePath: DatabaseManager.getInstance().getDbPath(),
+      recordingsPath: null,
+      audioPersisted: false,
+      encryptedAtRest: false,
+      deletion: 'Use Clear local data or remove the database after creating a backup.',
+    },
+  }));
 
   // UX2: in-app TCC repair button.
   //
@@ -6115,6 +6319,217 @@ export function initializeIpcHandlers(appState: AppState): void {
     safeInterviewHandle(() => getInterviewService().get(input as any))
   ));
 
+  safeHandle('stage-workspace:get', async (_, stageId: string) => (
+    safeInterviewHandle(() => getStageWorkspaceService().getStageWorkspace(stageId))
+  ));
+
+  safeHandle('stage-workspace:preflight', async (_, stageId: string, options?: { includeAi?: boolean }) => {
+    const previous = activeStagePreflights.get(stageId);
+    previous?.abort();
+    const controller = new AbortController();
+    activeStagePreflights.set(stageId, controller);
+    try {
+      const { CredentialsManager } = require('./services/CredentialsManager');
+      const credentials = CredentialsManager.getInstance();
+      const sttProvider = credentials.getSttProvider();
+      const sttKey = sttProvider === 'openai' ? credentials.getOpenAiSttApiKey()
+        : sttProvider === 'groq' ? credentials.getGroqSttApiKey()
+          : sttProvider === 'deepgram' ? credentials.getDeepgramApiKey()
+            : sttProvider === 'elevenlabs' ? credentials.getElevenLabsApiKey()
+              : sttProvider === 'azure' ? credentials.getAzureApiKey()
+                : sttProvider === 'ibmwatson' ? credentials.getIbmWatsonApiKey()
+                  : sttProvider === 'soniox' ? credentials.getSonioxApiKey() : undefined;
+      const sttEndpoint = sttProvider === 'openai' ? credentials.getOpenAiSttBaseUrl() : undefined;
+      const probes: Array<{ id: 'stt' | 'ai'; provider: string; configured: boolean; apiKey?: string; endpoint?: string }> = [{
+        id: 'stt', provider: sttProvider, configured: sttProvider !== 'none' && (sttProvider === 'local-whisper' || sttProvider === 'gigastt' || Boolean(sttKey)), apiKey: sttKey, endpoint: sttEndpoint,
+      }];
+      if (options?.includeAi) {
+        const llm = appState.processingHelper?.getLLMHelper?.();
+        const llmProvider = String(llm?.getCurrentProvider?.() || 'none');
+        const llmKey = llmProvider === 'gemini' ? credentials.getGeminiApiKey()
+          : llmProvider === 'groq' ? credentials.getGroqApiKey()
+            : llmProvider === 'openai' ? credentials.getOpenaiApiKey()
+              : llmProvider === 'claude' ? credentials.getClaudeApiKey()
+                : llmProvider === 'deepseek' ? credentials.getDeepseekApiKey()
+                  : llmProvider === 'yandex' ? credentials.getYandexApiKey() : undefined;
+        probes.push({ id: 'ai', provider: llmProvider, configured: Boolean(llmKey), apiKey: llmKey });
+      }
+      const results = await runStageProviderPreflight(probes, controller.signal);
+      if (controller.signal.aborted) return { ok: false, code: 'operation_in_progress', message: 'Preflight was cancelled.', retryable: true, action: 'retry' };
+      stagePreflightCache.set(stageId, { checkedAt: Date.now(), results });
+      const snapshot = getStageWorkspaceService().getStageWorkspace(stageId);
+      broadcastStageWorkspaceInvalidated(snapshot);
+      return { ok: true, data: snapshot };
+    } finally {
+      if (activeStagePreflights.get(stageId) === controller) activeStagePreflights.delete(stageId);
+    }
+  });
+
+  safeHandle('stage-workspace:cancel-preflight', async (_, stageId: string) => {
+    activeStagePreflights.get(stageId)?.abort();
+    activeStagePreflights.delete(stageId);
+    return { ok: true, data: { cancelled: true } };
+  });
+
+  safeHandle('stage-workspace:ensure-backing', async (_, stageId: string, expectedRevision?: number) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().ensureStageBackingRecord(stageId, expectedRevision));
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:update-stage', async (_, stageId: string, operationId: string, expectedRevision: number | undefined, patch: unknown) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().updateStageDetails(stageId, (patch ?? {}) as Record<string, unknown>, expectedRevision, operationId));
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:attach-meeting', async (_, stageId: string, meetingId: string, operationId: string, expectedRevision?: number) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().attachMeeting(stageId, meetingId, expectedRevision, operationId));
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:prepare', async (_, stageId: string, operationId: string, expectedRevision: number | undefined, payload: unknown) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().createPreparationDraft(stageId, payload as any, expectedRevision, operationId));
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:start', async (_, stageId: string, operationId: string, expectedRevision?: number, context?: unknown) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().startStageSession(stageId, operationId, expectedRevision, (context ?? {}) as any));
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:stop', async (_, meetingId: string, operationId: string, expectedSessionRevision?: number) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().completeStageSession(meetingId, operationId, expectedSessionRevision));
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:confirm-capture', async (_, meetingId: string, expectedSessionRevision?: number) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().confirmStageSessionStarted(meetingId, expectedSessionRevision));
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:retry-artifact', async (_, meetingId: string, artifactType: 'transcript' | 'summary' | 'ai_review') => (
+    (async () => {
+      const result = await safeInterviewHandle(() => artifactType === 'ai_review'
+        ? getStageWorkspaceService().requestAiReviewJob(meetingId)
+        : getStageWorkspaceService().retryArtifactJob(meetingId, artifactType));
+      if (result.ok) {
+        broadcastStageWorkspaceInvalidated(result.data);
+        const work = artifactType === 'ai_review'
+          ? appState.getIntelligenceManager()?.generateStageReview(meetingId)
+          : appState.getIntelligenceManager()?.retryStageArtifacts(meetingId);
+        void work?.catch((error: any) => {
+          console.warn('[StageWorkspace] manual artifact retry failed:', error?.message || error);
+        });
+      }
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:fail', async (_, meetingId: string, operationId: string, failureCode?: string) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().failStageSession(meetingId, operationId, failureCode));
+      appState.stopStageHeartbeatFor(meetingId);
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:save-review', async (_, stageId: string, meetingId: string, review: unknown, expectedRevision?: number) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().saveStageReview(stageId, meetingId, (review ?? {}) as Record<string, unknown>, expectedRevision));
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:select-primary', async (_, stageId: string, meetingId: string | null, expectedRevision?: number) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().selectPrimarySession(stageId, meetingId, expectedRevision));
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:clear-review', async (_, stageId: string, confirmationToken: string, expectedRevision?: number) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().clearStageReview(stageId, confirmationToken, expectedRevision));
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:delete-session', async (_, meetingId: string, confirmationToken: string, expectedRevision?: number) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().deleteStageSession(meetingId, confirmationToken, expectedRevision));
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:set-next-action', async (_, stageId: string, nextAction: unknown, expectedRevision?: number) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().setStageNextAction(stageId, (nextAction ?? {}) as any, expectedRevision));
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:complete-next-action', async (_, stageId: string, expectedRevision?: number) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().completeStageNextAction(stageId, expectedRevision));
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:no-next-action', async (_, stageId: string, expectedRevision?: number) => (
+    (async () => {
+      const result = await safeInterviewHandle(() => getStageWorkspaceService().markNoStageNextActionRequired(stageId, expectedRevision));
+      if (result.ok) broadcastStageWorkspaceInvalidated(result.data);
+      return result;
+    })()
+  ));
+
+  safeHandle('stage-workspace:cancel-operation', async (_, operationId: string) => (
+    safeInterviewHandle(() => getStageWorkspaceService().cancelStageOperation(operationId))
+  ));
+
+  safeHandle('stage-workspace:export', async (_, stageId: string, format: 'json' | 'markdown', includeTranscript = false) => {
+    const exported = await safeInterviewHandle(() => getStageWorkspaceService().exportStageWorkspace(stageId, format, includeTranscript));
+    if (!exported.ok) return exported;
+    const extension = format === 'json' ? 'json' : 'md';
+    const result: any = await dialog.showSaveDialog({
+      title: 'Export stage workspace',
+      defaultPath: exported.data.filename,
+      filters: [{ name: format === 'json' ? 'JSON' : 'Markdown', extensions: [extension] }],
+    });
+    if (result.canceled || !result.filePath) {
+      return { ok: false, code: 'invalid_payload', message: 'Export cancelled.', retryable: false, action: 'none' };
+    }
+    fs.writeFileSync(result.filePath, exported.data.content, 'utf8');
+    return { ok: true, data: { ...exported.data, path: result.filePath } };
+  });
+
   safeHandle('interviews:create', async (_, operationId: string, payload: unknown) => (
     safeInterviewHandle(() => getInterviewService().create(operationId, payload))
   ));
@@ -6152,22 +6567,42 @@ export function initializeIpcHandlers(appState: AppState): void {
   ));
 
   safeHandle('interview-stages:update', async (_, id: string, patch: unknown) => (
-    safeInterviewHandle(() => getInterviewService().updateStage(id, patch))
+    safeInterviewHandle(() => {
+      const workspace = getStageWorkspaceService().getStageWorkspace(id);
+      const next = getStageWorkspaceService().updateStageDetails(id, (patch ?? {}) as Record<string, unknown>, workspace.revision, crypto.randomUUID());
+      broadcastStageWorkspaceInvalidated(next);
+      return next.application;
+    })
   ));
 
   safeHandle('interview-stages:archive', async (_, id: string) => (
-    safeInterviewHandle(() => getInterviewService().archiveStage(id))
+    safeInterviewHandle(() => {
+      const workspace = getStageWorkspaceService().getStageWorkspace(id);
+      const next = getStageWorkspaceService().updateStageDetails(id, { status: 'archived' }, workspace.revision, crypto.randomUUID());
+      broadcastStageWorkspaceInvalidated(next);
+      return next.application;
+    })
   ));
 
   safeHandle('interview-stages:restore', async (_, id: string, status?: unknown) => (
-    safeInterviewHandle(() => getInterviewService().restoreStage(id, status))
+    safeInterviewHandle(() => {
+      const workspace = getStageWorkspaceService().getStageWorkspace(id);
+      const next = getStageWorkspaceService().updateStageDetails(id, { status: status ?? 'scheduled' }, workspace.revision, crypto.randomUUID());
+      broadcastStageWorkspaceInvalidated(next);
+      return next.application;
+    })
   ));
 
   safeHandle('interview-stages:attach-meeting', async (_, stageId: string, meetingId: string) => (
-    safeInterviewHandle(() => getInterviewService().attachMeetingToStage(stageId, meetingId))
+    safeInterviewHandle(() => {
+      const workspace = getStageWorkspaceService().getStageWorkspace(stageId);
+      const next = getStageWorkspaceService().attachMeeting(stageId, meetingId, workspace.revision, crypto.randomUUID());
+      broadcastStageWorkspaceInvalidated(next);
+      return { attached: true };
+    })
   ));
 
-  safeHandle('interview-stages:create-calendar-event', async (_, stageId: string, provider: unknown) => (
+  safeHandle('interview-stages:create-calendar-event', async (_, stageId: string, provider: unknown, operationId: string, expectedRevision?: number) => (
     safeInterviewHandle(async () => {
       if (provider !== 'google' && provider !== 'macos') {
         throw new InterviewDomainError('invalid_payload', 'calendar provider is invalid.', false, 'fix_input');
@@ -6223,14 +6658,16 @@ export function initializeIpcHandlers(appState: AppState): void {
         attendeeNames: (event.attendees ?? []).map((attendee: any) => attendee.name || attendee.email).filter(Boolean),
         capturedAt: Date.now(),
       };
-      return service.updateStage(stage.id, {
+      const workspace = getStageWorkspaceService().updateStageDetails(stage.id, {
         calendarProvider: provider,
         calendarId: snapshot.calendarId,
         calendarEventId: event.id,
         calendarSnapshot: snapshot,
         calendarLastSeenAt: Date.now(),
         calendarSyncStatus: 'linked',
-      });
+      }, expectedRevision, operationId);
+      broadcastStageWorkspaceInvalidated(workspace);
+      return workspace.application;
     })
   ));
 
