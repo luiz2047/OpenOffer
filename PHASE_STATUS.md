@@ -4,7 +4,7 @@ This file tracks public launch readiness, not historical implementation phases.
 
 ## Current State
 
-- Public source version: `1.5.2`.
+- Public source version: `1.6.0`.
 - Primary story: a local recruiter chat becomes an editable process, then continues through stage recording, a permitted live hint, transcript, overview, and retro.
 - Source development path: ready.
 - Binary release path: unsigned macOS preview artifacts can ship now; official signed/notarized artifacts remain pending Apple signing/notarization secrets.

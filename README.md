@@ -78,6 +78,7 @@ The complete synthetic scenario and recapture instructions are in [Real Intervie
 ## What Works Today
 
 - Reviewed recruiter and vacancy intake into either a new process or a stage on an existing vacancy.
+- Stage Workspace that keeps preparation, consented recording, transcript and summary artifacts, review, next actions, and export attached to one interview stage.
 - Interview Command Center for vacancies, stage timelines, schedules, meeting links, linked recordings, and Google/macOS Calendar sync.
 - Stage-level microphone and system-audio recording for interviews and professional calls.
 - Live transcription and concise meeting assistance through local or BYOK providers.
