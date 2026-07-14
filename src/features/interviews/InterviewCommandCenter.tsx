@@ -51,9 +51,10 @@ import type {
   RetroPromptDecision,
   VacancyDossierPayload,
 } from '../../types/interviews';
-import { applicationApi, interviewApi, stageApi } from './api';
+import { applicationApi, interviewApi, stageApi, stageWorkspaceApi } from './api';
 import { CalendarDatePickerButton } from './CalendarDatePickerButton';
 import { DateTimePickerField } from './DateTimePickerField';
+import StageWorkspacePanel from './StageWorkspacePanel';
 import { createInterviewUiError, normalizeInterviewError, type InterviewUiError } from './interviewErrors';
 import {
   formatCalendarDayLabel,
@@ -80,6 +81,8 @@ export interface InterviewMeetingStartMetadata {
   interviewStageId?: string;
   applicationId?: string;
   source?: 'manual' | 'calendar';
+  stageWorkspaceMeetingId?: string;
+  stageWorkspaceSessionRevision?: number;
 }
 
 interface InterviewCommandCenterProps {
@@ -602,6 +605,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const [interviews, setInterviews] = useState<InterviewListItem[]>([]);
   const [applications, setApplications] = useState<ApplicationDetail[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [workspaceStageId, setWorkspaceStageId] = useState<string | null>(null);
   const [detail, setDetail] = useState<InterviewDetail | null>(null);
   const [applicationDetail, setApplicationDetail] = useState<ApplicationDetail | null>(null);
   const [retroPrompt, setRetroPrompt] = useState<RetroPromptDecision | null>(null);
@@ -722,6 +726,7 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         if (cancelled) return;
         setDetail(nextDetail);
         setApplicationDetail(nextApplication);
+        setWorkspaceStageId(nextApplication?.selectedStageId ?? nextApplication?.stages[0]?.id ?? null);
         setApplicationDraft(applicationDraftFromDetail(nextApplication));
         setApplicationSaveStatus('synced');
         setStageDrafts(Object.fromEntries((nextApplication?.stages ?? []).map(stage => [stage.id, stageDraftFromStage(stage)])));
@@ -898,6 +903,12 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   const nearestStage = useMemo(() => getNearestStage(stages), [stages]);
   const activeStages = stages.filter(stage => stage.status !== 'archived' && !stage.archivedAt);
   const archivedStages = stages.filter(stage => stage.status === 'archived' || stage.archivedAt);
+  const workspaceStage = stages.find(stage => stage.id === workspaceStageId) ?? activeStages[0] ?? stages[0] ?? null;
+  useEffect(() => {
+    if (!workspaceStageId || !stages.some(stage => stage.id === workspaceStageId)) {
+      setWorkspaceStageId(activeStages[0]?.id ?? stages[0]?.id ?? null);
+    }
+  }, [activeStages, stages, workspaceStageId]);
   const formatSchedule = useCallback((ms?: number | null) => (ms ? formatDateTime(ms) : t('interviews.unscheduled')), [t]);
   const formatCalendarSyncStatus = useCallback((status: CalendarSyncStatus, provider?: CalendarProvider | null) => {
     const providerKey = calendarProviderLabelKey(provider);
@@ -939,6 +950,11 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       const result = await applicationApi.createFromIntake(intake, options);
       await loadInterviews();
       setSelectedId(result.legacyInterview?.id ?? result.application.legacyInterviewEventId ?? null);
+      const createdStage = result.application.stages[0];
+      if (createdStage) {
+        setWorkspaceStageId(createdStage.id);
+        setDetailTab('Stages');
+      }
       return result;
     } catch (err: any) {
       showError(err);
@@ -1088,6 +1104,11 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       setParseWarnings([]);
       await loadInterviews();
       setSelectedId(legacyId ?? result.application.legacyInterviewEventId ?? null);
+      const createdStage = result.application.stages[0];
+      if (createdStage) {
+        setWorkspaceStageId(createdStage.id);
+        setDetailTab('Stages');
+      }
     });
   };
 
@@ -1217,7 +1238,15 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
       calendarSyncStatus: stage.calendarSyncStatus ?? 'local_only',
     };
     await run(async () => {
-      const updated = await stageApi.update(stage.id, patch);
+      let updated: ApplicationDetail;
+      if (Object.prototype.hasOwnProperty.call(window.electronAPI ?? {}, 'stageWorkspaceUpdateStage')) {
+        const workspace = await stageWorkspaceApi.get(stage.id);
+        const nextWorkspace = await stageWorkspaceApi.updateStage(stage.id, patch, workspace.revision);
+        updated = nextWorkspace.application;
+      } else {
+        // Older test/compatibility bridges have no workspace IPC yet.
+        updated = await stageApi.update(stage.id, patch);
+      }
       setApplicationDetail(updated);
       setStageDrafts(Object.fromEntries(updated.stages.map(nextStage => [nextStage.id, stageDraftFromStage(nextStage)])));
       setStageSaveStatus(prev => ({ ...prev, [stage.id]: 'saved' }));
@@ -1247,7 +1276,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
   const archiveStage = async (stage: InterviewStage) => {
     await run(async () => {
-      const updated = await stageApi.archive(stage.id);
+      let updated: ApplicationDetail;
+      if (Object.prototype.hasOwnProperty.call(window.electronAPI ?? {}, 'stageWorkspaceUpdateStage')) {
+        const workspace = await stageWorkspaceApi.get(stage.id);
+        updated = (await stageWorkspaceApi.updateStage(stage.id, { status: 'archived' }, workspace.revision)).application;
+      } else {
+        updated = await stageApi.archive(stage.id);
+      }
       setApplicationDetail(updated);
       setStageDrafts(Object.fromEntries(updated.stages.map(nextStage => [nextStage.id, stageDraftFromStage(nextStage)])));
       await loadInterviews();
@@ -1256,7 +1291,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
   const restoreStage = async (stage: InterviewStage) => {
     await run(async () => {
-      const updated = await stageApi.restore(stage.id, 'scheduled');
+      let updated: ApplicationDetail;
+      if (Object.prototype.hasOwnProperty.call(window.electronAPI ?? {}, 'stageWorkspaceUpdateStage')) {
+        const workspace = await stageWorkspaceApi.get(stage.id);
+        updated = (await stageWorkspaceApi.updateStage(stage.id, { status: 'scheduled' }, workspace.revision)).application;
+      } else {
+        updated = await stageApi.restore(stage.id, 'scheduled');
+      }
       setApplicationDetail(updated);
       setStageDrafts(Object.fromEntries(updated.stages.map(nextStage => [nextStage.id, stageDraftFromStage(nextStage)])));
       await loadInterviews();
@@ -1265,23 +1306,21 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
 
   const createStageCalendarEvent = async (stage: InterviewStage, provider: CalendarProviderId) => {
     await run(async () => {
-      const updated = await stageApi.createCalendarEvent(stage.id, provider);
+      const updated = Object.prototype.hasOwnProperty.call(window.electronAPI ?? {}, 'stageWorkspaceGet')
+        ? await stageApi.createCalendarEvent(stage.id, provider, (await stageWorkspaceApi.get(stage.id)).revision)
+        : await stageApi.createCalendarEvent(stage.id, provider);
       setApplicationDetail(updated);
       setStageDrafts(Object.fromEntries(updated.stages.map(nextStage => [nextStage.id, stageDraftFromStage(nextStage)])));
       await loadInterviews();
     });
   };
 
-  const startStageRecording = (stage: InterviewStage) => {
-    if (!applicationDetail || stage.status === 'archived' || stage.archivedAt) return;
-    onStartMeeting({
-      title: stage.title || applicationDetail.title,
-      interviewEventId: stage.legacyInterviewEventId ?? applicationDetail.legacyInterviewEventId ?? undefined,
-      interviewStageId: stage.id,
-      applicationId: applicationDetail.id,
-      calendarEventId: stage.calendarEventId ?? undefined,
-      source: 'manual',
-    });
+  const openStageWorkspace = (stage: InterviewStage) => {
+    if (stage.status === 'archived' || stage.archivedAt) return;
+    // Recording is intentionally owned by the selected workspace. This card
+    // only selects the stage so the user must see context, readiness, and the
+    // explicit confirmation before any capture/session IPC can run.
+    setWorkspaceStageId(stage.id);
   };
 
   const saveDossier = async () => {
@@ -1398,7 +1437,13 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
     const meetingId = attachMeetingIds[stage.id];
     if (!meetingId) return;
     await run(async () => {
-      await stageApi.attachMeeting(stage.id, meetingId);
+      if (Object.prototype.hasOwnProperty.call(window.electronAPI ?? {}, 'stageWorkspaceAttachMeeting')) {
+        const workspace = await stageWorkspaceApi.get(stage.id);
+        await stageWorkspaceApi.attachMeeting(stage.id, meetingId, workspace.revision);
+      } else {
+        // Compatibility bridge for older renderer-only test fixtures.
+        await stageApi.attachMeeting(stage.id, meetingId);
+      }
       const next = await interviewApi.get(detail.id);
       const nextApplication = await applicationApi.get(applicationDetail.id).catch(() => null);
       setDetail(next);
@@ -1450,19 +1495,8 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
   }, [paneLayout, updatePaneLayout]);
 
   const startSelectedInterview = () => {
-    if (!detail) {
-      onStartMeeting();
-      return;
-    }
-    if (!applicationDetail) {
-      onStartMeeting({
-        title: detail.title,
-        interviewEventId: detail.id,
-        interviewStageId: detail.selectedStageId ?? undefined,
-        applicationId: detail.applicationId ?? undefined,
-        calendarEventId: detail.calendarEventId ?? undefined,
-        source: 'manual',
-      });
+    if (!detail || !applicationDetail) {
+      setError(createInterviewUiError('ambiguous_stage'));
       return;
     }
     void run(async () => {
@@ -1482,14 +1516,14 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
         ?? targetApplication.stages[0];
       setApplicationDetail(targetApplication);
       setStageDrafts(Object.fromEntries(targetApplication.stages.map(stage => [stage.id, stageDraftFromStage(stage)])));
-      onStartMeeting({
-        title: targetStage?.title || targetApplication.title || detail.title,
-        interviewEventId: targetStage?.legacyInterviewEventId ?? targetApplication.legacyInterviewEventId ?? detail.id,
-        interviewStageId: targetStage?.id,
-        applicationId: targetApplication.id,
-        calendarEventId: targetStage?.calendarEventId ?? detail.calendarEventId ?? undefined,
-        source: 'manual',
-      });
+      if (targetStage) {
+        // The global/header action selects the exact stage workspace. Capture
+        // can only start from that workspace after context/readiness approval.
+        setDetailTab('Stages');
+        setWorkspaceStageId(targetStage.id);
+      } else {
+        setError(createInterviewUiError('ambiguous_stage'));
+      }
     });
   };
 
@@ -2002,6 +2036,33 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                     </button>
                   </div>
 
+                  {applicationDetail && workspaceStage && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className={labelClass}>Stage Workspace</div>
+                        <select
+                          aria-label="Stage Workspace stage"
+                          className="min-h-9 max-w-[260px] rounded-md border border-white/[0.08] bg-bg-input px-2.5 text-[11px] text-text-secondary outline-none focus:border-cyan-300/45"
+                          value={workspaceStage.id}
+                          onChange={event => setWorkspaceStageId(event.target.value)}
+                        >
+                          {activeStages.map((stage, index) => <option key={stage.id} value={stage.id} aria-label={stage.title}>Stage {index + 1}</option>)}
+                        </select>
+                      </div>
+                      <StageWorkspacePanel
+                        application={applicationDetail}
+                        stage={workspaceStage}
+                        isMeetingActive={isMeetingActive}
+                        busy={busy}
+                        onStartMeeting={onStartMeeting}
+                        onOpenMeeting={meetingId => {
+                          const meeting = meetings.find(item => item.id === meetingId);
+                          if (meeting) onOpenMeeting(meeting);
+                        }}
+                      />
+                    </div>
+                  )}
+
                   {stages.length > 0 ? (
                     [...activeStages, ...archivedStages].map((stage, index) => {
                       const stageMeetings = linkedMeetingsForStage(
@@ -2034,8 +2095,8 @@ const InterviewCommandCenter: React.FC<InterviewCommandCenterProps> = ({
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 {!isArchived && (
-                                  <button type="button" onClick={() => startStageRecording(stage)} className={primaryButtonClass}>
-                                    {isMeetingActive ? t('common.openLive') : t('interviews.detail.startRecording')}
+                                  <button type="button" onClick={() => openStageWorkspace(stage)} className={primaryButtonClass}>
+                                    {isMeetingActive && workspaceStage?.id === stage.id ? t('common.openLive') : t('interviews.detail.openStageWorkspace')}
                                   </button>
                                 )}
                                 <button

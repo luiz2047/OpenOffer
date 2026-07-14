@@ -1,0 +1,8 @@
+Рекрутер: Алексей, привет! Есть роль Senior/Lead ML Engineer.
+Компания: ExampleAI, remote EU-friendly.
+Стек: Python, CV, OCR, LLM evaluation, production MLOps.
+Процесс: 1) intro 30 min, 2) technical interview, 3) system design.
+ЗП: обсуждаем, ориентир 7-9k EUR gross.
+Можем созвониться во вторник в 16:00 MSK? Вот ссылка на Google Meet: [redacted]
+Описание вакансии ниже:
+Нужно владеть production ML, строить пайплайны оценки качества моделей, общаться с продуктом и ревьюить архитектуру.

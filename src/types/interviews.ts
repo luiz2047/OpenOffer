@@ -142,6 +142,18 @@ export type InterviewErrorCode =
   | 'migration_incomplete'
   | 'provider_unavailable'
   | 'stale_proposal'
+  | 'stage_conflict'
+  | 'operation_id_conflict'
+  | 'operation_in_progress'
+  | 'primary_session_review_conflict'
+  | 'stt_not_configured'
+  | 'microphone_permission_denied'
+  | 'system_audio_permission_denied'
+  | 'stt_probe_failed'
+  | 'provider_probe_timeout'
+  | 'session_capture_failed'
+  | 'review_generation_failed'
+  | 'stage_readiness_blocked'
   | 'unexpected_error';
 
 export type InterviewErrorAction =
@@ -274,6 +286,12 @@ export interface InterviewStage {
   calendarSyncStatus: CalendarSyncStatus;
   rawSourceText?: string | null;
   legacyInterviewEventId?: string | null;
+  nextAction?: string | null;
+  nextActionDueAt?: number | null;
+  nextActionState?: 'missing' | 'saved' | 'completed' | 'none_required';
+  nextActionCompletedAt?: number | null;
+  primarySessionMeetingId?: string | null;
+  workspaceRevision?: number;
   createdAt: string;
   updatedAt: string;
   archivedAt?: string | null;
@@ -546,6 +564,108 @@ export interface LinkedMeeting {
   applicationId?: string | null;
 }
 
+export type StageWorkspacePrimaryStep = 'context' | 'prepare' | 'preflight' | 'interview' | 'review';
+export type StageWorkspaceSessionStatus = 'none' | 'initializing' | 'recording' | 'stopping' | 'stopped' | 'abandoned' | 'failed';
+export type StageArtifactStatus = 'not_requested' | 'pending' | 'ready' | 'failed' | 'skipped' | 'cancelled';
+
+export interface StageSessionSummary {
+  meetingId: string;
+  interviewStageId: string;
+  status: Exclude<StageWorkspaceSessionStatus, 'none'>;
+  startedAt?: number | null;
+  stoppedAt?: number | null;
+  heartbeatAt?: number | null;
+  stopRequestedAt?: number | null;
+  stopOperationId?: string | null;
+  failureCode?: string | null;
+  revision: number;
+  artifacts: Record<'transcript' | 'summary' | 'aiReview', StageArtifactStatus>;
+  /** Durable handle for post-call work that is queued/running. */
+  artifactOperationIds?: Partial<Record<'transcript' | 'summary' | 'aiReview', string>>;
+}
+
+export interface StageReviewSummary {
+  meetingId: string;
+  status: 'draft' | 'saved';
+  review: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StageNextAction {
+  text: string | null;
+  dueAt?: number | null;
+  state: 'missing' | 'saved' | 'completed' | 'none_required';
+  completedAt?: number | null;
+}
+
+export interface StageWorkspaceCapabilities {
+  canPrepare: boolean;
+  canStart: boolean;
+  canStop: boolean;
+  canReview: boolean;
+  canSetNextAction: boolean;
+}
+
+export interface StageWorkspaceStatus {
+  primaryStep: StageWorkspacePrimaryStep;
+  context: 'missing' | 'ready';
+  preparation: 'empty' | 'draft' | 'ready';
+  coreReadiness: 'unknown' | 'blocked' | 'ready';
+  session: StageWorkspaceSessionStatus;
+  artifacts: {
+    transcript: StageArtifactStatus;
+    summary: StageArtifactStatus;
+    aiReview: StageArtifactStatus;
+  } | null;
+  review: 'unavailable' | 'ready' | 'draft' | 'saved';
+  nextAction: StageNextAction['state'];
+  complete: boolean;
+}
+
+export interface StageWorkspaceSnapshot {
+  schemaVersion: 1;
+  stageId: string;
+  revision: number;
+  application: ApplicationDetail;
+  stage: InterviewStage;
+  context: {
+    sourceText: string | null;
+    sourceHash: string | null;
+    confirmed: boolean;
+  };
+  preparation: PrepBrief | null;
+  readiness: ReadinessResult;
+  sessions: StageSessionSummary[];
+  primarySessionId: string | null;
+  activeSession: StageSessionSummary | null;
+  primaryArtifacts: {
+    transcript: StageArtifactStatus;
+    summary: StageArtifactStatus;
+    aiReview: StageArtifactStatus;
+  } | null;
+  review: StageReviewSummary | null;
+  nextAction: StageNextAction;
+  status: StageWorkspaceStatus;
+  capabilities: StageWorkspaceCapabilities;
+}
+
+export interface StageWorkspaceInvalidation {
+  stageId: string;
+  workspaceRevision: number;
+  sessionRevision: number | null;
+  eventSeq: number;
+}
+
+export type StageWorkspaceExportFormat = 'json' | 'markdown';
+
+export interface StageWorkspaceExportResult {
+  format: StageWorkspaceExportFormat;
+  filename: string;
+  content: string;
+  includesTranscript: boolean;
+}
+
 export interface ReadinessResult {
   score: number;
   level: 'not_started' | 'needs_work' | 'ready';
@@ -553,6 +673,20 @@ export interface ReadinessResult {
   warnings: string[];
   completed: string[];
   nextAction: string | null;
+  checks?: ReadinessCheck[];
+}
+
+export interface ReadinessCheck {
+  id: 'context' | 'ai' | 'stt' | 'microphone' | 'system_audio';
+  required: boolean;
+  status: 'ready' | 'missing' | 'denied' | 'failed' | 'unknown' | 'optional';
+  messageKey: string;
+  errorCode?: string;
+  checkedAt?: number;
+  expiresAt?: number;
+  recoveryAction?: string;
+  provider?: string;
+  endpoint?: string;
 }
 
 export type RetroPromptAction = 'prompted' | 'snooze' | 'dismiss' | 'complete';

@@ -76,7 +76,7 @@ Recommended topics:
 
 ### GitHub Discussion
 
-Title: `OpenOffer 1.5.2: local-first interview and job-search workspace`
+Title: `OpenOffer 1.6.0: local-first interview and job-search workspace`
 
 Body:
 

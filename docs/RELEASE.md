@@ -5,14 +5,35 @@ This guide describes how to publish an OpenOffer release from the public reposit
 OpenOffer's release workflow publishes desktop artifacts from native GitHub Actions runners:
 
 - **macOS**: DMG and updater ZIP for Apple Silicon and Intel Macs.
-- **Windows**: unsigned x64 NSIS setup and portable EXE.
+- **Windows**: x64 NSIS setup and portable EXE; Authenticode-signed when the
+  Windows signing secrets are configured, otherwise explicitly labelled
+  unsigned preview artifacts.
 
 macOS supports two binary release modes:
 
 - **Unsigned preview**: ad-hoc signed macOS artifacts for early testers. This works without Apple Developer Program membership, but macOS shows Gatekeeper warnings.
 - **Signed official**: Developer ID-signed, notarized, and stapled macOS artifacts. This requires Apple Developer ID credentials and repository secrets.
 
-The same GitHub Actions workflow chooses the macOS mode automatically. If all Apple signing secrets are present, it publishes signed macOS artifacts. If they are missing, it publishes unsigned preview artifacts and marks the GitHub Release as a prerelease. Windows artifacts are unsigned until Authenticode signing is configured, so SmartScreen warnings are expected.
+The same GitHub Actions workflow chooses the macOS mode automatically. If all Apple signing secrets are present, it publishes signed macOS artifacts. If they are missing, it publishes unsigned preview artifacts and marks the GitHub Release as a prerelease. Windows follows the same explicit preview fallback until Authenticode signing is configured.
+
+Every desktop release is gated by the `quality-gates` job before either platform build starts. It runs the web/Electron builds, typecheck, public-doc and localization checks, the canonical deterministic intake and Stage Workspace recovery/dogfood tests, and the full regression suite. These gates do not replace real microphone/system-audio or signing evidence on native runners.
+
+The evidence ledger for the Stage Workspace rollout is maintained in
+[`docs/design/stage-workspace-acceptance.md`](design/stage-workspace-acceptance.md).
+It lists the exact local commands and keeps physical dogfood, upgrade, signing,
+packet-capture, and real-data deletion gates explicitly open until they are
+actually observed.
+
+Each platform job also runs a packaged main-process launch smoke with
+`OPENOFFER_PACKAGED_SMOKE=1`. The smoke exits before creating a window or
+requesting a provider, and it kills the entire helper process group on timeout.
+The macOS job additionally runs
+`scripts/clean-launch-network-smoke.mjs` with `lsof` and fails if the packaged
+clean launch establishes an outbound TCP connection before consent.
+The exact uploaded files receive `RELEASE_MANIFEST.json` and
+`ARTIFACT_SIZES.md`; both include the package version and SHA-256 hashes. The
+publish job then generates the combined `SHA256SUMS.txt` from those exact
+assets.
 
 ## Version Source
 
@@ -48,7 +69,7 @@ A source release is acceptable when signed artifacts are not ready yet.
 
 ## Desktop Preview Release
 
-Use this mode until Apple Developer ID signing, notarization, and Windows Authenticode signing are configured.
+Use this mode until Apple Developer ID signing, notarization, and Windows Authenticode signing are configured. The workflow supports both signed and unsigned-preview Windows artifacts.
 
 The preview release path uses:
 
@@ -60,6 +81,8 @@ The preview release path uses:
 The macOS artifacts are ad-hoc signed with `codesign --sign -`. The workflow verifies the app signatures and DMG integrity, but it does not run `spctl` or `stapler` because these artifacts are not notarized. Preview DMGs are created after Electron Builder finishes ZIP/app packaging so CI does not race two `hdiutil create` jobs.
 
 The Windows artifacts are built on `windows-latest` with `npm run app:build:win`, collected from `release/`, and published only if the macOS job also succeeds.
+
+Stable updater builds use the `latest` channel. Maintainer preview builds must set `OPENOFFER_UPDATE_CHANNEL=preview`; only then does the updater query GitHub prereleases and allow prerelease metadata.
 
 ### Local Unsigned Build
 
@@ -155,7 +178,7 @@ npm run dist:signed
 
 1. Confirm secrets are configured.
 2. Create and push `vX.Y.Z`, or rerun the workflow against an existing tag.
-3. The `Release (desktop artifacts)` workflow builds macOS in signed mode and Windows in unsigned x64 mode.
+3. The `Release (desktop artifacts)` workflow builds macOS in signed mode and Windows in signed mode when `WINDOWS_CERT_P12_BASE64` and `WINDOWS_CERT_PASSWORD` exist; otherwise it labels the Windows artifacts as unsigned preview.
 4. The macOS and Windows jobs upload platform artifacts separately.
 5. The `publish-release` job downloads both artifact sets, generates a combined `SHA256SUMS.txt`, and publishes everything to the GitHub Release.
 6. If `.github/release-notes/vX.Y.Z.md` exists, the workflow uses it as the GitHub Release body. Otherwise it falls back to a short generated body and `CHANGELOG.md` remains the source of detailed notes.
@@ -178,7 +201,7 @@ npm ci
 npm run app:build:win
 ```
 
-Expected outputs land in `release/`. Windows code signing is not configured yet, so users should expect SmartScreen warnings until an Authenticode signing certificate is added.
+Expected outputs land in `release/`. In unsigned-preview mode users should expect SmartScreen warnings; signed mode verifies every `.exe` with `Get-AuthenticodeSignature` before upload.
 
 Do not publish `ia32` Windows artifacts yet. The Electron Builder config still lists the target, but `npm run app:build:win` intentionally forces `--x64` until the native module build produces every Windows arch that the installer packages.
 

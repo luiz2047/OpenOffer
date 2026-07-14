@@ -4,6 +4,19 @@
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-07-14
+
+### Added
+
+- **Stage Workspace**: Open a single stage-owned workspace for preparation, consented recording, transcript and summary artifacts, review, next actions, and export.
+- **Recovery and integrity controls**: Added revision checks, operation idempotency, artifact leases, retry states, deletion confirmations, and schema recovery coverage for interrupted interview work.
+- **Launch and release trust checks**: Added packaged launch, release-manifest, clean-launch network, privacy, and optional Windows signing verification gates.
+
+### Changed
+
+- **Interview workflow**: Stage-linked capture, calendar linking, review selection, and legacy interview commands now route through the Stage Workspace lifecycle.
+- **Privacy controls**: Telemetry consent is explicit and versioned; clean launches keep network access disabled unless the user opts in.
+
 ## [1.5.2] - 2026-07-13
 
 ### Added

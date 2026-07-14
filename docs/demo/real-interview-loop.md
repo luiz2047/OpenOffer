@@ -74,8 +74,8 @@ The current public UI shows this retro through the meeting summary's coaching an
 ## Capture Path
 
 1. Open the ExampleAI vacancy in the Interview Command Center.
-2. Open `Stages` and show the `Technical interview` card with its schedule, `Start recording`, and linked recording.
-3. Start the interview and show a live answer hint for one canonical question.
+2. Open `Stages` and show the `Technical interview` card with its schedule and `Open stage workspace` action.
+3. Open the stage workspace, complete its context/readiness checks, start the interview, and show a live answer hint for one canonical question.
 4. Open `ExampleAI technical interview` from the stage.
 5. Capture the `Transcript` tab with the five canonical turns.
 6. Capture the `Summary` tab with the overview, next steps, and interview signals.

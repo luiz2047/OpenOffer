@@ -8,7 +8,7 @@
 
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows-blueviolet?style=flat-square)](#system-requirements)
-[![Version](https://img.shields.io/badge/Version-1.5.2-success?style=flat-square)](#project-status)
+[![Version](https://img.shields.io/badge/Version-1.6.0-success?style=flat-square)](#project-status)
 
 <a href="assets/demo/openoffer-real-interview-loop.mp4">
   <img src="assets/demo/openoffer-real-interview-loop-poster.png" alt="OpenOffer real interview loop: live answer hint, transcript, coaching, and retro attached to one ExampleAI process" width="960" />
@@ -78,6 +78,7 @@ The complete synthetic scenario and recapture instructions are in [Real Intervie
 ## What Works Today
 
 - Reviewed recruiter and vacancy intake into either a new process or a stage on an existing vacancy.
+- Stage Workspace that keeps preparation, consented recording, transcript and summary artifacts, review, next actions, and export attached to one interview stage.
 - Interview Command Center for vacancies, stage timelines, schedules, meeting links, linked recordings, and Google/macOS Calendar sync.
 - Stage-level microphone and system-audio recording for interviews and professional calls.
 - Live transcription and concise meeting assistance through local or BYOK providers.
@@ -163,7 +164,7 @@ Until Apple Developer ID signing and Windows Authenticode signing are configured
 3. Download `SHA256SUMS.txt` and verify the file before opening it:
 
    ```bash
-   FILE="OpenOffer-1.5.2-arm64.dmg" # or the asset you downloaded
+   FILE="OpenOffer-1.6.0-arm64.dmg" # or the asset you downloaded
    grep "  $FILE$" SHA256SUMS.txt | shasum -a 256 -c -
    ```
 
@@ -248,7 +249,7 @@ For local speech setup, see [Local STT setup](docs/LOCAL_STT_OPENOFFER_SETUP.md)
 
 ## Project Status
 
-Current public version: `1.5.2`.
+Current public version: `1.6.0`.
 
 OpenOffer is a source-first public beta:
 

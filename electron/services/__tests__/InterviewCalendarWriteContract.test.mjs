@@ -64,12 +64,13 @@ test('stage calendar creation has a first-class local-first IPC contract', () =>
   const coordinator = read('electron/services/CalendarProviderCoordinator.ts');
 
   assert.ok(findSafeHandle(ipc, 'interview-stages:create-calendar-event') >= 0);
-  assert.match(ipc, /service\.updateStage\(stage\.id,[\s\S]{0,500}calendarSyncStatus: ['"]linked['"]/);
+  assert.match(ipc, /getStageWorkspaceService\(\)\.updateStageDetails\(stage\.id,[\s\S]{0,700}calendarSyncStatus: ['"]linked['"]/);
+  assert.match(ipc, /expectedRevision, operationId/);
   assert.match(ipc, /CalendarProviderCoordinator\.getInstance\(\)\.createEvent/);
   assert.match(coordinator, /public async createEvent\(/);
   assert.match(ipc, /calendar_refresh_failed/);
   assert.doesNotMatch(ipc, /interview-stages:create-calendar-event[\s\S]{0,2200}archiveStage/);
-  assert.match(preload, /interviewStagesCreateCalendarEvent:\s*\(id: string, provider: InterviewStageCalendarEventPayload\[['"]provider['"]\]\)/);
-  assert.match(types, /interviewStagesCreateCalendarEvent:\s*\(id: string, provider: InterviewStageCalendarEventPayload\[['"]provider['"]\]\)/);
-  assert.match(api, /createCalendarEvent\(id: string, provider: InterviewStageCalendarEventPayload\[['"]provider['"]\]\)/);
+  assert.match(preload, /interviewStagesCreateCalendarEvent:\s*\(id: string, provider: InterviewStageCalendarEventPayload\[['"]provider['"]\], operationId: string, expectedRevision\?: number\)/);
+  assert.match(types, /interviewStagesCreateCalendarEvent:\s*\(id: string, provider: InterviewStageCalendarEventPayload\[['"]provider['"]\], operationId: string, expectedRevision\?: number\)/);
+  assert.match(api, /createCalendarEvent\(id: string, provider: InterviewStageCalendarEventPayload\[['"]provider['"]\], expectedRevision\?: number\)/);
 });

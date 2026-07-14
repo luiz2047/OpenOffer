@@ -111,10 +111,8 @@ const Launcher: React.FC<LauncherProps> = ({ onStartMeeting, onOpenSettings, onO
     useEffect(() => {
         let mounted = true;
         console.log("Launcher mounted");
-        // Seed demo data if needed (safe to call always — runs ONCE on mount)
-        if (window.electronAPI && window.electronAPI.seedDemo) {
-            window.electronAPI.seedDemo().catch(err => console.error("Failed to seed demo:", err));
-        }
+        // Demo data is explicit and removable; a clean launch must not mutate
+        // the user's interview history or create a fake meeting implicitly.
 
         // Onboarding Check
         const hasSeenProfileOnboarding = localStorage.getItem('natively_seen_profile_onboarding_v1');

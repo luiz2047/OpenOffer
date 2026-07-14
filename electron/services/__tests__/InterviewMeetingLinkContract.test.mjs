@@ -8,13 +8,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '../../..');
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 
-test('renderer starts meetings with selected interview metadata without dropping audio metadata', () => {
+test('renderer resolves the selected stage workspace before passing capture metadata', () => {
   const commandCenter = read('src/features/interviews/InterviewCommandCenter.tsx');
   const app = read('src/App.tsx');
 
-  assert.match(commandCenter, /interviewEventId:\s*detail\.id/);
-  assert.match(commandCenter, /calendarEventId:\s*detail\.calendarEventId\s*\?\?/);
-  assert.match(commandCenter, /source:\s*['"]manual['"]/);
+  assert.match(commandCenter, /setDetailTab\(['"]Stages['"]\)/);
+  assert.match(commandCenter, /setWorkspaceStageId\(targetStage\.id\)/);
+  assert.doesNotMatch(commandCenter, /onStartMeeting\(\{[\s\S]{0,500}detail\.id/);
   assert.match(app, /const handleStartMeeting = async \(metadata: StartMeetingMetadata = \{\}\)/);
   assert.match(app, /\.\.\.metadata,[\s\S]*audio: \{ inputDeviceId, outputDeviceId \}/);
   assert.match(app, /doNotPersist: meetingRetention === ['"]never['"]/);

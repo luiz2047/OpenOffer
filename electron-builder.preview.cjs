@@ -13,7 +13,10 @@ module.exports = {
         arch: ['x64', 'arm64'],
       },
     ],
-    identity: null,
+    // Ask electron-builder to perform an ad-hoc signing pass so the afterSign
+    // hook runs after all native unpacked files are final. The hook then
+    // applies the preview entitlements and reseals the bundle.
+    identity: '-',
     hardenedRuntime: false,
   },
 };

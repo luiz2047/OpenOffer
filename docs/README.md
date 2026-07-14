@@ -12,6 +12,7 @@ OpenOffer is a local-first, free, open-source assistant for job-search processes
 - Demo walkthrough: [Recruiter Chat to Process](demo/recruiter-chat-to-process.md)
 - Real interview walkthrough: [Recording, Transcript, Overview, and Retro](demo/real-interview-loop.md)
 - Release process: [Release Guide](RELEASE.md)
+- Stage Workspace rollout evidence: [Acceptance Ledger](design/stage-workspace-acceptance.md)
 - Local STT setup: [Local STT OpenOffer Setup](LOCAL_STT_OPENOFFER_SETUP.md)
 - Interview workspace architecture: [Interview Command Center](engineering/interview-command-center.md)
 - Yandex AI Studio setup: [Yandex AI Studio](YANDEX_AI_STUDIO_SETUP.md)

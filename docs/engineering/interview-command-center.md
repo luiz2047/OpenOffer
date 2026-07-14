@@ -4,7 +4,7 @@ OpenOffer opens into a local-first job-search workspace. The current shape is va
 
 ## Data Model
 
-Migrations v17-v19 in `electron/db/DatabaseManager.ts` install and backfill the interview domain through `electron/services/interviews/schema.ts`.
+Migrations v17-v20 in `electron/db/DatabaseManager.ts` install and backfill the interview domain through `electron/services/interviews/schema.ts`. Migration v20 adds the Stage Workspace integrity layer without guessing ambiguous legacy ownership.
 
 Primary entities:
 
@@ -20,6 +20,9 @@ Primary entities:
 - `contacts` and `interview_contacts`: interviewer and recruiter relationships.
 - `retro_prompt_state`: post-interview prompt state with snooze, dismiss, and completion timestamps.
 - `interview_client_operations`: idempotency records keyed by `(operation_id, action)`.
+- `stage_sessions`: durable stage-owned recording lifecycle with a single active-session invariant.
+- `stage_session_contexts` and `stage_session_artifacts`: redacted context snapshots and transcript/summary/review status for each session.
+- `stage_reviews`, `stage_artifact_jobs`, and `stage_workspace_operations`: review selection, leased asynchronous artifact work, and replay-safe workspace operations.
 
 `meetings` can link by `interview_event_id`, `interview_stage_id`, and `application_id`. Starting a recording from a selected stage passes all three ids where available. Stage-level links are preferred; application-level links are only treated as stage recordings for single-stage applications.
 
@@ -29,6 +32,7 @@ The domain boundary is:
 
 - `InterviewRepository`: SQLite persistence, idempotency, application/stage creation, legacy mapping, meeting linkage, and status/archive synchronization.
 - `InterviewService`: validation, domain errors, deterministic parsing, AI-assisted intake, task model policy, readiness scoring for legacy support, retro prompt decisions, and AI retro generation.
+- `StageWorkspaceService`: stage-owned preparation, consent/readiness, recording lifecycle, artifact scheduling, review selection, next actions, export, deletion, and revision/operation boundaries.
 - `parser.ts`: deterministic paste parser for HH/Getmatch/Telegram/calendar text. It strips HTML/script content, bounds input size, extracts source/company/role/URLs/requirements/compensation/questions/stage data, and stores sanitized raw text as fallback.
 - `TaskModelPolicy`: resolves the model for agent, scraping, and vacancy-intake tasks from task-specific settings or existing provider defaults.
 - `ipcHandlers.ts`: thin IPC bridge returning `InterviewIpcResult<T>`.
@@ -46,6 +50,7 @@ Calendar support uses the existing Google Calendar manager plus `MacCalendarMana
 - top search assistant bridge that searches vacancies, stages, and meetings, parses pasted recruiter/vacancy/calendar text, reviews editable proposals, and applies only from the explicit proposal button;
 - right detail pane with `Vacancy`, `Stages`, `Prep`, `Retro`, and `Questions` tabs;
 - stage cards that show schedule, status, meeting URL, and recordings scoped to that exact stage;
+- `src/features/interviews/StageWorkspacePanel.tsx` is the stage-owned workspace surface. Recording entrypoints select this workspace first, then require context/readiness approval before capture;
 - local draft recovery for vacancy, prep, and retro editors under `openoffer:interviews:draft:*`, cleared after successful save.
 
 The assistant flow only auto-attaches a stage proposal when the backend match is strong or the local vacancy match is unambiguous. Weak, stale, missing, or ambiguous matches require an explicit vacancy selection before applying.
@@ -63,3 +68,4 @@ Targeted coverage:
 - `InterviewTaxonomy.test.mjs`: Obsidian workflow mapping.
 - `MacCalendarManagerContract.test.mjs`: local macOS calendar bridge contract.
 - `tests/e2e/interview-command-center.spec.ts`: top assistant proposal review, no accidental Enter apply, active application center list, add-stage-to-existing-vacancy behavior, old agent/search surface removal, per-stage recording counts, calendar week navigation, compact raw-source rendering, prep/questions/retro flow.
+- `StageWorkspaceService.test.mjs`, `StageWorkspaceDogfood.test.mjs`, `StageWorkspaceRecovery.test.mjs`, and `StageWorkspaceInvalidation.test.mjs`: lifecycle, multi-stage isolation, migration recovery, stale revision, deletion, and operation replay coverage.
